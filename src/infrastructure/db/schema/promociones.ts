@@ -18,6 +18,7 @@ import {
 import { tenants } from "./tenants";
 import { users } from "./users";
 import { geometryPoint4326 } from "./geo";
+import { tenantIsolationPolicy } from "./rls";
 
 export const promociones = pgTable(
   "promociones",
@@ -64,8 +65,11 @@ export const promociones = pgTable(
       table.tenantId,
       table.constructionStatus,
     ),
+    index("promociones_location_gist_idx")
+      .using("gist", table.location),
+    tenantIsolationPolicy("promociones"),
   ],
-);
+).enableRLS();
 
 export type Promocion = typeof promociones.$inferSelect;
 export type NewPromocion = typeof promociones.$inferInsert;

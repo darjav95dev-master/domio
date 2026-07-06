@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { roleEnum } from "./enums";
 import { tenants } from "./tenants";
+import { tenantIsolationPolicy } from "./rls";
 
 export const users = pgTable(
   "users",
@@ -30,8 +31,9 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex("users_tenant_email_idx").on(table.tenantId, table.email),
+    tenantIsolationPolicy("users"),
   ],
-);
+).enableRLS();
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

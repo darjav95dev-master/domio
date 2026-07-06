@@ -8,6 +8,7 @@ import {
 import { tenants } from "./tenants";
 import { leads } from "./leads";
 import { users } from "./users";
+import { tenantIsolationPolicy } from "./rls";
 
 export const leadNotes = pgTable(
   "lead_notes",
@@ -33,8 +34,9 @@ export const leadNotes = pgTable(
       table.leadId,
       table.createdAt,
     ),
+    tenantIsolationPolicy("lead_notes"),
   ],
-);
+).enableRLS();
 
 export type LeadNote = typeof leadNotes.$inferSelect;
 export type NewLeadNote = typeof leadNotes.$inferInsert;

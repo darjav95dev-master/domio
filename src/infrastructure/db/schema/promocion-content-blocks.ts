@@ -10,6 +10,7 @@ import { contentBlockTypeEnum } from "./enums";
 import { tenants } from "./tenants";
 import { promociones } from "./promociones";
 import { users } from "./users";
+import { tenantIsolationPolicy } from "./rls";
 
 export const promocionContentBlocks = pgTable(
   "promocion_content_blocks",
@@ -36,8 +37,9 @@ export const promocionContentBlocks = pgTable(
       table.tenantId,
       table.promocionId,
     ),
+    tenantIsolationPolicy("promocion_content_blocks"),
   ],
-);
+).enableRLS();
 
 export type PromocionContentBlock =
   typeof promocionContentBlocks.$inferSelect;

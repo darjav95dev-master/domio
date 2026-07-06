@@ -8,9 +8,10 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { mediaAssetKindEnum, mediaAssetOwnerTypeEnum } from "./enums";
 import { tenants } from "./tenants";
+import { tenantIsolationPolicy } from "./rls";
 
 export const mediaAssets = pgTable(
   "media_assets",
@@ -40,9 +41,10 @@ export const mediaAssets = pgTable(
     ),
     uniqueIndex("media_assets_tenant_owner_cover_idx")
       .on(table.tenantId, table.ownerId)
-      .where(eq(table.isCover, true)),
+      .where(sql`${table.isCover} = true`),
+    tenantIsolationPolicy("media_assets"),
   ],
-);
+).enableRLS();
 
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type NewMediaAsset = typeof mediaAssets.$inferInsert;

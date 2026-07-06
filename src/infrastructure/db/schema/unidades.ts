@@ -8,6 +8,7 @@ import {
 import { unitStatusEnum } from "./enums";
 import { tenants } from "./tenants";
 import { tipologias } from "./tipologias";
+import { tenantIsolationPolicy } from "./rls";
 
 export const unidades = pgTable(
   "unidades",
@@ -28,8 +29,11 @@ export const unidades = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("unidades_tenant_tipologia_idx").on(table.tenantId, table.tipologiaId)],
-);
+  (table) => [
+    index("unidades_tenant_tipologia_idx").on(table.tenantId, table.tipologiaId),
+    tenantIsolationPolicy("unidades"),
+  ],
+).enableRLS();
 
 export type Unidad = typeof unidades.$inferSelect;
 export type NewUnidad = typeof unidades.$inferInsert;

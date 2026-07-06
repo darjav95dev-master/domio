@@ -5,6 +5,7 @@ export * from "./tipologias";
 export * from "./unidades";
 export * from "./media-assets";
 export * from "./promocion-content-blocks";
+export * from "./promocion-history";
 export * from "./leads";
 export * from "./lead-read-marks";
 export * from "./lead-notes";

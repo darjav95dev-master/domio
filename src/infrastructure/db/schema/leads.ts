@@ -10,6 +10,7 @@ import { tenants } from "./tenants";
 import { promociones } from "./promociones";
 import { tipologias } from "./tipologias";
 import { users } from "./users";
+import { tenantIsolationPolicy } from "./rls";
 
 export const leads = pgTable(
   "leads",
@@ -49,8 +50,9 @@ export const leads = pgTable(
       table.assignedAgentId,
       table.status,
     ),
+    tenantIsolationPolicy("leads"),
   ],
-);
+).enableRLS();
 
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;

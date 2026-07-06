@@ -11,6 +11,7 @@ import { energyCertEnum } from "./enums";
 import { tenants } from "./tenants";
 import { promociones } from "./promociones";
 import { mediaAssets } from "./media-assets";
+import { tenantIsolationPolicy } from "./rls";
 
 export const tipologias = pgTable(
   "tipologias",
@@ -45,8 +46,11 @@ export const tipologias = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("tipologias_tenant_promocion_idx").on(table.tenantId, table.promocionId)],
-);
+  (table) => [
+    index("tipologias_tenant_promocion_idx").on(table.tenantId, table.promocionId),
+    tenantIsolationPolicy("tipologias"),
+  ],
+).enableRLS();
 
 export type Tipologia = typeof tipologias.$inferSelect;
 export type NewTipologia = typeof tipologias.$inferInsert;
