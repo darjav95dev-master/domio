@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "feature/*"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test:run
+
+      - name: Build
+        run: pnpm build
+
+      - name: CI grep check #1 — no SET without LOCAL outside infrastructure
+        run: |
+          matches=$(git ls-files '*.ts' | grep -v '^src/infrastructure/' | while read -r file; do
+            awk '{sub(/\/\/.*/,""); if ($0 ~ /SET / && $0 !~ /SET LOCAL/) print FILENAME":"NR":"$0}' "$file"
+          done)
+          if [ -n "$matches" ]; then
+            echo "Found SET without LOCAL outside src/infrastructure/:"
+            echo "$matches"
+            exit 1
+          fi
+
+      - name: CI grep check #2 — no raw db queries outside repositories/tenant
+        run: |
+          matches=$(git ls-files '*.ts' | grep -vE '^src/infrastructure/db/repositories/' | grep -vE '^src/infrastructure/tenant/' | while read -r file; do
+            awk '{sub(/\/\/.*/,""); if ($0 ~ /db\.(select|insert|update|delete)/) print FILENAME":"NR":"$0}' "$file"
+          done)
+          if [ -n "$matches" ]; then
+            echo "Found raw db queries outside allowed paths:"
+            echo "$matches"
+            exit 1
+          fi

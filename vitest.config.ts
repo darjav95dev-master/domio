@@ -32,6 +32,7 @@ export default defineConfig({
         "app/layout.tsx",
         "app/(public)/page.tsx",
         "app/(auth)/layout.tsx",
+        "src/infrastructure/db/schema/**",
       ],
       thresholds: {
         statements: 80,
