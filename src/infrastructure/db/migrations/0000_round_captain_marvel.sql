@@ -1,3 +1,20 @@
+CREATE TYPE "public"."arsop_request_type" AS ENUM('EXPORT', 'DELETE');--> statement-breakpoint
+CREATE TYPE "public"."construction_status" AS ENUM('ON_PLAN', 'IN_CONSTRUCTION', 'READY');--> statement-breakpoint
+CREATE TYPE "public"."content_block_type" AS ENUM('DESCRIPCION_GENERAL', 'MEMORIA_CALIDADES', 'ZONAS_COMUNES', 'UBICACION_SERVICIOS', 'PLAZOS_GARANTIAS');--> statement-breakpoint
+CREATE TYPE "public"."email_status" AS ENUM('PENDING', 'SENT', 'FAILED');--> statement-breakpoint
+CREATE TYPE "public"."energy_cert" AS ENUM('A', 'B', 'C', 'D', 'E', 'F', 'G', 'EN_TRAMITE');--> statement-breakpoint
+CREATE TYPE "public"."lead_channel" AS ENUM('FORM', 'WHATSAPP');--> statement-breakpoint
+CREATE TYPE "public"."lead_source" AS ENUM('commercial', 'institutional');--> statement-breakpoint
+CREATE TYPE "public"."lead_status" AS ENUM('NEW', 'CONTACTED', 'IN_NEGOTIATION', 'WON', 'LOST');--> statement-breakpoint
+CREATE TYPE "public"."map_privacy_mode" AS ENUM('EXACT', 'AREA');--> statement-breakpoint
+CREATE TYPE "public"."media_asset_kind" AS ENUM('IMAGE_GALLERY', 'PLAN', 'DOCUMENT');--> statement-breakpoint
+CREATE TYPE "public"."media_asset_owner_type" AS ENUM('PROMOCION', 'TIPOLOGIA', 'CONTENT');--> statement-breakpoint
+CREATE TYPE "public"."operation_type" AS ENUM('SALE', 'RENT', 'SALE_AND_RENT');--> statement-breakpoint
+CREATE TYPE "public"."promocion_kind" AS ENUM('portfolio', 'external');--> statement-breakpoint
+CREATE TYPE "public"."promocion_status" AS ENUM('DRAFT', 'PUBLISHED', 'RESERVED', 'SOLD', 'RENTED', 'WITHDRAWN');--> statement-breakpoint
+CREATE TYPE "public"."property_type" AS ENUM('piso', 'ático', 'casa', 'chalet', 'dúplex', 'estudio', 'local', 'oficina', 'nave', 'garaje', 'trastero', 'terreno');--> statement-breakpoint
+CREATE TYPE "public"."role" AS ENUM('ADMIN', 'OPERATOR', 'AGENT');--> statement-breakpoint
+CREATE TYPE "public"."unit_status" AS ENUM('AVAILABLE', 'RESERVED', 'SOLD', 'RENTED');--> statement-breakpoint
 CREATE TABLE "tenants" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"slug" text NOT NULL,
@@ -305,6 +322,7 @@ CREATE INDEX "tipologias_tenant_promocion_idx" ON "tipologias" USING btree ("ten
 CREATE INDEX "unidades_tenant_tipologia_idx" ON "unidades" USING btree ("tenant_id","tipologia_id");--> statement-breakpoint
 CREATE INDEX "media_assets_tenant_owner_idx" ON "media_assets" USING btree ("tenant_id","owner_type","owner_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "media_assets_tenant_owner_cover_idx" ON "media_assets" USING btree ("tenant_id","owner_id") WHERE "media_assets"."is_cover" = true;--> statement-breakpoint
+CREATE UNIQUE INDEX "media_assets_gallery_sort_idx" ON "media_assets" USING btree ("tenant_id","owner_id","sort_order") WHERE "media_assets"."kind" = 'IMAGE_GALLERY';--> statement-breakpoint
 CREATE INDEX "promocion_content_blocks_tenant_promocion_idx" ON "promocion_content_blocks" USING btree ("tenant_id","promocion_id");--> statement-breakpoint
 CREATE INDEX "promocion_history_tenant_promocion_idx" ON "promocion_history" USING btree ("tenant_id","promocion_id");--> statement-breakpoint
 CREATE INDEX "leads_tenant_status_idx" ON "leads" USING btree ("tenant_id","status");--> statement-breakpoint

@@ -1,7 +1,7 @@
 export const USER_ROLES = ["ADMIN", "OPERATOR", "AGENT"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
-export const PROMOCION_KINDS = ["portfolio", "institutional"] as const;
+export const PROMOCION_KINDS = ["portfolio", "external"] as const;
 export type PromocionKind = (typeof PROMOCION_KINDS)[number];
 
 export const PROMOCION_STATUSES = [
@@ -49,9 +49,9 @@ export type UnitStatus = (typeof UNIT_STATUSES)[number];
 export const LEAD_STATUSES = [
   "NEW",
   "CONTACTED",
-  "QUALIFIED",
-  "CONVERTED",
-  "CLOSED",
+  "IN_NEGOTIATION",
+  "WON",
+  "LOST",
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 

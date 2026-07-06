@@ -42,6 +42,9 @@ export const mediaAssets = pgTable(
     uniqueIndex("media_assets_tenant_owner_cover_idx")
       .on(table.tenantId, table.ownerId)
       .where(sql`${table.isCover} = true`),
+    uniqueIndex("media_assets_gallery_sort_idx")
+      .on(table.tenantId, table.ownerId, table.sortOrder)
+      .where(sql`${table.kind} = 'IMAGE_GALLERY'`),
     tenantIsolationPolicy("media_assets"),
   ],
 ).enableRLS();

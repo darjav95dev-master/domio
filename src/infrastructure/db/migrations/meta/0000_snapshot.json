@@ -1,5 +1,5 @@
 {
-  "id": "91f7f9f5-ec6a-41e6-8f9f-b0e2886a7f4b",
+  "id": "f51af6bc-bddd-4d8d-a0a7-458ae47bd7a1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -934,6 +934,34 @@
           ],
           "isUnique": true,
           "where": "\"media_assets\".\"is_cover\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "media_assets_gallery_sort_idx": {
+          "name": "media_assets_gallery_sort_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sort_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"media_assets\".\"kind\" = 'IMAGE_GALLERY'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2652,7 +2680,178 @@
       "isRLSEnabled": true
     }
   },
-  "enums": {},
+  "enums": {
+    "public.arsop_request_type": {
+      "name": "arsop_request_type",
+      "schema": "public",
+      "values": [
+        "EXPORT",
+        "DELETE"
+      ]
+    },
+    "public.construction_status": {
+      "name": "construction_status",
+      "schema": "public",
+      "values": [
+        "ON_PLAN",
+        "IN_CONSTRUCTION",
+        "READY"
+      ]
+    },
+    "public.content_block_type": {
+      "name": "content_block_type",
+      "schema": "public",
+      "values": [
+        "DESCRIPCION_GENERAL",
+        "MEMORIA_CALIDADES",
+        "ZONAS_COMUNES",
+        "UBICACION_SERVICIOS",
+        "PLAZOS_GARANTIAS"
+      ]
+    },
+    "public.email_status": {
+      "name": "email_status",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "SENT",
+        "FAILED"
+      ]
+    },
+    "public.energy_cert": {
+      "name": "energy_cert",
+      "schema": "public",
+      "values": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "EN_TRAMITE"
+      ]
+    },
+    "public.lead_channel": {
+      "name": "lead_channel",
+      "schema": "public",
+      "values": [
+        "FORM",
+        "WHATSAPP"
+      ]
+    },
+    "public.lead_source": {
+      "name": "lead_source",
+      "schema": "public",
+      "values": [
+        "commercial",
+        "institutional"
+      ]
+    },
+    "public.lead_status": {
+      "name": "lead_status",
+      "schema": "public",
+      "values": [
+        "NEW",
+        "CONTACTED",
+        "IN_NEGOTIATION",
+        "WON",
+        "LOST"
+      ]
+    },
+    "public.map_privacy_mode": {
+      "name": "map_privacy_mode",
+      "schema": "public",
+      "values": [
+        "EXACT",
+        "AREA"
+      ]
+    },
+    "public.media_asset_kind": {
+      "name": "media_asset_kind",
+      "schema": "public",
+      "values": [
+        "IMAGE_GALLERY",
+        "PLAN",
+        "DOCUMENT"
+      ]
+    },
+    "public.media_asset_owner_type": {
+      "name": "media_asset_owner_type",
+      "schema": "public",
+      "values": [
+        "PROMOCION",
+        "TIPOLOGIA",
+        "CONTENT"
+      ]
+    },
+    "public.operation_type": {
+      "name": "operation_type",
+      "schema": "public",
+      "values": [
+        "SALE",
+        "RENT",
+        "SALE_AND_RENT"
+      ]
+    },
+    "public.promocion_kind": {
+      "name": "promocion_kind",
+      "schema": "public",
+      "values": [
+        "portfolio",
+        "external"
+      ]
+    },
+    "public.promocion_status": {
+      "name": "promocion_status",
+      "schema": "public",
+      "values": [
+        "DRAFT",
+        "PUBLISHED",
+        "RESERVED",
+        "SOLD",
+        "RENTED",
+        "WITHDRAWN"
+      ]
+    },
+    "public.property_type": {
+      "name": "property_type",
+      "schema": "public",
+      "values": [
+        "piso",
+        "ático",
+        "casa",
+        "chalet",
+        "dúplex",
+        "estudio",
+        "local",
+        "oficina",
+        "nave",
+        "garaje",
+        "trastero",
+        "terreno"
+      ]
+    },
+    "public.role": {
+      "name": "role",
+      "schema": "public",
+      "values": [
+        "ADMIN",
+        "OPERATOR",
+        "AGENT"
+      ]
+    },
+    "public.unit_status": {
+      "name": "unit_status",
+      "schema": "public",
+      "values": [
+        "AVAILABLE",
+        "RESERVED",
+        "SOLD",
+        "RENTED"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

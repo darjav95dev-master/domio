@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { emailStatusEnum } from "./enums";
 
+// Infrastructure table — no tenant_id, no RLS by design. See architecture.md §6.5 note.
 export const emailQueue = pgTable(
   "email_queue",
   {
