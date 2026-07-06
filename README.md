@@ -392,8 +392,3 @@ Ninguna de las dos está incluida en este repositorio; ambas se
 instalan como prerrequisito.
 
 ---
-
-*Spec-Driven Development con Spec Kit es agente-agnóstico. Esta
-plantilla está optimizada para Claude Code, pero los principios y la
-estructura de subagentes pueden trasladarse a otros agentes (Cursor,
-opencode, Codex) con adaptaciones menores.*
