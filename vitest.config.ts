@@ -4,8 +4,12 @@ import path from "node:path";
 export default defineConfig({
   resolve: {
     alias: {
-      "@/": path.resolve(__dirname, "./src/"),
+      "@": path.resolve(".", "src"),
     },
+  },
+  esbuild: {
+    jsx: "automatic",
+    jsxImportSource: "react",
   },
   test: {
     pool: "forks",
@@ -15,7 +19,10 @@ export default defineConfig({
       },
     },
     fileParallelism: false,
-    include: ["tests/**/*.test.ts"],
+    environment: "jsdom",
+    include: ["tests/**/*.test.{ts,tsx}"],
+    globals: true,
+    setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",
       include: ["app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx"],
