@@ -37,8 +37,8 @@ lenguaje natural de 200-400 palabras que:
    técnicas que aplican.
 4. **`.specify/memory/roadmap.md`** — para localizar la feature
    solicitada y sus dependencias.
-5. **`.specify/specs/`** — para verificar qué features anteriores ya
-   están implementadas (carpetas existentes).
+5. **`specs/`** — directorio raíz donde Spec Kit crea las features;
+   para verificar qué features anteriores ya están implementadas.
 
 ## Tu output
 

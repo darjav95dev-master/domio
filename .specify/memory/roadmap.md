@@ -13,9 +13,9 @@
 | F002 | db-schema-and-migrations | M | F001 | Schema Drizzle completo: tablas, RLS, índices compuestos, migraciones |
 | F003 | visual-system-implementation | M | F001 | Tokens CSS Tailwind v4, fuentes, primitives base (Button, Input, Skeleton, Toast, MediaImage) |
 | F004 | tenant-context-and-isolation | M | F002 | TenantContext (Public/Authenticated/ApiKey), repos context-aware con SET LOCAL, tests de aislamiento |
-| F005 | auth-and-session | M | F002, F004 | Auth.js v5, credentials provider, login page, middleware de protección, JWT con tenant_id+role |
+| F005 | auth-and-session | M | F002, F004, F007 | Auth.js v5, credentials provider, login page, middleware de protección, JWT con tenant_id+role, flujo de recuperación de contraseña |
 | F006 | media-service-r2 | M | F001 | Cloudflare R2 client, upload/delete/transform, signed URLs, componente MediaImage |
-| F007 | email-queue-and-resend | S | F001 | Tabla email_queue, cliente Resend, worker de procesamiento, templates de notificación |
+| F007 | email-queue-and-resend | S | F001, F002 | Tabla email_queue, cliente Resend, worker de procesamiento, templates de notificación |
 | F008 | rate-limiting-and-observability | S | F001 | Upstash Redis/Vercel KV para rate limiting, Sentry config (client + serverless), tenant_id en eventos |
 | F009 | domain-constants-and-seed | S | F002 | Sets cerrados (PROPERTY_TYPES, AMENITIES, estados), zod schemas, seed data (tenant, admin, datos demo) |
 | F010 | backoffice-shell | M | F003, F005, F009 | Layout panel (sidebar 240px slate), auth guard, badge leads no leídos, routing por rol |
@@ -24,15 +24,15 @@
 | F013 | media-gallery-backoffice | M | F006, F011 | Upload server-side a R2, reordenar galería (drag & drop), marcar portada, alt_text obligatorio, categoría planos separada |
 | F014 | leads-management | M | F010, F011 | Bandeja de leads: CRUD, máquina de estados (NEW→WON/LOST), marcas leído/no-leído por usuario, notas internas, scope por agente vía RLS |
 | F015 | rgpd-compliance | M | F014 | Registro de consentimiento (consent_records), ejercicio de derechos ARSOP (export CSV + borrado en cascada), trazabilidad en arsop_requests |
-| F016 | team-and-api-keys | M | F005, F010 | Gestión de equipo (CRUD usuarios, roles, invitación por email, soft-delete), gestión de API keys (creación, revocación, hash, rate limit) |
+| F016 | team-and-api-keys | M | F005, F007, F010 | Gestión de equipo (CRUD usuarios, roles, invitación por email, soft-delete), gestión de API keys (creación, revocación, hash, rate limit) |
 | F017 | global-content-editor | M | F010 | Editor de contenidos globales (home, sobre, equipo, legales), configuración de contacto global, historial versionado con revert |
 | F018 | public-shared-chrome | M | F003, F009 | Nav (fixed, over-hero/glass on scroll), Footer (slate 4-col), skip-to-content, layout público base |
 | F019 | home-publica | M | F018, F011, F017 | Home completa SSR con 9 bloques: hero+TrustCard, cómo-trabajamos grid, sobre-Domio compare, portafolio destacado, métricas+testimonios, CTA band, FAQ accordion |
 | F020 | portafolio-catalogo | M | F018, F011 | Catálogo público SSR: filter bar, grid 3-col de PropertyCards, cursor pagination, empty state compuesto, URL compartible con filtros |
 | F021 | detalle-inmueble-core | M | F018, F011, F012, F013 | Ficha pública SSR/ISR: photo hero, infobar 4-col, renderizado de bloques editoriales, tabla de tipologías, mapa con modo de privacidad (EXACT/AREA), SEO meta + datos estructurados RealEstateListing |
-| F022 | detalle-inmueble-engagement | M | F021, F014 | Formulario de contacto (zod client+server), botón WhatsApp con mensaje predefinido, botón compartir (OG), inmuebles relacionados (regla: misma zona+tipo+precio ±20%) |
+| F022 | detalle-inmueble-engagement | M | F007, F008, F014, F017, F021 | Formulario de contacto (zod client+server), botón WhatsApp con mensaje predefinido, botón compartir (OG), inmuebles relacionados (regla: misma zona+tipo+precio ±20%) |
 | F023 | contacto-y-sobre | S | F018, F017 | Páginas /contacto (formulario + quick-band + mapa) y /sobre (contenido desde bloques globales) |
-| F024 | api-publica-v1 | M | F004, F011, F015 | GET /api/v1/promociones (filtro obligatorio kind=portfolio, cursor pagination) + POST /api/v1/leads/institutional (consentimiento RGPD, email queue), auth por API key, rate limiting, serialización que respeta modo de privacidad |
+| F024 | api-publica-v1 | M | F004, F007, F008, F011, F015 | GET /api/v1/promociones (filtro obligatorio kind=portfolio, cursor pagination) + POST /api/v1/leads/institutional (consentimiento RGPD, email queue), auth por API key, rate limiting, serialización que respeta modo de privacidad |
 | F025 | seo-sitemap-meta | M | F019, F020, F021 | Sitemap XML autogenerado (solo PUBLISHED), robots.txt diferenciado (público vs panel), canonical URLs, Open Graph + Twitter Cards, meta tags con fallback determinista |
 | F026 | e2e-tests | M | F019–F025 | Playwright E2E con Page Object Model para los 5 recorridos: visitante público, editor de catálogo, agente comercial, consumidor API, administrador |
 | F027 | contract-tests | M | F024 | Tests de contrato para /api/v1/*, schemas zod versionados, espejo del consumidor, OpenAPI autogenerado (interno), test de no-divergencia bloqueante en CI |
@@ -59,7 +59,7 @@
 **Tamaño**: M (3–5 días)
 **Dependencias**: F001
 
-**Descripción**: Schema Drizzle completo con todas las tablas del MVP según architecture.md §6: `tenants`, `users`, `api_keys`, `promociones` (con location PostGIS, map_privacy_mode, location_approx, draft_payload, seo_title, seo_description), `tipologias` (con amenities JSONB, energy_cert, plan_asset_id), `unidades`, `promocion_content_blocks`, `media_assets`, `leads`, `lead_read_marks`, `lead_notes`, `lead_history`, `consent_records`, `arsop_requests`, `content_blocks`, `contact_config`, `content_history`, `email_queue`. RLS activado en toda tabla de dominio con políticas que filtran por `app.current_tenant_id`. Índices compuestos con `tenant_id` como primera columna (según §6.6). Índice GIST espacial en `promociones.location`. Constraint parcial UNIQUE en `media_assets.is_cover`. Migraciones con `drizzle-kit`.
+**Descripción**: Schema Drizzle completo con todas las tablas del MVP según architecture.md §6: `tenants`, `users`, `api_keys`, `promociones` (con location PostGIS, map_privacy_mode, location_approx, draft_payload, seo_title, seo_description, **construction_status** — enum `ON_PLAN`/`IN_CONSTRUCTION`/`READY` NULL, aplicable principalmente a `kind='portfolio'`), `tipologias` (con amenities JSONB, energy_cert, plan_asset_id), `unidades`, `promocion_content_blocks`, `media_assets`, `leads`, `lead_read_marks`, `lead_notes`, `lead_history`, `consent_records`, `arsop_requests`, `content_blocks`, `contact_config`, `content_history`, `email_queue`. RLS activado en toda tabla de dominio con políticas que filtran por `app.current_tenant_id`. Índices compuestos con `tenant_id` como primera columna (según §6.6). Índice adicional `(tenant_id, construction_status)` en `promociones` para filtro de catálogo público. Índice GIST espacial en `promociones.location`. Constraint parcial UNIQUE en `media_assets.is_cover`. Migraciones con `drizzle-kit`.
 
 **Criterio de salida**: `pnpm db:migrate` ejecuta sin errores y crea todas las tablas, índices y políticas RLS en la rama de desarrollo de Neon. Tipos TypeScript derivados del schema compilan sin errores.
 
@@ -77,6 +77,8 @@
 - **Skeleton** — `role="status"`, `aria-hidden="true"`, shimmer animado con gradient parchment, reduced-motion estático (§17).
 - **Toast** — `role="alert"`, `aria-live="polite"`, variantes success/error/warning/info.
 - **MediaImage** — wrapper sobre `next/image` con fallback robusto (`linear-gradient(135deg, ink-2, ink)`), alt_text obligatorio, transformaciones R2.
+
+Además, instalar el set de iconos funcionales: `@phosphor-icons/react` (regular weight, 1.5px stroke) según design.md §14. Tamaños canónicos: 20×20 (nav), 16×16 (chips e inline), 12×12 (meta). Los iconos decorativos junto a texto llevan `aria-hidden="true"`; los iconos como único control llevan `aria-label`.
 
 Sin esta feature, toda feature de UI posterior reinventa tokens y el diseño deriva. Toda feature de UI posterior **depende** de F003.
 
@@ -100,11 +102,13 @@ Sin esta feature, toda feature de UI posterior reinventa tokens y el diseño der
 ### F005 · auth-and-session
 
 **Tamaño**: M (3–5 días)
-**Dependencias**: F002, F004
+**Dependencias**: F002, F004, F007
 
 **Descripción**: Configurar Auth.js v5 con credentials provider (email + password). JWT con `tenant_id`, `user_id`, `role` embebidos. Página de login (`/panel/login`) con diseño editorial según design.md §13.5. Middleware de autorización: todas las rutas bajo `app/(auth)/` requieren sesión válida; ruteo condicional por rol. Sesión con expiración 2h + renovación deslizante. Cierre de sesión invalida JWT. Protección CSRF. Middleware de backoffice inyecta `X-Robots-Tag: noindex`.
 
-**Criterio de salida**: Login funcional con credenciales contra tabla `users`, sesión JWT con claims correctos, rutas protegidas redirigen a login, rutas por rol deniegan acceso con 403.
+**Flujo de recuperación de contraseña**: rutas `/panel/forgot-password` (formulario con email) y `/panel/reset-password?token=…` (formulario con nueva contraseña). Al solicitar recuperación, se genera un token firmado con TTL corto (30 minutos) y se encola un email vía `email_queue` (template "recuperación de contraseña") con enlace de reset. El token se invalida tras un uso o al expirar. Rate limiting por email + IP para prevenir enumeración. Validación de fortaleza de contraseña según constitution.md §5 (12 chars mínimo, mayúscula + minúscula + número + carácter especial).
+
+**Criterio de salida**: Login funcional con credenciales contra tabla `users`, sesión JWT con claims correctos, rutas protegidas redirigen a login, rutas por rol deniegan acceso con 403. Flujo de recuperación de contraseña end-to-end funcional (solicitud → email → reset → login con nueva contraseña).
 
 ---
 
@@ -122,9 +126,9 @@ Sin esta feature, toda feature de UI posterior reinventa tokens y el diseño der
 ### F007 · email-queue-and-resend
 
 **Tamaño**: S (1–2 días)
-**Dependencias**: F001
+**Dependencias**: F001, F002
 
-**Descripción**: Cliente Resend para envío transaccional de emails. Tabla `email_queue` con estados PENDING/SENT/FAILED y contador de reintentos. Worker de procesamiento (`pnpm worker:emails` en desarrollo, función serverless con cron trigger en Vercel en producción) que procesa la cola con backoff exponencial (máx 5 intentos). Templates de notificación: lead nuevo asignado a agente, confirmación de contacto a lead, invitación a nuevo miembro del equipo.
+**Descripción**: Cliente Resend para envío transaccional de emails. Tabla `email_queue` con estados PENDING/SENT/FAILED y contador de reintentos. Worker de procesamiento (`pnpm worker:emails` en desarrollo, función serverless con cron trigger en Vercel en producción) que procesa la cola con backoff exponencial (máx 5 intentos). Templates de notificación: lead nuevo asignado a agente, confirmación de contacto a lead, invitación a nuevo miembro del equipo, recuperación de contraseña.
 
 **Regla crítica**: El servicio de creación de lead **nunca** invoca a Resend directamente — siempre encola en `email_queue` en la misma transacción. Si Resend está caído, el lead se persiste igualmente (§6.3 product.md, §7.13 architecture.md).
 
@@ -148,7 +152,7 @@ Sin esta feature, toda feature de UI posterior reinventa tokens y el diseño der
 **Tamaño**: S (1–2 días)
 **Dependencias**: F002
 
-**Descripción**: Constantes centralizadas en `src/shared/constants/`: `PROPERTY_TYPES` (piso, ático, casa, chalet, dúplex, estudio, local, oficina, nave, garaje, trastero, terreno), `AMENITIES` (ascensor, terraza, balcón, piscina, garaje, trastero, calefacción, aire_acondicionado, amueblado, mascotas_permitidas, accesible, zonas_verdes, seguridad), enums para `PromotionKind`, `PromotionStatus`, `OperationType`, `LeadStatus`, `LeadSource`, `MapPrivacyMode`, `EnergyCert`, `BlockType`, `MediaKind`, `UserRole`. Zod schemas de dominio que referencian estos sets. Script `db:seed` que inserta: 1 tenant por defecto, 1 admin, 2 agentes, 2 operadores, 8 promociones demo (4 portfolio + 4 external, con tipologías, unidades, bloques editoriales y media_assets de placeholder), 5 leads demo, configuración de contacto inicial.
+**Descripción**: Constantes centralizadas en `src/shared/constants/`: `PROPERTY_TYPES` (piso, ático, casa, chalet, dúplex, estudio, local, oficina, nave, garaje, trastero, terreno), `AMENITIES` (ascensor, terraza, balcón, piscina, garaje, trastero, calefacción, aire_acondicionado, amueblado, mascotas_permitidas, accesible, zonas_verdes, seguridad), enums para `PromotionKind` (`portfolio`/`external`), `PromotionStatus` (`DRAFT`/`PUBLISHED`/`RESERVED`/`SOLD`/`RENTED`/`WITHDRAWN`), **`OperationType` (`SALE`/`RENT`/`SALE_AND_RENT`)**, **`ConstructionStatus` (`ON_PLAN`/`IN_CONSTRUCTION`/`READY`)**, `LeadStatus` (`NEW`/`CONTACTED`/`IN_NEGOTIATION`/`WON`/`LOST`), `LeadSource` (`commercial`/`institutional`), `LeadChannel` (`FORM`/`WHATSAPP`), `MapPrivacyMode` (`EXACT`/`AREA`), `EnergyCert` (`A`..`G`/`EN_TRAMITE`), `BlockType` (`DESCRIPCION_GENERAL`/`MEMORIA_CALIDADES`/`ZONAS_COMUNES`/`UBICACION_SERVICIOS`/`PLAZOS_GARANTIAS`), `MediaKind` (`IMAGE_GALLERY`/`PLAN`/`DOCUMENT`), `UserRole` (`ADMIN`/`OPERATOR`/`AGENT`). Zod schemas de dominio que referencian estos sets. Script `db:seed` que inserta: 1 tenant por defecto, 1 admin, 2 agentes, 2 operadores, 8 promociones demo (4 portfolio con `construction_status` variados + 4 external con `construction_status='READY'`, con tipologías, unidades, bloques editoriales y media_assets de placeholder), 5 leads demo, configuración de contacto inicial.
 
 **Criterio de salida**: Constantes y schemas compilan. `pnpm db:seed` puebla la BD de desarrollo con datos demo verificables.
 
@@ -161,6 +165,8 @@ Sin esta feature, toda feature de UI posterior reinventa tokens y el diseño der
 
 **Descripción**: Layout del backoffice en `app/(auth)/panel/layout.tsx`: sidebar fijo 240px con fondo slate (`bg.inverted`), items de navegación con estado activo (border-left terracota 3px), secciones: Dashboard, Catálogo, Leads, Equipo, Contenidos, API Keys, ARSOP. Auth guard que redirige a login si no hay sesión. Routing condicional por rol: AGENT no ve secciones de operador, OPERATOR no ve bandeja de leads. Badge de leads no leídos en el nav: endpoint `GET /api/internal/leads/unread-count` que consulta `lead_read_marks` filtrando por `user_id` de la sesión. Cliente refresca cada 30s con `aria-live="polite"`. Header superior con nombre del usuario y logout. `X-Robots-Tag: noindex` + `robots.txt` excluyendo `/panel/*`.
 
+**Dashboard (`panel/page.tsx`)**: página de bienvenida con enlaces rápidos a las secciones del backoffice, contador de leads no leídos (grande, en `numeral-lg`), lista de las 5 últimas promociones editadas por el usuario actual, atajos a las acciones más frecuentes ("Nueva promoción", "Ver bandeja"). **Sin gráficos, sin analítica de tráfico, sin métricas de conversión** (regla product.md §7 "no dashboard de estadísticas / analítica"). Es una landing operativa, no un tablero de business intelligence.
+
 **Design tokens**: Sidebar: `bg.inverted` (#2E2B27), texto `fg.on-inverted` (#FFFCF7), active: `border-l-[3px] border-accent`. Nav items: `type.body-sm weight-medium`.
 
 **Criterio de salida**: Backoffice renderiza sidebar + área de contenido con datos de sesión reales. Badge numérico refleja leads no leídos del agente autenticado. Cambios de rol muestran/ocultan secciones correctamente. Panel no es indexable (verificar headers + robots.txt).
@@ -172,7 +178,7 @@ Sin esta feature, toda feature de UI posterior reinventa tokens y el diseño der
 **Tamaño**: M (3–5 días)
 **Dependencias**: F010, F009
 
-**Descripción**: CRUD completo de promociones, tipologías y unidades desde el backoffice. `PromocionRepository` context-aware con todos los métodos de consulta y mutación. Slugs generados por función pura determinista desde `(tipo, operacion, municipio, dormitorios, id_corto)` — se calculan al publicar y **nunca** cambian en ediciones posteriores (regla §7.18 architecture.md). Autoguardado de borrador: cada 30s, `PATCH /api/internal/promociones/:id/draft` actualiza `draft_payload` (JSONB). Al publicar, el draft se aplica y se limpia. Al descartar, se pone a NULL. El autoguardado nunca modifica los campos publicados (regla §7.14). Histórico de cambios en `promocion_history` (inmutable: sin UPDATE/DELETE vía RLS). Listado con filtros (estado, kind, ubicación, agente). Asignación de agente por promoción. Validación zod en cliente y servidor (mismo schema). Revalidación incremental: al guardar, disparar `revalidateTag('promocion:{slug}')` y `revalidateTag('catalog')`.
+**Descripción**: CRUD completo de promociones, tipologías y unidades desde el backoffice. `PromocionRepository` context-aware con todos los métodos de consulta y mutación. Slugs generados por función pura determinista desde `(tipo, operacion, municipio, dormitorios, id_corto)` — se calculan al publicar y **nunca** cambian en ediciones posteriores (regla §7.18 architecture.md). Formulario de edición organizado en secciones: **Identidad** (nombre, tipo, operación, kind), **Estado comercial** (status, `construction_status` con opciones `ON_PLAN`/`IN_CONSTRUCTION`/`READY` — con warning suave no bloqueante si la etiqueta contradice el `entrega_estimada` del bloque `plazos_garantias`), **Ubicación** (isla, municipio, dirección, coordenadas, `map_privacy_mode`), **SEO** (campos opcionales `seo_title` y `seo_description`; si están vacíos, se aplica el fallback determinista descrito en F025), **Agente asignado**. Autoguardado de borrador: cada 30s, `PATCH /api/internal/promociones/:id/draft` actualiza `draft_payload` (JSONB). Al publicar, el draft se aplica y se limpia. Al descartar, se pone a NULL. El autoguardado nunca modifica los campos publicados (regla §7.14). Histórico de cambios en `promocion_history` (inmutable: sin UPDATE/DELETE vía RLS). Listado con filtros (estado, kind, ubicación, agente, `construction_status`). Validación zod en cliente y servidor (mismo schema). Revalidación incremental: al guardar, disparar `revalidateTag('promocion:{slug}')` y `revalidateTag('catalog')`.
 
 **Criterio de salida**: CRUD completo operativo desde backoffice. Slugs generados y persistentes. Autoguardado funcional (sobrevive a refresco). Cambios en backoffice disparan revalidación ISR en superficies públicas.
 
@@ -238,7 +244,7 @@ Trazabilidad completa en `arsop_requests` con timestamp, usuario que ejecutó, t
 ### F016 · team-and-api-keys
 
 **Tamaño**: M (3–5 días)
-**Dependencias**: F005, F010
+**Dependencias**: F005, F007, F010
 
 **Descripción**: Gestión del equipo (solo ADMIN):
 
@@ -321,7 +327,7 @@ Contenidos de bloques 1, 3, 5 (métricas+testimonios), 6 y 7 se leen de `content
 **Tamaño**: M (3–5 días)
 **Dependencias**: F018, F011
 
-**Descripción**: Página de catálogo (`app/(public)/portafolio/page.tsx`) renderizada SSR. Header band: H1 `display-md` "Portafolio" + lead 52ch. Filter bar (`bg.surface`, radius surface, sticky top on scroll): filtros por isla, municipio, tipo de inmueble, operación (SALE/RENT), rango de precio, dormitorios, baños, amenities (checkboxes), estado de obra (sobre plano / en construcción / entrega inmediata). `<form role="search">` con labels asociados. Active chips con bg `accent.subtle` + borde accent. Clear button. URL cambia con filtros — es compartible. Result count anunciado vía `aria-live="polite"`. Paginación **basada en cursor** (nunca offset, regla §7 architecture.md): cursor codifica `(sort_key, id)`. Ordenación: precio (asc/desc), fecha de publicación, relevancia. Grid de PropertyCards: 3-col ≥ xl, 2-col ≥ md, 1-col mobile. Empty state compuesto (eyebrow + heading-sm Fraunces + body-sm + botón secondary "Ver todo el portafolio"). Solo vista grid (sin vista lista — regla product.md §7).
+**Descripción**: Página de catálogo (`app/(public)/portafolio/page.tsx`) renderizada SSR. Header band: H1 `display-md` "Portafolio" + lead 52ch. Filter bar (`bg.surface`, radius surface, sticky top on scroll): filtros por isla, municipio, tipo de inmueble, operación (`SALE`/`RENT`/`SALE_AND_RENT`), rango de precio, dormitorios, baños, amenities (checkboxes), **estado de obra (mapea directamente a `construction_status`: `ON_PLAN` → "sobre plano", `IN_CONSTRUCTION` → "en construcción", `READY` → "entrega inmediata")**. `<form role="search">` con labels asociados. Active chips con bg `accent.subtle` + borde accent. Clear button. URL cambia con filtros — es compartible. Result count anunciado vía `aria-live="polite"`. Paginación **basada en cursor** (nunca offset, regla §7 architecture.md): cursor codifica `(sort_key, id)`. Ordenación: precio (asc/desc), fecha de publicación, relevancia. Grid de PropertyCards: 3-col ≥ xl, 2-col ≥ md, 1-col mobile. Empty state compuesto (eyebrow + heading-sm Fraunces + body-sm + botón secondary "Ver todo el portafolio"). Solo vista grid (sin vista lista — regla product.md §7).
 
 **Design tokens**: PropertyCard §7.3 (variants standard), FilterBar §7.4, empty state §8, layout §13.2.
 
@@ -340,7 +346,7 @@ Contenidos de bloques 1, 3, 5 (métricas+testimonios), 6 y 7 se leen de `content
 2. **Infobar** (4-col grid, `bg.surface`, border-right dividers): Precio/m², Superficie, Plazas/Dormitorios, Entrega/Año. Valores en `numeral-lg` (Fraunces italic 32px). Esta es la primera aparición de la firma numeral en la ficha.
 3. **Bloques editoriales** renderizados desde `promocion_content_blocks` según su `block_type`: descripción general (prosa con formato limitado), memoria de calidades (4×2 grid con iconos terracota + título Fraunces + descripción), zonas comunes (solo si `kind='portfolio'`), ubicación y servicios (lista de distancias), plazos y garantías (solo si `kind='portfolio'`, con timeline de 4 hitos: dot ink done / dot terracota next, línea conectora).
 4. **Tabla de tipologías**: columnas nombre, superficie, dormitorios, baños, precio, estado. Datos desde `tipologias`. Planos renderizados en columna separada con `MediaImage` (kind='PLAN').
-5. **Mapa**: MapLibre + OpenStreetMap tiles respetando `map_privacy_mode`: si `EXACT`, muestra punto en coordenadas reales; si `AREA`, muestra círculo aproximado (centroide del municipio desde `location_approx`). **Nunca** expone coordenadas exactas en HTML, JSON embebido ni schema.org si `map_privacy_mode='AREA'` (regla §7.3).
+5. **Mapa**: instalación de `maplibre-gl` como cliente de mapas + tiles de OpenStreetMap (sin dependencia comercial de Google Maps, según architecture.md §1 "Servicios NO"). El componente `MapPromocion` respeta `map_privacy_mode`: si `EXACT`, muestra punto en coordenadas reales; si `AREA`, muestra círculo aproximado (centroide del municipio desde `location_approx`). **Nunca** expone coordenadas exactas en HTML, JSON embebido ni schema.org si `map_privacy_mode='AREA'` (regla §7.3).
 6. **SEO**: `<title>` y `<meta description>` desde `seo_title`/`seo_description`, con fallback determinista: `{tipo} en {operacion} en {zona} — {n_dormitorios} dormitorios | Domio`. Datos estructurados `RealEstateListing` de schema.org generados **desde los bloques editoriales estructurados**, no desde texto libre. Open Graph y Twitter Cards con imagen de portada. Canonical URL. Slug en la URL es el persistente (no cambia con renombres — regla §7.18).
 
 **Design tokens**: Composición §13.3, numeral-lg §3.4, tipografía §12.3.
@@ -352,7 +358,7 @@ Contenidos de bloques 1, 3, 5 (métricas+testimonios), 6 y 7 se leen de `content
 ### F022 · detalle-inmueble-engagement
 
 **Tamaño**: M (3–5 días)
-**Dependencias**: F021, F014
+**Dependencias**: F007, F008, F014, F017, F021
 
 **Descripción**: Componentes de interacción y conversión en la ficha de detalle:
 
@@ -384,7 +390,7 @@ Contenidos de bloques 1, 3, 5 (métricas+testimonios), 6 y 7 se leen de `content
 ### F024 · api-publica-v1
 
 **Tamaño**: M (3–5 días)
-**Dependencias**: F004, F011, F015
+**Dependencias**: F004, F007, F008, F011, F015
 
 **Descripción**: API pública versionada bajo `app/api/v1/`. Autenticación por API key en cabecera `X-API-Key`. `ApiKeyContext` resuelto en middleware de API.
 
@@ -452,10 +458,20 @@ Limpiar estado (DB) antes de cada test. Selectores accesibles: `getByRole` > `ge
 
 ## Cuestiones detectadas
 
-Ninguna ambigüedad seria detectada. Los cuatro documentos de memoria (constitution, product, architecture, design) son coherentes entre sí y no presentan contradicciones que bloqueen la planificación.
+Ninguna ambigüedad seria detectada tras la revisión v1.1. Los cuatro documentos de memoria (constitution, product v2.0, architecture v2.0, design) son coherentes entre sí y no presentan contradicciones que bloqueen la planificación.
 
 ---
 
-**Versión:** 1.0 — Julio 2026
-**Generado por:** `architect` subagent a partir de constitution.md v1.0, product.md v2.0, architecture.md v2.0, design.md inicial.
+**Versión:** 1.1 — Julio 2026
+**Cambios desde v1.0:**
+- CRIT-1: 5 dependencias implícitas ahora declaradas (F007→F002, F005→F007, F016→F007, F022→F007+F008+F017, F024→F007+F008)
+- CRIT-2: enum `OperationType` completado con `SALE_AND_RENT`
+- CRIT-3: nueva columna `construction_status` en `promociones` (`ON_PLAN`/`IN_CONSTRUCTION`/`READY`), reflejada en F002 (schema+índice), F009 (constante+seed), F011 (editor+warning suave si contradice `plazos_garantias`), F020 (filtro del catálogo público)
+- IMP-1: instalación de `@phosphor-icons/react` en F003 con tamaños y reglas de a11y
+- IMP-2: instalación de `maplibre-gl` en F021 (evita dependencia de Google Maps con billing)
+- IMP-3: campos `seo_title` y `seo_description` explícitos en el editor de F011, con fallback determinista
+- IMP-4: dashboard del backoffice descrito como landing operativa (enlaces + contador + últimas editadas), sin analítica
+- MIN-1: flujo de recuperación de contraseña añadido a F005 con template en `email_queue`
+
+**Generado por:** `architect` subagent a partir de constitution.md v1.0, product.md v2.0, architecture.md v2.0, design.md.
 **Features totales:** 27 (S: 7, M: 20, L: 0 tras splits)

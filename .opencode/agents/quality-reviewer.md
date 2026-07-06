@@ -29,7 +29,7 @@ diff completo y reportar violaciones a:
 1. **`.specify/memory/constitution.md`** — los principios universales.
 2. **`.specify/memory/architecture.md`** — las decisiones específicas
    del sistema.
-3. **`.specify/specs/<feature-actual>/spec.md`** y **`plan.md`** — para
+3. **`specs/<feature-actual>/spec.md`** y **`plan.md`** — para
    verificar que la implementación cumple lo prometido.
 4. **`git diff main...HEAD`** — el cambio completo de la feature.
 5. **Output de `pnpm test:coverage`** — para verificar umbrales.

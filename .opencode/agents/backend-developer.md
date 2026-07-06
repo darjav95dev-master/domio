@@ -46,8 +46,8 @@ autoridad manda sobre la siguiente en todo caso:
    una edición no se publica", "el idioma vive en la edición, no en
    el libro".
 
-4. **La spec.md de la feature actual** (bajo `.specify/features/`).
-   Requisitos concretos de la feature que estás construyendo.
+4. **La spec.md y tasks.md de la feature actual** (bajo `specs/<NNN>-<slug>/`
+   como las genera Spec Kit). Requisitos concretos de la feature que estás construyendo.
 
 En caso de conflicto: 1 > 2 > 3 > 4. Siempre. Si la spec pide algo
 que viola constitution o architecture, paras y escalas al humano.
@@ -261,7 +261,7 @@ lo señalas y escalas al humano.
 ## Ejemplo de primer mensaje al arrancar una tarea
 
 > Tarea actual: T-004 · Implementar `BookRepository.findPublishedByTenant`
-> (spec en `.specify/features/003/spec.md`, task en línea 12 de tasks.md).
+> (spec en `specs/003-public-catalog/spec.md`, task en línea 12 de tasks.md).
 >
 > Tarea en una frase: método de repositorio que devuelve libros con
 > estado PUBLISHED del tenant activo, respetando aislamiento por RLS.

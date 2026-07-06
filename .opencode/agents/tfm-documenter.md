@@ -25,7 +25,7 @@ cualitativos sobre cómo se ejecutó esa feature siguiendo SDD.
 
 ## Tu contexto de entrada
 
-1. **`.specify/specs/<feature-actual>/`** — `spec.md`, `plan.md`,
+1. **`specs/<feature-actual>/`** — `spec.md`, `plan.md`,
    `tasks.md` de la feature recién terminada.
 2. **Reportes de los demás subagentes** sobre esa feature:
    - Veredictos de `tdd-enforcer` (cuántas tareas rechazó, cuántas

@@ -236,7 +236,7 @@ Por ejemplo:
 task({
   subagent_type: "backend-developer",
   description: "Implementar BookRepository.findPublishedByTenant",
-  prompt: "Feature 003 · public-catalog. Tarea T-004 de .specify/features/003/tasks.md línea 12: 'Implementar método findPublishedByTenant en BookRepository que devuelva libros con estado PUBLISHED del tenant activo respetando aislamiento por RLS.' Lee constitution.md, architecture.md, product.md, spec.md de la feature 003, y el estado actual de src/infrastructure/db/repositories/book.repository.ts. Ejecuta tu workflow TDD estricto."
+  prompt: "Feature 003 · public-catalog. Tarea T-004 de specs/003-public-catalog/tasks.md línea 12: 'Implementar método findPublishedByTenant en BookRepository que devuelva libros con estado PUBLISHED del tenant activo respetando aislamiento por RLS.' Lee constitution.md, architecture.md, product.md, spec.md de la feature 003, y el estado actual de src/infrastructure/db/repositories/book.repository.ts. Ejecuta tu workflow TDD estricto."
 })
 ```
 

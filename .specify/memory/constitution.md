@@ -267,7 +267,72 @@ Dos reglas heredables, derivadas de fallos reales de producción. Las verifica e
 
 ---
 
-## 11. Límites operacionales del host de desarrollo
+## 11. Patrones que emergen de la práctica
+
+Esta sección recoge patrones derivados de ejecutar la metodología en proyectos reales. No son "primeros principios" sino descubrimientos operativos: cosas que costaron una tarde de bug o un roadmap mal ordenado, y que ahora previenen ese mismo modo de fallo en cualquier proyecto futuro.
+
+### 11.1 Enums y sets cerrados como fuente única
+
+Cualquier campo con valores acotados (roles, estados, categorías, tipos, canales, modos) tiene su fuente en `shared/constants/` y su schema en Zod (o Bean Validation en Java/Spring). Los repositorios y los servicios consumen la constante, nunca definen literales inline.
+
+**Regla dura**: el agente **no puede** inventar valores nuevos. Añadir un valor requiere migración de BD explícita + actualización de la constante + PR aprobado + tests que cubran el nuevo valor.
+
+Motivación: sin este patrón, cada feature acaba con su propia definición del enum y aparecen valores fantasma en producción (`"ACTIVE"` vs `"active"` vs `"ACTIVO"` para lo mismo). El coste es depurar tres semanas después bugs que no se ven en desarrollo.
+
+### 11.2 Dependencias entre features siempre explícitas
+
+Cada feature del roadmap declara **todas** sus dependencias, incluidas las que "parecen obvias" (tablas ya creadas por otra feature, servicios ya instanciados, contextos ya resueltos). Una dependencia transitiva **no cuenta como declarada**.
+
+**Regla dura**: si la feature F usa un artefacto que produce la feature G, F lista a G aunque haya features intermedias que también dependan de G.
+
+Motivación: los subagentes SDD no razonan bien sobre transitividad. Si `send-email` usa la tabla `email_queue` (creada por `email-service`), `send-email` debe listar `email-service` aunque `db-schema` haya creado la tabla, porque el servicio funcional lo materializa `email-service`. Sin esta disciplina, los agentes empiezan features sin sus prerrequisitos reales y descubren a mitad de sprint que falta infraestructura.
+
+### 11.3 Servicios externos nunca síncronos en el path crítico
+
+Todo envío que dependa de un servicio externo (email, SMS, notificación push, webhook saliente, llamada a API de IA, envío a portal de terceros) pasa por una **cola persistente en base de datos**. El path crítico persiste el trabajo pendiente en la misma transacción del recurso de origen; un worker separado procesa la cola con backoff exponencial y política de reintentos declarada.
+
+**Regla dura**: prohibido `await externalService.send()` (o equivalente) en el path de un endpoint público o de una operación de negocio.
+
+Consecuencia: la caída del servicio externo **nunca** bloquea la operación de negocio. Un fallo de Resend no impide crear el lead. Un fallo de Stripe no impide registrar el pedido. Un fallo de la API de terceros no impide guardar la solicitud del usuario. El sistema degrada; no cae.
+
+Excepción única: cuando la respuesta del servicio externo es **parte del contrato del endpoint** (ej. `POST /verify-payment` que debe retornar el resultado real). En ese caso el timeout y el fallback están declarados en el propio contrato.
+
+### 11.4 Historiales inmutables por policy, no por convención
+
+Toda tabla de auditoría (cambios de estado, eventos, registros de consentimiento, log de acciones administrativas, historial de reasignaciones) es **físicamente inmutable**: las policies de la base de datos impiden `UPDATE` y `DELETE` incluso desde el rol de aplicación.
+
+**Regla dura**: confiar en que "convencionalmente no se modifica" es dejarlo a merced del primer bug, del primer script correctivo apresurado, o del primer agente que decide "limpiar" un histórico. La inmutabilidad se declara en el motor de datos.
+
+Ejemplo (PostgreSQL con RLS):
+```sql
+CREATE POLICY history_read   ON audit_log FOR SELECT USING (…);
+CREATE POLICY history_insert ON audit_log FOR INSERT WITH CHECK (…);
+-- Deliberadamente no hay policy de UPDATE ni DELETE.
+```
+
+Tests verifican que un `UPDATE` sobre la tabla falla incluso con el rol de aplicación activo.
+
+### 11.5 Dependencias del sistema de diseño desde la feature fundacional
+
+Cuando el proyecto tiene sistema de diseño (design.md o equivalente), **todas** sus dependencias externas (fuentes, sets de iconos, librerías de mapas, librerías de motion, componentes base) se instalan y configuran en la **feature fundacional del sistema visual**, no como side-effect de la primera feature de UI que las necesite.
+
+**Regla dura**: la primera feature de UI de negocio (una página real, un dashboard) no debe estar instalando fuentes, iconos y componentes primitivos a la vez que resuelve su propio problema. Los cimientos ya están.
+
+Motivación: sin este patrón, la primera feature de UI se convierte en un vertedero de instalaciones. La cadena confunde "cimientos del sistema visual" con "necesidades de esta pantalla" y acaba mezclando tokens con lógica de negocio en el mismo commit.
+
+### 11.6 Warnings suaves para redundancias intencionales
+
+Cuando dos campos del dominio pueden diverger y **uno tiene autoridad** (típicamente porque uno es una decisión del operador y otro es un dato observable), el sistema **avisa pero no bloquea**. El bloqueo pertenece a las reglas duras del §6 del `product.md`; la contradicción entre campos redundantes es información, no error.
+
+**Regla dura**: distinguir *"esto es incorrecto"* (bloquea) de *"esto parece raro"* (advierte).
+
+Ejemplo: si un operador marca un producto como "novedad" pero su fecha de creación es de hace 3 años, el editor emite un warning suave (`"marcado como novedad pero se creó hace 3 años, ¿correcto?"`). No bloquea, porque el operador tiene contexto que el sistema no tiene (relanzamiento, cambio de posicionamiento, etc.).
+
+Motivación: sistemas que bloquean por contradicciones semánticas suaves obligan a los operadores a mentir a la máquina para poder trabajar. Los warnings preservan la autoridad del operador sin ocultar el problema.
+
+---
+
+## 12. Límites operacionales del host de desarrollo
 
 El agente NUNCA debe asumir que dispone de recursos ilimitados en la
 máquina de desarrollo. Para evitar saturar memoria y CPU:
@@ -284,5 +349,6 @@ máquina de desarrollo. Para evitar saturar memoria y CPU:
 Estas restricciones son **operacionales**, no estéticas. Violarlas puede
 forzar reinicio del host y corromper el estado del repositorio.
 
-**Versión:** 1.0 — Junio 2026
+**Versión:** 1.1 — Julio 2026
+**Cambios desde v1.0:** añadida sección §11 "Patrones que emergen de la práctica" con 6 principios universales derivados de la ejecución de la metodología SDD en proyectos reales — enums cerrados como fuente única (§11.1), dependencias explícitas entre features (§11.2), servicios externos desacoplados por cola persistente (§11.3), historiales inmutables por policy no por convención (§11.4), dependencias del sistema de diseño desde la feature fundacional (§11.5), warnings suaves para redundancias intencionales (§11.6). Renumeración: la antigua §11 (Límites operacionales del host) pasa a §12.
 **Mantenedor:** Darío J. Díaz Caballero

@@ -37,8 +37,8 @@ autoridad manda sobre la siguiente en todo caso:
    proyecto. Paleta, tipografía, tokens, contratos de componentes,
    voz. **Es fuente de verdad visual y no se cuestiona**.
 
-3. **La spec.md de la feature actual** (bajo `.specify/features/`
-   o donde tu Spec Kit las coloque). Requisitos concretos de la
+3. **La spec.md y tasks.md de la feature actual** (bajo `specs/<NNN>-<slug>/`
+   como las genera Spec Kit). Requisitos concretos de la
    feature que estás construyendo.
 
 4. **La skill `design-taste-frontend`** (cuando esté cargada). Es
@@ -253,7 +253,7 @@ de improvisar.
 
 ## Ejemplo de primer mensaje al arrancar una feature
 
-> Feature actual: `public-catalog-home` (spec en `.specify/features/005/spec.md`).
+> Feature actual: `public-catalog-home` (spec en `specs/005-home-publica/spec.md`).
 >
 > Feature en una frase: Reescribir la home consumiendo tokens del design.md
 > y los primitives de `visual-system-implementation`, con signature

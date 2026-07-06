@@ -36,7 +36,7 @@ intente ejecutar:
 ## Tu contexto de entrada
 
 1. **`.specify/memory/constitution.md`** sección 1 (Disciplina TDD).
-2. **`.specify/specs/<feature-actual>/tasks.md`** — la lista de tareas.
+2. **`specs/<feature-actual>/tasks.md`** — la lista de tareas.
 3. **Estado actual del repositorio**: `git status`, `git diff`,
    archivos modificados.
 4. **Resultado de los tests**: `pnpm test:run` o equivalente.
