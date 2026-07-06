@@ -17,12 +17,18 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:contract": "echo 'contract tests — reserved'",
+    "db:generate": "drizzle-kit generate --config=src/infrastructure/db/drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=src/infrastructure/db/drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config=src/infrastructure/db/drizzle.config.ts",
+    "db:push": "drizzle-kit push --config=src/infrastructure/db/drizzle.config.ts",
     "quality": "pnpm lint && pnpm typecheck && pnpm test:run",
     "verify": "pnpm quality && pnpm test:contract && pnpm test:e2e && pnpm build",
     "prepare": "husky"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.2",
     "next": "15.5.20",
+    "pg": "^8.22.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
@@ -33,10 +39,14 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.0",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "^8.34.0",
     "@typescript-eslint/parser": "^8.34.0",
+    "@vitest/coverage-v8": "^3.2.0",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-zod": "^0.8.3",
     "eslint": "^9",
     "eslint-config-next": "15.5.20",
     "eslint-plugin-jsx-a11y": "^6.10.0",
@@ -46,7 +56,6 @@
     "prettier": "^3.5.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^3.2.0",
-    "@vitest/coverage-v8": "^3.2.0"
+    "vitest": "^3.2.0"
   }
 }
