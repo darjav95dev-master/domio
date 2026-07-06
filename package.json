@@ -26,6 +26,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "drizzle-orm": "^0.45.2",
     "next": "15.5.20",
     "pg": "^8.22.0",
@@ -36,6 +37,7 @@
     "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.0",
     "@types/node": "^20",
