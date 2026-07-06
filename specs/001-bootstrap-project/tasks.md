@@ -12,9 +12,9 @@
 
 **Independent Test**: `pnpm dev` arranca en localhost:3000.
 
-- [ ] T001 Scaffold Next.js 15 con `create-next-app`: App Router, TypeScript strict, Tailwind CSS, pnpm, `src/` directory — flags: `--typescript --tailwind --eslint --app --src-dir --use-pnpm` en raíz del repo
-- [ ] T002 Configurar `package.json` con `"packageManager": "pnpm@9.x"`, `"engines": { "node": ">=20" }`, e instalar dependencias base con `pnpm install`
-- [ ] T003 Crear `tsconfig.json` con `"strict": true`, `"noUncheckedIndexedAccess": true`, `"exclude": ["tests/", "node_modules/", ".next/"]`, `"paths": { "@/*": ["./src/*"] }`
+- [x] T001 Scaffold Next.js 15 con `create-next-app`: App Router, TypeScript strict, Tailwind CSS, pnpm, `src/` directory — flags: `--typescript --tailwind --eslint --app --src-dir --use-pnpm` en raíz del repo
+- [x] T002 Configurar `package.json` con `"packageManager": "pnpm@9.x"`, `"engines": { "node": ">=20" }`, e instalar dependencias base con `pnpm install`
+- [x] T003 Crear `tsconfig.json` con `"strict": true`, `"noUncheckedIndexedAccess": true`, `"exclude": ["tests/", "node_modules/", ".next/"]`, `"paths": { "@/*": ["./src/*"] }`
 
 ---
 
@@ -24,13 +24,13 @@
 
 **Independent Test**: `pnpm lint` y `pnpm typecheck` ejecutan sin errores (aunque aún no haya código de dominio).
 
-- [ ] T004 [P] Crear `eslint.config.mjs` (flat config) con plugins: `@typescript-eslint`, `sonarjs` (cognitive-complexity ≤ 15, no-duplicate-string threshold 3, no-identical-functions), `jsx-a11y` — extender `next/core-web-vitals` y `next/typescript`
-- [ ] T005 [P] Crear `.prettierrc` con `semi: true`, `singleQuote: true`, `trailingComma: 'all'`, `printWidth: 100`, `tabWidth: 2` y `.prettierignore` excluyendo `node_modules/`, `.next/`, `dist/`, `coverage/`
-- [ ] T006 [P] Crear `vitest.config.ts` con `pool: 'forks'`, `singleFork: true`, `fileParallelism: false`, `include: ['tests/**/*.test.ts']`, coverage thresholds 80% (statements, branches, functions, lines), path alias `@/` → `src/`
-- [ ] T007 [P] Crear `playwright.config.ts` con `workers: 1`, `fullyParallel: false`, `testDir: './tests/e2e'`, `webServer.command: 'pnpm dev'`, `webServer.port: 3000`
-- [ ] T008 [P] Crear `postcss.config.mjs` y `tailwind.config.ts` compatibles con Tailwind v4 (`@theme inline` con CSS variables de diseño para futuro F003)
-- [ ] T009 [P] Crear `next.config.ts` con config base: `reactStrictMode: true`, `output: 'standalone'`, y soporte para `images.remotePatterns` vacío (se poblará en features futuras)
-- [ ] T010 Agregar scripts a `package.json`: `"typecheck": "tsc --noEmit"`, `"test": "vitest"`, `"test:run": "vitest run"`, `"test:coverage": "vitest run --coverage"`, `"test:e2e": "playwright test"`, `"test:contract": "echo 'contract tests — reserved'"`, `"quality": "pnpm lint && pnpm typecheck && pnpm test:run"`, `"verify": "pnpm quality && pnpm test:contract && pnpm test:e2e && pnpm build"`
+- [x] T004 [P] Crear `eslint.config.mjs` (flat config) con plugins: `@typescript-eslint`, `sonarjs` (cognitive-complexity ≤ 15, no-duplicate-string threshold 3, no-identical-functions), `jsx-a11y` — extender `next/core-web-vitals` y `next/typescript`
+- [x] T005 [P] Crear `.prettierrc` con `semi: true`, `singleQuote: true`, `trailingComma: 'all'`, `printWidth: 100`, `tabWidth: 2` y `.prettierignore` excluyendo `node_modules/`, `.next/`, `dist/`, `coverage/`
+- [x] T006 [P] Crear `vitest.config.ts` con `pool: 'forks'`, `singleFork: true`, `fileParallelism: false`, `include: ['tests/**/*.test.ts']`, coverage thresholds 80% (statements, branches, functions, lines), path alias `@/` → `src/`
+- [x] T007 [P] Crear `playwright.config.ts` con `workers: 1`, `fullyParallel: false`, `testDir: './tests/e2e'`, `webServer.command: 'pnpm dev'`, `webServer.port: 3000`
+- [x] T008 [P] Crear `postcss.config.mjs` y `tailwind.config.ts` compatibles con Tailwind v4 (`@theme inline` con CSS variables de diseño para futuro F003)
+- [x] T009 [P] Crear `next.config.ts` con config base: `reactStrictMode: true`, `output: 'standalone'`, y soporte para `images.remotePatterns` vacío (se poblará en features futuras)
+- [x] T010 Agregar scripts a `package.json`: `"typecheck": "tsc --noEmit"`, `"test": "vitest"`, `"test:run": "vitest run"`, `"test:coverage": "vitest run --coverage"`, `"test:e2e": "playwright test"`, `"test:contract": "echo 'contract tests — reserved'"`, `"quality": "pnpm lint && pnpm typecheck && pnpm test:run"`, `"verify": "pnpm quality && pnpm test:contract && pnpm test:e2e && pnpm build"`
 
 ---
 
@@ -42,16 +42,16 @@
 
 ### Tests for US1+US5
 
-- [ ] T011 [P] [US1] Escribir smoke test en `tests/unit/smoke.test.ts` que verifica que `pnpm dev` arranca (import dinámico de Next.js, testea que el proceso no crashea)
-- [ ] T012 [P] [US1] Escribir smoke test E2E en `tests/e2e/smoke.spec.ts` que abre localhost:3000 y verifica título de página y status 200
+- [x] T011 [P] [US1] Escribir smoke test en `tests/unit/smoke.test.ts` que verifica que `pnpm dev` arranca (import dinámico de Next.js, testea que el proceso no crashea)
+- [x] T012 [P] [US1] Escribir smoke test E2E en `tests/e2e/smoke.spec.ts` que abre localhost:3000 y verifica título de página y status 200
 
 ### Implementation for US1+US5
 
-- [ ] T013 [US1] Crear estructura de carpetas según architecture.md §5: `app/(public)/`, `app/(auth)/`, `app/api/health/`, `src/shared/{types,utils,constants,components,hooks,strategies}/`, `src/features/`, `src/context/`, `src/infrastructure/`, `tests/{unit,isolation,contract,e2e}/` — cada directorio con `.gitkeep` para trackear en git
-- [ ] T014 [US1] Crear `app/layout.tsx` con metadata base (title: "Domio", description), `<html lang="es">` con `colorScheme: 'light'`, y `globals.css` import
-- [ ] T015 [US1] Crear `app/(public)/page.tsx` con página landing placeholder (componente simple con `<main>` y texto "Domio — Próximamente")
-- [ ] T016 [US1] Crear `app/(auth)/layout.tsx` con layout auth placeholder
-- [ ] T017 [US1] Crear `app/api/health/route.ts` con endpoint GET que devuelve `Response.json({ status: "ok" })` y status 200
+- [x] T013 [US1] Crear estructura de carpetas según architecture.md §5: `app/(public)/`, `app/(auth)/`, `app/api/health/`, `src/shared/{types,utils,constants,components,hooks,strategies}/`, `src/features/`, `src/context/`, `src/infrastructure/`, `tests/{unit,isolation,contract,e2e}/` — cada directorio con `.gitkeep` para trackear en git
+- [x] T014 [US1] Crear `app/layout.tsx` con metadata base (title: "Domio", description), `<html lang="es">` con `colorScheme: 'light'`, y `globals.css` import
+- [x] T015 [US1] Crear `app/(public)/page.tsx` con página landing placeholder (componente simple con `<main>` y texto "Domio — Próximamente")
+- [x] T016 [US1] Crear `app/(auth)/layout.tsx` con layout auth placeholder
+- [x] T017 [US1] Crear `app/api/health/route.ts` con endpoint GET que devuelve `Response.json({ status: "ok" })` y status 200
 
 ---
 
@@ -63,14 +63,14 @@
 
 ### Tests for US2
 
-- [ ] T018 [P] [US2] Test de configuración de ESLint en `tests/unit/eslint-config.test.ts`: verifica que el flat config carga correctamente, que las reglas sonarjs están activas (cognitive-complexity, no-duplicate-string), y que jsx-a11y está habilitado
+- [x] T018 [P] [US2] Test de configuración de ESLint en `tests/unit/eslint-config.test.ts`: verifica que el flat config carga correctamente, que las reglas sonarjs están activas (cognitive-complexity, no-duplicate-string), y que jsx-a11y está habilitado
 
 ### Implementation for US2
 
-- [ ] T019 [US2] Verificar que `pnpm lint` funciona con la config actual (corregir warnings/errors que aparezcan del scaffold inicial de `create-next-app`)
-- [ ] T020 [US2] Verificar que `pnpm typecheck` pasa con `tsc --noEmit` (sin errores de tipo en el scaffold)
-- [ ] T021 [US2] Verificar que `pnpm test:run` ejecuta los smoke tests y pasan
-- [ ] T022 [US2] Ejecutar `pnpm quality` y confirmar que los tres pasos (lint, typecheck, test:run) se ejecutan en secuencia y el comando termina con exit code 0
+- [x] T019 [US2] Verificar que `pnpm lint` funciona con la config actual (corregir warnings/errors que aparezcan del scaffold inicial de `create-next-app`)
+- [x] T020 [US2] Verificar que `pnpm typecheck` pasa con `tsc --noEmit` (sin errores de tipo en el scaffold)
+- [x] T021 [US2] Verificar que `pnpm test:run` ejecuta los smoke tests y pasan
+- [x] T022 [US2] Ejecutar `pnpm quality` y confirmar que los tres pasos (lint, typecheck, test:run) se ejecutan en secuencia y el comando termina con exit code 0
 
 ---
 
@@ -82,9 +82,9 @@
 
 ### Implementation for US4
 
-- [ ] T023 [US4] Crear `.env.example` con las 10 variables de architecture.md §8: DATABASE_URL, AUTH_SECRET, AUTH_URL, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, RESEND_API_KEY, SENTRY_DSN, RATE_LIMIT_STORE_URL — cada una con `# Descripción del propósito` como comentario y valor vacío o placeholder descriptivo
-- [ ] T024 [US4] Verificar `.gitignore` incluye `.env.local`, `.env*.local`, `node_modules/`, `.next/`, `coverage/`, `dist/`, `playwright-report/`, `test-results/` — añadir los que falten
-- [ ] T025 [US4] Test unitario en `tests/unit/env-example.test.ts`: verifica que `.env.example` existe, contiene las 10 variables esperadas, y sus valores son placeholders (no contienen secrets reales — regex para detectar `sk-`, `eyJ`, `https://`, etc.)
+- [x] T023 [US4] Crear `.env.example` con las 10 variables de architecture.md §8: DATABASE_URL, AUTH_SECRET, AUTH_URL, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, RESEND_API_KEY, SENTRY_DSN, RATE_LIMIT_STORE_URL — cada una con `# Descripción del propósito` como comentario y valor vacío o placeholder descriptivo
+- [x] T024 [US4] Verificar `.gitignore` incluye `.env.local`, `.env*.local`, `node_modules/`, `.next/`, `coverage/`, `dist/`, `playwright-report/`, `test-results/` — añadir los que falten
+- [x] T025 [US4] Test unitario en `tests/unit/env-example.test.ts`: verifica que `.env.example` existe, contiene las 10 variables esperadas, y sus valores son placeholders (no contienen secrets reales — regex para detectar `sk-`, `eyJ`, `https://`, etc.)
 
 ---
 
@@ -96,9 +96,9 @@
 
 ### Implementation for US3
 
-- [ ] T026 [US3] Instalar Husky: verificar `.git` existe, ejecutar `pnpm exec husky init`, configurar `pre-commit` hook: `pnpm lint && pnpm typecheck`, configurar `pre-push` hook: `pnpm test:run && pnpm build`
-- [ ] T027 [US3] Verificar hook pre-commit funcional: crear archivo temporal con error de TypeScript, intentar commit → debe ser rechazado. Limpiar archivo temporal.
-- [ ] T028 [US3] Verificar hook pre-push funcional: simular test fail → push rechazado (opcional si hay remote configurado; si no, verificar que el script del hook existe y es ejecutable)
+- [x] T026 [US3] Instalar Husky: verificar `.git` existe, ejecutar `pnpm exec husky init`, configurar `pre-commit` hook: `pnpm lint && pnpm typecheck`, configurar `pre-push` hook: `pnpm test:run && pnpm build`
+- [x] T027 [US3] Verificar hook pre-commit funcional: crear archivo temporal con error de TypeScript, intentar commit → debe ser rechazado. Limpiar archivo temporal.
+- [x] T028 [US3] Verificar hook pre-push funcional: simular test fail → push rechazado (opcional si hay remote configurado; si no, verificar que el script del hook existe y es ejecutable)
 
 ---
 
@@ -108,10 +108,10 @@
 
 **Independent Test**: `pnpm build` exitoso. `README.md` contiene instrucciones de instalación.
 
-- [ ] T029 [P] Crear `README.md` con: nombre del proyecto (Domio), descripción breve, prerequisitos (Node ≥20, pnpm), instrucciones de instalación (`corepack enable && pnpm install`), scripts disponibles (tabla con descripciones)
-- [ ] T030 [P] Crear `.gitignore` si no existe ya, asegurando cobertura de: `node_modules/`, `.next/`, `.env.local`, `.env*.local`, `coverage/`, `dist/`, `*.tsbuildinfo`, `playwright-report/`, `test-results/`, `.DS_Store`
-- [ ] T031 Ejecutar `pnpm verify` (quality + test:contract + test:e2e + build) — todo debe pasar con exit code 0
-- [ ] T032 Ejecutar `pnpm build` y verificar que la carpeta `.next/` se genera, que el build es exitoso, y que el tamaño del bundle es razonable (< 500KB para una página vacía)
+- [x] T029 [P] Crear `README.md` con: nombre del proyecto (Domio), descripción breve, prerequisitos (Node ≥20, pnpm), instrucciones de instalación (`corepack enable && pnpm install`), scripts disponibles (tabla con descripciones)
+- [x] T030 [P] Crear `.gitignore` si no existe ya, asegurando cobertura de: `node_modules/`, `.next/`, `.env.local`, `.env*.local`, `coverage/`, `dist/`, `*.tsbuildinfo`, `playwright-report/`, `test-results/`, `.DS_Store`
+- [x] T031 Ejecutar `pnpm verify` (quality + test:contract + test:e2e + build) — todo debe pasar con exit code 0
+- [x] T032 Ejecutar `pnpm build` y verificar que la carpeta `.next/` se genera, que el build es exitoso, y que el tamaño del bundle es razonable (< 500KB para una página vacía)
 
 ---
 
