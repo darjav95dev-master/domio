@@ -19,6 +19,7 @@ export default defineConfig([
     ".opencode/**",
     ".claude/**",
     ".specify/**",
+    ".design-audit/**",
     "scripts/**",
     "specs/**",
     "next-env.d.ts",

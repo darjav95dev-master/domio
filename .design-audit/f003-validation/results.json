@@ -1,0 +1,99 @@
+{
+  "fonts": {
+    "desktop": {
+      "fraunces": false,
+      "inter": true,
+      "geistMono": false
+    },
+    "mobile": {
+      "fraunces": false,
+      "inter": true,
+      "geistMono": false
+    }
+  },
+  "tokens": {
+    "desktop": {
+      "filled": 30,
+      "total": 30,
+      "sample": {
+        "--color-ink": "#1a1410",
+        "--color-bone": "#fffcf7",
+        "--color-paper": "#fbf8f3",
+        "--color-terracota": "#c75d3f",
+        "--color-slate": "#2e2b27",
+        "--bg-canvas": "#fbf8f3",
+        "--bg-surface": "#fffcf7",
+        "--fg-default": "#1a1410",
+        "--fg-muted": "#3d2e20",
+        "--fg-subtle": "#7a6857",
+        "--fg-on-inverted": "#fffcf7",
+        "--accent-default": "#c75d3f",
+        "--accent-hover": "#a84a2e",
+        "--border-default": "#ebe2d2",
+        "--focus-ring": "#c75d3f",
+        "--font-display": "'Fraunces', 'Fraunces Fallback'",
+        "--font-body": "'Inter', 'Inter Fallback'",
+        "--font-mono": "'Geist Mono', 'Geist Mono Fallback'",
+        "--radius-control": "8px",
+        "--radius-card": "12px",
+        "--radius-surface": "20px",
+        "--radius-pill": "9999px",
+        "--space-4": "16px",
+        "--space-gutter": "24px",
+        "--space-section-lg": "160px",
+        "--duration-standard": "250ms",
+        "--ease-standard": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "--z-nav": "100",
+        "--z-modal": "50",
+        "--shadow-tint": "26, 20, 16"
+      }
+    },
+    "mobile": {
+      "filled": 30,
+      "total": 30,
+      "sample": {
+        "--color-ink": "#1a1410",
+        "--color-bone": "#fffcf7",
+        "--color-paper": "#fbf8f3",
+        "--color-terracota": "#c75d3f",
+        "--color-slate": "#2e2b27",
+        "--bg-canvas": "#fbf8f3",
+        "--bg-surface": "#fffcf7",
+        "--fg-default": "#1a1410",
+        "--fg-muted": "#3d2e20",
+        "--fg-subtle": "#7a6857",
+        "--fg-on-inverted": "#fffcf7",
+        "--accent-default": "#c75d3f",
+        "--accent-hover": "#a84a2e",
+        "--border-default": "#ebe2d2",
+        "--focus-ring": "#c75d3f",
+        "--font-display": "'Fraunces', 'Fraunces Fallback'",
+        "--font-body": "'Inter', 'Inter Fallback'",
+        "--font-mono": "'Geist Mono', 'Geist Mono Fallback'",
+        "--radius-control": "8px",
+        "--radius-card": "12px",
+        "--radius-surface": "20px",
+        "--radius-pill": "9999px",
+        "--space-4": "16px",
+        "--space-gutter": "24px",
+        "--space-section-lg": "160px",
+        "--duration-standard": "250ms",
+        "--ease-standard": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "--z-nav": "100",
+        "--z-modal": "50",
+        "--shadow-tint": "26, 20, 16"
+      }
+    }
+  },
+  "screenshots": [
+    {
+      "viewport": "desktop",
+      "file": ".design-audit/f003-validation/home-desktop.png"
+    },
+    {
+      "viewport": "mobile",
+      "file": ".design-audit/f003-validation/home-mobile.png"
+    }
+  ],
+  "issues": []
+}

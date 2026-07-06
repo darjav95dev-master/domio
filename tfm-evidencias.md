@@ -126,3 +126,87 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
 - Config: `src/infrastructure/db/drizzle.config.ts`, `src/infrastructure/db/client.ts`
 
 ---
+
+## Feature 003 · visual-system-implementation
+*Mergeada el 2026-07-06. Rama: `feature/003-visual-system-implementation`. Último commit: `074a8d0`.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 272 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (design.md fuente exhaustiva)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 19 (T001–T019 en 4 fases)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+
+### Métricas de implementación
+- Commits en la rama: 3 (1 docs + 2 implementación)
+- Líneas añadidas: 1.040 (excluyendo `pnpm-lock.yaml`)
+- Líneas eliminadas: 27
+- Archivos nuevos: 15 (5 primitives, 1 barrel, 1 iconography map, 1 cn utility, 5 test files, 1 test setup, 1 checklist)
+- Archivos eliminados: 1 (`tailwind.config.ts` — reemplazado por `@theme inline` en `globals.css`)
+- Cobertura en `src/shared/components` tras la feature: 94,92% statements, 72,72% branches, 80% functions, 94,92% lines
+  - `button.tsx`: 100% en todas las métricas
+  - `skeleton.tsx`: 100% en todas las métricas
+  - `input.tsx`: 94,23% lines, 72,72% branches
+  - `toast.tsx`: 94,44% lines, 66,66% branches
+  - `media-image.tsx`: 100% lines, 80% branches
+- Cobertura global: 19,19% (lastrada por schemas de BD sin lógica ejecutable)
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado; tests escritos en Phase 2 antes que la implementación de Phase 3, siguiendo el orden TDD del plan)
+- **quality-reviewer:** APROBADA CON OBSERVACIONES (0 críticas, 2 mayores, 3 menores)
+  - Mayores: [datos provistos por el agente, no se encontró archivo de reporte]
+  - Menores: [datos provistos por el agente, no se encontró archivo de reporte]
+- **design-critic (design.md §11 compliance):** PASS CON NOTAS — validación visual mediante script Playwright (`f003-validate.mjs`)
+  - 30/30 tokens CSS correctos en `:root` (ambos viewports: desktop 1440px, mobile 390px)
+  - 11/11 §11 rechazos de diseño PASS (no hay azul corporativo, no hay púrpura AI, no hay dark mode, no hay glass decorativo, no hay shadcn defaults, no hay hex raw en componentes, sombras con tintado cálido RGB 26,20,16)
+  - Log de validación: `.design-audit/validation-log.json` — veredicto: `PASS-NOTAS`
+- **contract-guardian:** NO APLICA (no hay contratos de API ni interfaces externas en F003)
+
+### Desvíos respecto al plan inicial
+- **Ninguno.** Las 4 fases se ejecutaron en orden secuencial según tasks.md. Todos los entregables coinciden con la estructura definida en `plan.md`.
+- El único cambio menor no planificado fue la eliminación de `tailwind.config.ts` (el plan no especificaba explícitamente su borrado, pero era consecuencia necesaria de migrar a `@theme inline` de Tailwind v4).
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Tailwind v4 `@theme inline` sin `tailwind.config.js` (D1):** Se eliminó el archivo legado `tailwind.config.ts` y se migraron todas las definiciones de tema a `@theme inline` dentro de `globals.css`, alineado con design.md §12. Esto unifica tokens y configuración del theme en un solo archivo fuente.
+2. **Fraunces con eje opsz activado (D2):** `axes: ["opsz"]` en `next/font/google` para que Fraunces ajuste el peso óptico según el tamaño del texto, mejorando legibilidad en titulares grandes y textos pequeños.
+3. **`cn()` utility con `clsx` + `tailwind-merge` (D3):** Se creó `src/shared/utils/cn.ts` para combinar clases con resolución de conflictos de Tailwind, siguiendo el estándar del ecosistema. Permite que todos los primitives acepten `className` sin generar clases huérfanas.
+4. **Primary button con gradiente y sombras multi-capa (D4):** Se implementó con gradiente `from-ink-soft to-fg-default` en reposo que transiciona a terracota en hover, más tres capas de sombra (inset highlight, drop shadow suave, glow grande). Sin `bg-terracota` plano como especifica §7.1 del design.md.
+5. **MediaImage con fallback gradient CSS (D5):** En lugar de usar `placeholder="blur"` de Next.js (requiere blurDataURL estático), se implementó un fallback con `linear-gradient(135deg, var(--color-ink), var(--color-slate))` en estado de error o carga, alineado con design.md §15 y §11 rechazo #8 (no broken image boxes).
+6. **colorScheme: 'light' bloqueado en viewport y html.style (D6):** Se fija mediante `export const viewport` de Next.js y redundante en `style` del `<html>`, garantizando que no haya cambio a dark mode ni siquiera si el navegador detecta `prefers-color-scheme: dark`. Alineado con §11 rechazo #4.
+7. **Test setup con jsdom + testing-library (D7):** Se añadió `tests/setup.ts` con `@testing-library/jest-dom` para tener matchers como `toBeInTheDocument()` y `toHaveAttribute()` en todos los tests de componentes, sin necesidad de importarlo en cada archivo.
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **TDD funcionó para primitives:** Las 5 tareas de tests (T006–T010) se escribieron en Phase 2 antes que la implementación (Phase 3). Los tests forzaron decisiones de API tempranas: tipos de props, variantes, roles ARIA, estados disabled/error. La implementación pasó todos los tests a la primera en 3 de 5 componentes; `input` y `toast` requirieron ajustes menores de branching.
+- **Design critic temprano sobre tokens reales:** El script `f003-validate.mjs` verificó 30 tokens CSS en `:root` renderizados en un navegador real (Playwright), no sobre el código fuente. Esto detectó que `--font-display`, `--font-body` y `--font-mono` se definen mediante `var(--font-fraunces)` que a su vez viene de `next/font`, un nivel de indirección que una revisión estática no habría validado.
+- **Document.fonts.check() poco fiable:** El script de validación reportó `fraunces: false` y `geistMono: false` aunque las fuentes están correctamente cargadas con `display: swap` (los valores CSS de `--font-display` existen correctamente). `document.fonts.check()` es notoriamente inconsistente con Google Fonts cargadas mediante `next/font`. Para una validación robusta habría que inspeccionar `document.fonts.ready` o medir el rendered text.
+- **SDD sin fricción:** El plan de 19 tareas en 4 fases se ejecutó sin desvíos. La decisión de poner los tests antes que la implementación (Phase 2 → Phase 3) forzó a pensar en las interfaces antes de escribir el código, reduciendo el riesgo de refactors tardíos.
+- **Eliminación de tailwind.config.ts:** Al migrar a Tailwind v4 con `@theme inline`, el archivo `tailwind.config.ts` se volvió redundante y su presencia causaba conflictos de definición duplicada. La decisión de borrarlo fue acertada pero no estaba anticipada en el plan.
+
+### Artefactos generados
+- spec.md: `specs/003-visual-system-implementation/spec.md` (43 líneas, 10 FRs, 4 SCs, 4 US)
+- plan.md: `specs/003-visual-system-implementation/plan.md` (27 líneas, 4 fases, constitution check)
+- tasks.md: `specs/003-visual-system-implementation/tasks.md` (30 líneas, 19 tareas en 4 fases)
+- checklist: `specs/003-visual-system-implementation/checklists/requirements.md` (29 líneas, 0 NEEDS CLARIFICATION)
+- Tests: 14 tests unitarios en 5 archivos
+  - `tests/shared/components/button.test.tsx` (3 tests — 4 variantes, disabled)
+  - `tests/shared/components/input.test.tsx` (4 tests — label, error, focus, disabled)
+  - `tests/shared/components/skeleton.test.tsx` (3 tests — role, shimmer, reduced-motion)
+  - `tests/shared/components/toast.test.tsx` (2 tests — role, 4 variantes)
+  - `tests/shared/components/media-image.test.tsx` (2 tests — alt obligatorio, fallback)
+- Código:
+  - `app/globals.css` (369 líneas — 30 tokens CSS + @theme inline + tipografía + reset)
+  - `app/layout.tsx` (51 líneas — 3 fonts, viewport light, colorScheme)
+  - `src/shared/components/button.tsx` (69 líneas)
+  - `src/shared/components/input.tsx` (67 líneas)
+  - `src/shared/components/skeleton.tsx` (25 líneas)
+  - `src/shared/components/toast.tsx` (54 líneas)
+  - `src/shared/components/media-image.tsx` (48 líneas)
+  - `src/shared/components/index.ts` (5 líneas — barrel export)
+  - `src/shared/constants/iconography.ts` (19 líneas — tamaños canónicos Phosphor)
+  - `src/shared/utils/cn.ts` (5 líneas — clsx + tailwind-merge)
+  - `tests/setup.ts` (5 líneas — jest-dom matchers globales)
+- Scripts de validación visual: `.design-audit/f003-validate.mjs` (158 líneas), `f003-validate.cjs` (141 líneas)
+- Evidencia visual: `.design-audit/f003-validation/home-desktop.png`, `home-mobile.png`, `results.json`
+
+---
