@@ -185,16 +185,20 @@ Verifica antes de cerrar la tarea:
 - Sin dependencias externas nuevas que no estén declaradas en
   `architecture.md`. Si necesitas una, pídelo primero al humano.
 
-### Paso 5 — Quality gates
+### Paso 5 — Quality gates (scoped a TU tarea)
 
 Antes de dar la tarea por terminada, ejecuta y reporta:
 
 ```bash
-pnpm lint
+npx eslint <archivos que has tocado>
 pnpm typecheck
-pnpm test:run
-pnpm build
+pnpm vitest run <archivos de test de tu tarea> --reporter=dot
 ```
+
+La suite completa, `pnpm build` y los E2E NO se ejecutan por tarea:
+los lanza el orchestrator al cerrar cada fase de tasks.md. Si un test
+de tu scope falla, re-ejecuta SOLO ese archivo sin `--reporter=dot`
+para ver el detalle.
 
 Respeta los límites operacionales del `constitution.md` sección 11:
 Vitest en `singleFork: true`, no lanzar `pnpm verify` y `pnpm dev`

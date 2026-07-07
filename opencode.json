@@ -1,5 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codebase-memory-mcp": {
+      "type": "local",
+      "enabled": true,
+      "command": ["/Users/dariojavierdiazcaballero/.local/bin/codebase-memory-mcp"]
+    }
+  },
   "agent": {
     "orchestrator": {
       "mode": "primary",

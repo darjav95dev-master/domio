@@ -43,8 +43,11 @@ function createRequest({
 describe("context-middleware", () => {
   beforeEach(() => {
     vi.resetModules();
-    process.env.PUBLIC_TENANT_ID = publicTenantId;
-    process.env.NODE_ENV = "development";
+    // stubEnv + unstubEnvs (vitest.config) restauran tras cada test: con
+    // singleFork, un NODE_ENV mutado contamina el require cache de React
+    // de todos los archivos posteriores (jsxDEV is not a function).
+    vi.stubEnv("PUBLIC_TENANT_ID", publicTenantId);
+    vi.stubEnv("NODE_ENV", "development");
   });
 
   it(`resolves ${PUBLIC_HOST} to a PublicContext`, async () => {
@@ -79,7 +82,7 @@ describe("context-middleware", () => {
   });
 
   it(`rejects ${AUTH_HOST} mock session authentication outside development`, async () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const { resolveTenantContext, ContextResolutionError } = await import(
       "@/infrastructure/tenant/context-middleware"
     );
@@ -152,7 +155,7 @@ describe("context-middleware", () => {
   });
 
   it("rejects /api/v1/* mock API key lookup outside development", async () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const { resolveTenantContext, ContextResolutionError } = await import(
       "@/infrastructure/tenant/context-middleware"
     );
@@ -249,7 +252,7 @@ describe("context-middleware", () => {
   });
 
   it("assertDevelopmentOnly throws outside development", async () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const { assertDevelopmentOnly, ContextResolutionError } = await import(
       "@/infrastructure/tenant/context-middleware"
     );

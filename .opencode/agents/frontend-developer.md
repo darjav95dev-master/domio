@@ -185,23 +185,27 @@ Antes de dar por hecho un componente, verifica su a11y:
 Si algún compromiso no se puede cumplir por limitación técnica,
 documéntalo en el output y avisa al orchestrator.
 
-### Paso 5 — Quality gates
+### Paso 5 — Quality gates (scoped a TU tarea)
 
-Antes de dar la feature por terminada, ejecuta y reporta:
+Antes de dar la tarea por terminada, ejecuta y reporta:
 
 ```bash
-pnpm lint
+npx eslint <archivos que has tocado>
 pnpm typecheck
-pnpm test:run
-pnpm build
+pnpm vitest run <archivos de test de tu tarea> --reporter=dot
 ```
 
-Si alguno falla, no cierres la feature. Arréglalo o reporta al
+La suite completa, `pnpm build` y los E2E NO se ejecutan por tarea:
+los lanza el orchestrator al cerrar cada fase de tasks.md. Si un test
+de tu scope falla, re-ejecuta SOLO ese archivo sin `--reporter=dot`
+para ver el detalle.
+
+Si alguno falla, no cierres la tarea. Arréglalo o reporta al
 orchestrator con el error específico.
 
-Si el proyecto tiene Playwright, ejecuta los E2E de la feature
-también. Respeta los límites operacionales del `constitution.md`
-sección 11 (`workers: 1`, ejecución secuencial).
+Si tu tarea incluye E2E de Playwright, ejecútalos scoped al spec de
+la feature con `--reporter=line`. Respeta los límites operacionales
+del `constitution.md` sección 11 (`workers: 1`, ejecución secuencial).
 
 ## Reglas duras que jamás violas
 

@@ -1,0 +1,17 @@
+# .cbmignore — qué NO entra en el grafo de codebase-memory-mcp
+# (node_modules/.next/coverage/test-results ya los excluyen la lista built-in y .gitignore)
+
+# Snapshots meta de Drizzle: JSON generado, sin valor semántico
+src/infrastructure/db/migrations/meta/
+
+# Lockfile: en modo full se indexaría como YAML gigante
+pnpm-lock.yaml
+
+# Prompts de agentes y tooling SDD: contaminan la búsqueda BM25
+# con texto de instrucciones que no es código del dominio
+.opencode/
+.claude/
+.specify/
+
+# macOS
+.DS_Store
