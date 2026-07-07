@@ -16,6 +16,29 @@ export function createTestPool(): Pool {
 
 type PoolClient = Awaited<ReturnType<Pool["connect"]>>;
 
+/**
+ * Deja la BD de test vacía. TRUNCATE no está sujeto a RLS, y CASCADE
+ * arrastra todas las tablas con FK hacia tenants. Cada suite lo llama
+ * en su beforeAll para ser hermética frente a runs/suites anteriores.
+ */
+export async function resetTenantData(pool: Pool): Promise<void> {
+  await pool.query("TRUNCATE tenants RESTART IDENTITY CASCADE");
+}
+
+/** Seed idempotente de un tenant. */
+export async function seedTenant(
+  pool: Pool,
+  id: string,
+  slug: string,
+  name: string,
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO tenants (id, slug, name) VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO NOTHING`,
+    [id, slug, name],
+  );
+}
+
 export async function withTenant<T>(
   pool: Pool,
   tenantId: string,
