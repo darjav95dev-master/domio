@@ -3,8 +3,7 @@ import {
   TenantContext,
   type Transaction,
 } from "@/infrastructure/tenant/TenantContext";
-
-export type UserRole = "ADMIN" | "OPERATOR" | "AGENT";
+import type { UserRole } from "@/shared/constants/db-enums";
 
 export class AuthenticatedContext extends TenantContext {
   readonly type = "authenticated" as const;
