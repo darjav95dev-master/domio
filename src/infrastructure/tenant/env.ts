@@ -15,6 +15,35 @@ function validatePublicTenantId(value: string | undefined): string {
   return value.toLowerCase();
 }
 
-export const tenantEnv = {
-  PUBLIC_TENANT_ID: validatePublicTenantId(process.env.PUBLIC_TENANT_ID),
-};
+interface TenantEnvRecord {
+  readonly PUBLIC_TENANT_ID: string;
+}
+
+let validatedTenantRecord: TenantEnvRecord | null = null;
+
+function ensureTenantValidated(): TenantEnvRecord {
+  if (validatedTenantRecord) {
+    return validatedTenantRecord;
+  }
+
+  validatedTenantRecord = Object.freeze({
+    PUBLIC_TENANT_ID: validatePublicTenantId(process.env.PUBLIC_TENANT_ID),
+  });
+
+  return validatedTenantRecord;
+}
+
+export const tenantEnv: TenantEnvRecord = new Proxy(
+  {} as TenantEnvRecord,
+  {
+    get(_target, prop: string | symbol): string | undefined {
+      const record = ensureTenantValidated();
+
+      if (prop in record) {
+        return record[prop as keyof TenantEnvRecord];
+      }
+
+      return undefined;
+    },
+  },
+);

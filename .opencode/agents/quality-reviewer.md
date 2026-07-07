@@ -2,7 +2,7 @@
 name: quality-reviewer
 description: Use after /speckit-implement finishes and before merging a feature to main. Reviews the produced code against the principles in constitution.md and architecture.md, reporting violations grouped by severity (critical, major, minor) with concrete fix suggestions. Complements ESLint (which catches syntactic issues) by catching conceptual issues.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/minimax-m3
 permission:
   read: allow
   glob: allow

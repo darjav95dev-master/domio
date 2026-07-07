@@ -1,0 +1,243 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { randomUUID } from "crypto";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import type { MediaAsset } from "../db/schema/media-assets";
+import { mediaAssets } from "../db/schema/media-assets";
+import { db } from "../db/client";
+import {
+  ALLOWED_MEDIA_KINDS,
+  ALLOWED_UPLOAD_MIME_TYPES,
+  DEFAULT_MEDIA_OWNER_TYPE,
+  MAX_ALT_TEXT_LENGTH,
+  MAX_UPLOAD_SIZE_BYTES,
+} from "./constants";
+import { mediaEnv } from "./env";
+import { r2Client } from "./r2-client";
+import type { TransformOptions, UploadInput } from "./types";
+import { UploadValidationError } from "./types";
+
+export class MediaService {
+  private readonly s3Client = r2Client;
+  private readonly database = db;
+
+  constructor(private readonly tenantId: string) {}
+
+  async uploadImage(input: UploadInput): Promise<MediaAsset> {
+    const trimmedAltText = input.altText.trim();
+    if (trimmedAltText.length === 0) {
+      throw new UploadValidationError("alt_text is required");
+    }
+    if (trimmedAltText.length > MAX_ALT_TEXT_LENGTH) {
+      throw new UploadValidationError(
+        "alt_text must be 500 characters or less",
+      );
+    }
+
+    if (input.file.length === 0) {
+      throw new UploadValidationError("file cannot be empty");
+    }
+    if (input.file.length > MAX_UPLOAD_SIZE_BYTES) {
+      throw new UploadValidationError("file exceeds maximum size of 10 MB");
+    }
+
+    if (
+      !ALLOWED_UPLOAD_MIME_TYPES.includes(
+        input.mimeType as (typeof ALLOWED_UPLOAD_MIME_TYPES)[number],
+      )
+    ) {
+      throw new UploadValidationError(
+        `Unsupported MIME type. Allowed: ${ALLOWED_UPLOAD_MIME_TYPES.join(", ")}`,
+      );
+    }
+
+    if (
+      !ALLOWED_MEDIA_KINDS.includes(
+        input.kind as (typeof ALLOWED_MEDIA_KINDS)[number],
+      )
+    ) {
+      throw new UploadValidationError(
+        `Invalid kind. Must be ${ALLOWED_MEDIA_KINDS.join(", ")}`,
+      );
+    }
+
+    const extension = input.fileName.split(".").pop()?.toLowerCase() || "bin";
+    const r2Key = `${randomUUID()}.${extension}`;
+
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: mediaEnv.R2_BUCKET,
+        Key: r2Key,
+        Body: input.file,
+        ContentType: input.mimeType,
+      }),
+    );
+
+    return this.database.transaction(async (tx) => {
+      await tx.execute(
+        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+      );
+      const rows = await tx.insert(mediaAssets).values({
+        tenantId: this.tenantId,
+        ownerType: DEFAULT_MEDIA_OWNER_TYPE,
+        ownerId: input.ownerId,
+        kind: input.kind,
+        r2Key,
+        mimeType: input.mimeType,
+        sizeBytes: input.file.length,
+        altText: trimmedAltText,
+      }).returning();
+      return rows[0] as MediaAsset;
+    });
+  }
+
+  async signedReadUrl(
+    assetId: string,
+    ttlSeconds: number = 3600,
+    opts?: TransformOptions,
+  ): Promise<string> {
+    const asset = await this.database.transaction(async (tx) => {
+      await tx.execute(
+        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+      );
+      const [found] = await tx.select().from(mediaAssets).where(
+        and(eq(mediaAssets.id, assetId), eq(mediaAssets.tenantId, this.tenantId)),
+      );
+      return found;
+    });
+
+    if (!asset) {
+      throw new Error("Asset not found");
+    }
+
+    if (asset.kind === "IMAGE_GALLERY") {
+      return this.getPublicUrl(asset.r2Key);
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: mediaEnv.R2_BUCKET,
+      Key: asset.r2Key,
+    });
+
+    return getSignedUrl(this.s3Client, command, { expiresIn: ttlSeconds });
+  }
+
+  getPublicUrl(r2Key: string): string {
+    return `${mediaEnv.R2_PUBLIC_URL}/${r2Key}`;
+  }
+
+  async reorderGallery(
+    ownerId: string,
+    orderedAssetIds: string[],
+  ): Promise<void> {
+    if (orderedAssetIds.length === 0) {
+      return;
+    }
+
+    await this.database.transaction(async (tx) => {
+      await tx.execute(
+        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+      );
+
+      const existing = await tx
+        .select({ id: mediaAssets.id })
+        .from(mediaAssets)
+        .where(
+          and(
+            inArray(mediaAssets.id, orderedAssetIds),
+            eq(mediaAssets.ownerId, ownerId),
+            eq(mediaAssets.tenantId, this.tenantId),
+          ),
+        );
+
+      if (existing.length !== orderedAssetIds.length) {
+        throw new Error(
+          "One or more asset IDs do not belong to the specified owner",
+        );
+      }
+
+      for (const [i, assetId] of orderedAssetIds.entries()) {
+        await tx
+          .update(mediaAssets)
+          .set({ sortOrder: i })
+          .where(
+            and(
+              eq(mediaAssets.id, assetId),
+              eq(mediaAssets.ownerId, ownerId),
+              eq(mediaAssets.tenantId, this.tenantId),
+            ),
+          );
+      }
+    });
+  }
+
+  async setCover(ownerId: string, assetId: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await tx.execute(
+        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+      );
+
+      const [asset] = await tx
+        .select({ id: mediaAssets.id })
+        .from(mediaAssets)
+        .where(
+          and(
+            eq(mediaAssets.id, assetId),
+            eq(mediaAssets.ownerId, ownerId),
+            eq(mediaAssets.tenantId, this.tenantId),
+          ),
+        );
+
+      if (!asset) {
+        throw new Error("Asset not found for the specified owner");
+      }
+
+      await tx
+        .update(mediaAssets)
+        .set({ isCover: false })
+        .where(
+          and(
+            eq(mediaAssets.ownerId, ownerId),
+            eq(mediaAssets.tenantId, this.tenantId),
+          ),
+        );
+
+      await tx
+        .update(mediaAssets)
+        .set({ isCover: true })
+        .where(
+          and(
+            eq(mediaAssets.id, assetId),
+            eq(mediaAssets.ownerId, ownerId),
+            eq(mediaAssets.tenantId, this.tenantId),
+          ),
+        );
+    });
+  }
+
+  async delete(assetId: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await tx.execute(
+        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+      );
+
+      const [asset] = await tx.select().from(mediaAssets).where(
+        and(eq(mediaAssets.id, assetId), eq(mediaAssets.tenantId, this.tenantId)),
+      );
+
+      if (!asset) {
+        throw new Error("Asset not found");
+      }
+
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: mediaEnv.R2_BUCKET,
+          Key: asset.r2Key,
+        }),
+      );
+
+      await tx.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
+    });
+  }
+}

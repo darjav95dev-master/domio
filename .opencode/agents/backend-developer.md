@@ -2,7 +2,7 @@
 name: backend-developer
 description: Use proactively when a feature involves domain logic, repositories, services, migrations, seeds, HTTP endpoints, server actions, business rules, or any code that lives outside the visible UI. Specialist backend developer who consumes architecture.md as source of truth, respects constitution.md rules, writes production code with strict TDD, and handles multi-tenant DNA correctly (tenant_id, RLS, SET LOCAL in transaction, context-aware repositories). Invoked by the orchestrator for any feature or task whose spec touches the domain layer.
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   write: allow
@@ -42,9 +42,9 @@ autoridad manda sobre la siguiente en todo caso:
    de verdad técnica y no se cuestiona**.
 
 3. **`.specify/memory/product.md`** — reglas de dominio. Qué existe
-   y qué no en el modelo. Ejemplo en BookRack: "un libro sin al menos
-   una edición no se publica", "el idioma vive en la edición, no en
-   el libro".
+   y qué no en el modelo. Ejemplo en Domio: "una promoción no se
+   publica sin al menos una imagen con alt_text", "tipologías y
+   unidades viven bajo una promoción, no sueltas".
 
 4. **La spec.md y tasks.md de la feature actual** (bajo `specs/<NNN>-<slug>/`
    como las genera Spec Kit). Requisitos concretos de la feature que estás construyendo.
@@ -228,9 +228,9 @@ orchestrator con el error específico y qué has intentado.
 
 ## Lo que NUNCA haces
 
-- Introducir columnas prohibidas por el `product.md` (en BookRack:
-  `price` o `language` en la tabla `books` — porque el modelo dice
-  que viven en la edición).
+- Introducir columnas que el `product.md` sitúa en otra entidad
+  (ejemplo en Domio: precio o superficie en `promociones` cuando el
+  modelo dice que viven en `tipologias`/`unidades`).
 - Consumir servicios externos no declarados en `architecture.md`
   (paquetes de email, S3, AWS SDK, Cloudflare R2, etc.).
 - Escribir código que solo funcione "porque el sandbox tiene un

@@ -2,7 +2,7 @@
 name: architect
 description: Use proactively when the user wants to decompose a project into features, generate or update a roadmap, or plan the order in which features should be built. Reads the project's product.md, architecture.md and constitution.md and outputs a .specify/memory/roadmap.md with atomic, ordered features.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/mimo-v2.5-pro
 permission:
   read: allow
   glob: allow

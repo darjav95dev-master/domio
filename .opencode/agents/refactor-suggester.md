@@ -2,7 +2,7 @@
 name: refactor-suggester
 description: Use on demand (not automatically) when the user wants to identify refactoring opportunities after several features have been implemented. Scans the entire codebase looking for duplicated code between features, helpers that should be promoted to shared/, premature abstractions, and Scope Rule violations. Produces a prioritized refactor backlog.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/minimax-m3
 permission:
   read: allow
   glob: allow

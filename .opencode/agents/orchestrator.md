@@ -2,7 +2,7 @@
 name: orchestrator
 description: Master coordinator that drives the full SDD lifecycle for a feature. Use when the user wants to execute a complete feature from roadmap to merge with minimal manual intervention. Invokes architect, feature-briefer, /speckit-* commands, backend-developer (for domain code), frontend-developer (for UI code), tdd-enforcer, contract-guardian, quality-reviewer, and tfm-documenter in the correct order. The orchestrator NEVER writes production code itself — it only coordinates and delegates.
 mode: primary
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   task: allow
   todowrite: allow

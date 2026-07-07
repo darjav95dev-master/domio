@@ -1,7 +1,7 @@
 ---
 name: frontend-developer
 description: Use proactively when a feature involves rendering UI, building React/Next.js components, translating design.md tokens into code, or implementing any visible interface. Specialist frontend developer who consumes design.md as source of truth, loads design-taste-frontend as taste baseline when the feature has high visual weight, writes production code with tests, and respects constitution.md rules. Invoked by the orchestrator for any feature whose spec mentions components, pages, screens, layouts, styling, or user-facing interactions.
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow           # lee constitution, design.md, arch, spec, código existente
   write: allow          # escribe componentes, tests, globals.css
