@@ -56,7 +56,7 @@ describe("PublicContext", () => {
     expect(ctx.resolveFilters()).toEqual({ status: "PUBLISHED" });
   });
 
-  it("withTransaction sets SET LOCAL app.current_tenant_id before running callback", async () => {
+  it("withTransaction calls set_config for app.current_tenant_id before running callback", async () => {
     const { PublicContext } = await import(
       "@/infrastructure/tenant/PublicContext"
     );
@@ -71,7 +71,7 @@ describe("PublicContext", () => {
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(txMock.execute).toHaveBeenCalledTimes(1);
     expect(txMock.execute).toHaveBeenCalledWith(
-      sql`SET LOCAL app.current_tenant_id = ${publicTenantId}`,
+      sql`SELECT set_config('app.current_tenant_id', ${publicTenantId}, true)`,
     );
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledWith(txMock);
@@ -94,7 +94,7 @@ describe("PublicContext", () => {
     );
 
     expect(txMock.execute).toHaveBeenCalledWith(
-      sql`SET LOCAL app.current_tenant_id = ${publicTenantId}`,
+      sql`SELECT set_config('app.current_tenant_id', ${publicTenantId}, true)`,
     );
   });
 });
