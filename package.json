@@ -16,7 +16,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:contract": "echo 'contract tests — reserved'",
+    "test:contract": "vitest run tests/contract --passWithNoTests",
     "db:generate": "drizzle-kit generate --config=src/infrastructure/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=src/infrastructure/db/drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config=src/infrastructure/db/drizzle.config.ts",
