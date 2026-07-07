@@ -1,4 +1,4 @@
-import { createTestPool, withTenant } from "./db";
+import { createTestPool, resetTenantData, withTenant } from "./db";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import type { Pool } from "pg";
 
@@ -39,6 +39,7 @@ async function getPromocionIdBySlug(
 export async function seedTenantFixtures(): Promise<void> {
   const testPool = getTestPool();
   await testPool.query("SELECT 1");
+  await resetTenantData(testPool);
 
   await testPool.query(
     `INSERT INTO tenants (id, slug, name) VALUES

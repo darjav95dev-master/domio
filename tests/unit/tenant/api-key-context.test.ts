@@ -57,7 +57,7 @@ describe("ApiKeyContext", () => {
     });
   });
 
-  it("sets SET LOCAL app.current_tenant_id inside a transaction", async () => {
+  it("calls set_config for app.current_tenant_id inside a transaction", async () => {
     const ctx = new ApiKeyContext(tenantId, apiKeyId);
     const callback = vi.fn().mockResolvedValue("result");
     const txMock = { execute: vi.fn() };
@@ -69,7 +69,7 @@ describe("ApiKeyContext", () => {
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(txMock.execute).toHaveBeenCalledTimes(1);
     expect(txMock.execute).toHaveBeenCalledWith(
-      sql`SET LOCAL app.current_tenant_id = ${tenantId}`,
+      sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
     );
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledWith(txMock);

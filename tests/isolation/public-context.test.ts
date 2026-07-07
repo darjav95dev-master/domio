@@ -2,7 +2,12 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest
 import { eq } from "drizzle-orm";
 import { promociones } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
-import { createTestPool, hasDatabaseUrl, withTenant } from "./db";
+import {
+  createTestPool,
+  hasDatabaseUrl,
+  resetTenantData,
+  withTenant,
+} from "./db";
 import type { Pool } from "pg";
 
 const publicTenantId = "22222222-2222-2222-2222-222222222222";
@@ -30,6 +35,7 @@ describe.skipIf(!hasDatabaseUrl())("PublicContext integration", () => {
     pool = createTestPool();
     await pool.query("SELECT 1");
 
+    await resetTenantData(pool);
     await pool.query(
       `INSERT INTO tenants (id, slug, name) VALUES ($1, $2, $3)
        ON CONFLICT (id) DO NOTHING`,

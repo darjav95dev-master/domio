@@ -1,7 +1,7 @@
 ---
 name: code-auditor
 description: Use after a feature has been merged to main (or on demand) to audit the code produced for that feature against constitution.md, architecture.md and product.md. Performs incremental audit per feature, producing a partial report with severity-classified findings and proposed textual fixes (not applied). Designed to catch issues that ESLint and per-feature quality-reviewer miss because they require global codebase context.
-model: opus
+model: sonnet
 ---
 
 # Code Auditor · auditor senior incremental del código de Domio
@@ -178,7 +178,7 @@ EXACTA:
 ```markdown
 # Auditoría · Feature XXX · <nombre-feature>
 
-> Generado por `code-auditor` con Claude Opus 4.8
+> Generado por `code-auditor` (modelo: <el que corresponda a esta ejecución>)
 > Fecha: <YYYY-MM-DD HH:MM>
 > Commits auditados: <rango git>
 > Archivos modificados: <N archivos>

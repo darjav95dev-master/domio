@@ -30,7 +30,7 @@ describe("AuthenticatedContext", () => {
     expect(ctx.role).toBe(role);
   });
 
-  it("sets both SET LOCAL app.current_tenant_id and SET LOCAL app.current_user_id inside the transaction", async () => {
+  it("calls set_config for both app.current_tenant_id and app.current_user_id inside the transaction", async () => {
     const tenantId = "33333333-3333-3333-3333-333333333333";
     const userId = "44444444-4444-4444-4444-444444444444";
     const ctx = new AuthenticatedContext(tenantId, userId, "OPERATOR");
@@ -45,11 +45,11 @@ describe("AuthenticatedContext", () => {
     expect(txMock.execute).toHaveBeenCalledTimes(2);
     expect(txMock.execute).toHaveBeenNthCalledWith(
       1,
-      sql`SET LOCAL app.current_tenant_id = ${tenantId}`,
+      sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
     );
     expect(txMock.execute).toHaveBeenNthCalledWith(
       2,
-      sql`SET LOCAL app.current_user_id = ${userId}`,
+      sql`SELECT set_config('app.current_user_id', ${userId}, true)`,
     );
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledWith(txMock);
@@ -83,11 +83,11 @@ describe("AuthenticatedContext", () => {
     expect(txMock.execute).toHaveBeenCalledTimes(2);
     expect(txMock.execute).toHaveBeenNthCalledWith(
       1,
-      sql`SET LOCAL app.current_tenant_id = ${tenantId}`,
+      sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
     );
     expect(txMock.execute).toHaveBeenNthCalledWith(
       2,
-      sql`SET LOCAL app.current_user_id = ${userId}`,
+      sql`SELECT set_config('app.current_user_id', ${userId}, true)`,
     );
   });
 });

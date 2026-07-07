@@ -28,7 +28,7 @@ describe("TenantContext", () => {
     expect(ctx.getTenantId()).toBe(tenantId);
   });
 
-  it("opens a transaction and executes SET LOCAL app.current_tenant_id first", async () => {
+  it("opens a transaction and executes set_config for app.current_tenant_id first", async () => {
     const tenantId = "11111111-1111-1111-1111-111111111111";
     const ctx = new TestContext(tenantId);
     const callback = vi.fn().mockResolvedValue("result");
@@ -41,7 +41,7 @@ describe("TenantContext", () => {
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(txMock.execute).toHaveBeenCalledTimes(1);
     expect(txMock.execute).toHaveBeenCalledWith(
-      sql`SET LOCAL app.current_tenant_id = ${tenantId}`,
+      sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
     );
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledWith(txMock);
@@ -62,7 +62,7 @@ describe("TenantContext", () => {
     );
 
     expect(txMock.execute).toHaveBeenCalledWith(
-      sql`SET LOCAL app.current_tenant_id = ${tenantId}`,
+      sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
     );
   });
 });

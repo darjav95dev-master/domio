@@ -9,14 +9,13 @@ import { MediaService } from "@/infrastructure/media/media.service";
 import { UploadValidationError } from "@/infrastructure/media/types";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
+  ALLOWED_MEDIA_KINDS,
   MAX_UPLOAD_SIZE_BYTES,
   MAX_ALT_TEXT_LENGTH,
 } from "@/infrastructure/media/constants";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const VALID_KINDS = ["IMAGE_GALLERY", "PLAN", "DOCUMENT"] as const;
 
 const VALIDATION_FAILED = "Validation failed";
 const AUTH_REQUIRED = "Authentication required";
@@ -128,7 +127,7 @@ function validateKindField(
   if (
     !kindField ||
     typeof kindField !== "string" ||
-    !VALID_KINDS.includes(kindField as (typeof VALID_KINDS)[number])
+    !ALLOWED_MEDIA_KINDS.includes(kindField as (typeof ALLOWED_MEDIA_KINDS)[number])
   ) {
     errors.push({
       field: "kind",

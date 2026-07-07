@@ -1,3 +1,5 @@
+"use client";
+
 import { type InputHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/shared/utils/cn";
 

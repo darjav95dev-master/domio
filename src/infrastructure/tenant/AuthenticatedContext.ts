@@ -3,8 +3,7 @@ import {
   TenantContext,
   type Transaction,
 } from "@/infrastructure/tenant/TenantContext";
-
-export type UserRole = "ADMIN" | "OPERATOR" | "AGENT";
+import type { UserRole } from "@/shared/constants/db-enums";
 
 export class AuthenticatedContext extends TenantContext {
   readonly type = "authenticated" as const;
@@ -25,7 +24,7 @@ export class AuthenticatedContext extends TenantContext {
   async withTransaction<T>(fn: (tx: Transaction) => Promise<T>): Promise<T> {
     return super.withTransaction(async (tx) => {
       await tx.execute(
-        sql`SET LOCAL app.current_user_id = ${this.userId}`,
+        sql`SELECT set_config('app.current_user_id', ${this.userId}, true)`,
       );
       return fn(tx);
     });
