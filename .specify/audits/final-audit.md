@@ -400,3 +400,28 @@ Ningún `tasks.md` de feature mergeada refleja el trabajo realizado. Los `tasks.
 **Para calidad de código:** FIX-03 (z-index), FIX-04 (UserRole), FIX-05 (VALID_KINDS), FIX-06 (.eslintignore), FIX-07 (use client) y FIX-08 (CI #1 exención) son cambios de bajo riesgo aplicables en una sesión de 30 minutos.
 
 **Para el ciclo de desarrollo futuro:** configurar `DATABASE_URL` en CI (transversal X4), actualizar `tasks.md` al cerrar cada feature, y exigir commits separados de test antes de implementación.
+
+---
+
+## 8. Cierre de auditoría · 2026-07-08
+
+**`pnpm verify` VERDE** — 112 tests (23 archivos: unit, integration, isolation, e2e), lint, typecheck y build.
+
+Rama `audit/fixes-2026-07-08` mergeada a main con `--no-ff` y eliminada.
+
+| Fix | Estado final |
+|-----|-------------|
+| FIX-01 | APLICADO |
+| FIX-02 | APLICADO |
+| FIX-03 | APLICADO |
+| FIX-04 | APLICADO |
+| FIX-05 | APLICADO |
+| FIX-06 | APLICADO |
+| FIX-07 | APLICADO |
+| FIX-08 | APLICADO |
+| FIX-09 | APLICADO — `FORCE ROW LEVEL SECURITY` + policies SELECT/INSERT en históricos |
+| FIX-10 | PENDIENTE-HUMANO — refactor estructural de MediaAssetRepository |
+| NEW-01 | APLICADO — `SET LOCAL` parametrizado → `set_config()` (producción + tests) |
+| NEW-02 | APLICADO — suites de aislamiento herméticas (reset por suite, seeds idempotentes, sort_order explícito) |
+
+**Veredicto final post-fixes: APTO** — los dos críticos de seguridad (FORCE RLS + set_config) están corregidos y verificados con tests de aislamiento reales contra PostgreSQL. FIX-10 (MediaAssetRepository) queda como deuda técnica conocida para coordinarse con la feature F006+.
