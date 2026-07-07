@@ -43,11 +43,14 @@ jobs:
 
       - name: CI grep check #1 — no SET without LOCAL outside infrastructure
         run: |
-          matches=$(git ls-files '*.ts' | grep -v '^src/infrastructure/' | while read -r file; do
-            awk '{sub(/\/\/.*/,""); if ($0 ~ /SET / && $0 !~ /SET LOCAL/) print FILENAME":"NR":"$0}' "$file"
-          done)
+          matches=$(git ls-files '*.ts' \
+            | grep -vE '^src/infrastructure/tenant/' \
+            | grep -vE '^src/infrastructure/db/repositories/' \
+            | while read -r file; do
+              awk '{sub(/\/\/.*/,""); if ($0 ~ /SET / && $0 !~ /SET LOCAL/) print FILENAME":"NR":"$0}' "$file"
+            done)
           if [ -n "$matches" ]; then
-            echo "Found SET without LOCAL outside src/infrastructure/:"
+            echo "Found SET without LOCAL outside allowed paths:"
             echo "$matches"
             exit 1
           fi
