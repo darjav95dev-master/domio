@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(".", "src"),
+      "@app": path.resolve(".", "app"),
     },
   },
   esbuild: {

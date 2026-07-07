@@ -1,9 +1,16 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codebase-memory-mcp": {
+      "type": "local",
+      "enabled": true,
+      "command": ["/Users/dariojavierdiazcaballero/.local/bin/codebase-memory-mcp"]
+    }
+  },
   "agent": {
     "orchestrator": {
       "mode": "primary",
-      "model": "opencode-go/deepseek-v4-pro",
+      "model": "opencode-go/qwen3.7-plus",
       "permission": {
         "task": "allow",
         "todowrite": "allow",
@@ -19,7 +26,7 @@
       }
     },
     "architect": {
-      "model": "opencode-go/deepseek-v4-pro",
+      "model": "opencode-go/mimo-v2.5-pro",
       "permission": {
         "task": "allow",
         "read": "allow",
@@ -28,7 +35,7 @@
       }
     },
     "quality-reviewer": {
-      "model": "opencode-go/deepseek-v4-pro",
+      "model": "opencode-go/minimax-m3",
       "permission": {
         "read": "allow",
         "glob": "allow",
@@ -37,7 +44,7 @@
       }
     },
     "contract-guardian": {
-      "model": "opencode-go/minimax-m2.7",
+      "model": "opencode-go/deepseek-v4-flash",
       "permission": {
         "read": "allow",
         "glob": "allow",
@@ -45,11 +52,20 @@
       }
     },
     "refactor-suggester": {
-      "model": "opencode-go/deepseek-v4-pro",
+      "model": "opencode-go/minimax-m3",
       "permission": {
         "read": "allow",
         "glob": "allow",
         "grep": "allow"
+      }
+    },
+    "code-auditor": {
+      "model": "opencode-go/minimax-m3",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "bash": "allow"
       }
     },
     "tdd-enforcer": {
@@ -81,7 +97,7 @@
       }
     },
     "frontend-developer": {
-      "model": "opencode-go/kimi-k2.7-code",
+      "model": "opencode-go/deepseek-v4-flash",
       "permission": {
         "task": "allow",
         "todowrite": "allow",
@@ -96,7 +112,7 @@
       }
     },
     "backend-developer": {
-      "model": "opencode-go/kimi-k2.7-code",
+      "model": "opencode-go/deepseek-v4-flash",
       "permission": {
         "task": "allow",
         "todowrite": "allow",
@@ -111,7 +127,7 @@
       }
     },
     "design-director": {
-      "model": "opencode-go/deepseek-v4-pro",
+      "model": "opencode-go/deepseek-v4-flash",
       "permission": {
         "skill": "allow",
         "read": "allow",

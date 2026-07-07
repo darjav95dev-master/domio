@@ -20,18 +20,22 @@ describe("tenant env validation", () => {
     expect(tenantEnv.PUBLIC_TENANT_ID).toBe("11111111-1111-1111-1111-111111111111");
   });
 
-  it("throws when PUBLIC_TENANT_ID is missing", async () => {
+  it("throws when PUBLIC_TENANT_ID is missing on first property access", async () => {
     delete process.env.PUBLIC_TENANT_ID;
 
-    await expect(import("@/infrastructure/tenant/env")).rejects.toThrow(
+    const { tenantEnv } = await import("@/infrastructure/tenant/env");
+
+    expect(() => tenantEnv.PUBLIC_TENANT_ID).toThrow(
       "PUBLIC_TENANT_ID",
     );
   });
 
-  it("throws when PUBLIC_TENANT_ID is not a valid UUID", async () => {
+  it("throws when PUBLIC_TENANT_ID is not a valid UUID on first property access", async () => {
     process.env.PUBLIC_TENANT_ID = "not-a-uuid";
 
-    await expect(import("@/infrastructure/tenant/env")).rejects.toThrow(
+    const { tenantEnv } = await import("@/infrastructure/tenant/env");
+
+    expect(() => tenantEnv.PUBLIC_TENANT_ID).toThrow(
       "PUBLIC_TENANT_ID",
     );
   });

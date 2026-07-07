@@ -2,7 +2,7 @@
 name: contract-guardian
 description: Use whenever files under src/shared/api-contract/ or tests/contract/ are modified in a project that exposes or consumes a documented HTTP contract. Verifies that contract changes in one repository are mirrored in the sibling repository's mirror folder, blocking merges that would cause contract drift.
 mode: subagent
-model: opencode-go/minimax-m2.7
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

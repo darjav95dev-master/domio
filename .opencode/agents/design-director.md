@@ -2,7 +2,7 @@
 name: design-director
 description: Generates the project's visual design system (design.md) from a brief, via the visual-design-kit skill. Classifies the sector, proposes three distinct directions (each from a different aesthetic family, palette by engine, self-scored on the excellence rubric, checked against all ten AI-default traps, anchored to real references), waits for the human's pick, and writes design.md. Never writes component code. This is the design gate that must run BEFORE /bootstrap-project.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 permission:
   skill: allow
   read: allow
