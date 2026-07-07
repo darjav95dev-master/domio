@@ -107,6 +107,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 
 ### FIX-01 · CI grep check #2: añadir `transaction` y `execute` al patrón detectado
 
+> **ESTADO: APLICADO** — commit `c8ddcad` en rama `audit/fixes-2026-07-08`
+
 - **ID de referencia:** F004 C1
 - **Aplicabilidad:** AUTOMATICO
 - **Archivos afectados:** `.github/workflows/ci.yml` (líneas 56-64)
@@ -138,6 +140,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 
 ### FIX-02 · `test:contract`: reemplazar echo por vitest con --passWithNoTests
 
+> **ESTADO: APLICADO** — commit `f91706c` en rama `audit/fixes-2026-07-08`
+
 - **ID de referencia:** F001 M1 (transversal X3)
 - **Aplicabilidad:** AUTOMATICO
 - **Archivos afectados:** `package.json` (línea 15)
@@ -153,6 +157,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 ---
 
 ### FIX-03 · Z-index tokens: corregir escala para que toast (500) > nav (100)
+
+> **ESTADO: APLICADO** — commit `93a05e3` en rama `audit/fixes-2026-07-08`
 
 - **ID de referencia:** F003 M1
 - **Aplicabilidad:** AUTOMATICO
@@ -181,6 +187,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 
 ### FIX-04 · `UserRole` duplicado: importar desde `db-enums.ts` en `AuthenticatedContext.ts`
 
+> **ESTADO: APLICADO** — commit `7714a7a` en rama `audit/fixes-2026-07-08`
+
 - **ID de referencia:** F004 M1
 - **Aplicabilidad:** AUTOMATICO
 - **Archivos afectados:** `src/infrastructure/tenant/AuthenticatedContext.ts` (línea 7)
@@ -202,6 +210,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 ---
 
 ### FIX-05 · `VALID_KINDS` local en route: sustituir por `ALLOWED_MEDIA_KINDS` importado
+
+> **ESTADO: APLICADO** — commit `c711816` en rama `audit/fixes-2026-07-08`
 
 - **ID de referencia:** F005 M3
 - **Aplicabilidad:** AUTOMATICO
@@ -231,6 +241,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 
 ### FIX-06 · Eliminar `.eslintignore` deprecated (ESLint v9)
 
+> **ESTADO: APLICADO** — commit `5f6cbbf` en rama `audit/fixes-2026-07-08`
+
 - **ID de referencia:** F003 m6 (transversal X5)
 - **Aplicabilidad:** AUTOMATICO
 - **Archivos afectados:** `.eslintignore` (eliminar el archivo)
@@ -241,6 +253,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 ---
 
 ### FIX-07 · `input.tsx`: añadir `"use client"` (usa `forwardRef` sin directiva)
+
+> **ESTADO: APLICADO** — commit `78ff317` en rama `audit/fixes-2026-07-08`
 
 - **ID de referencia:** F003 m5
 - **Aplicabilidad:** AUTOMATICO
@@ -257,6 +271,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 ---
 
 ### FIX-08 · CI grep check #1: acotar exención a rutas quirúrgicas
+
+> **ESTADO: APLICADO** — commit `a16c527` en rama `audit/fixes-2026-07-08`
 
 - **ID de referencia:** F004 m2 (transversal X6)
 - **Aplicabilidad:** AUTOMATICO
@@ -280,6 +296,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 ---
 
 ### FIX-09 · RLS `FORCE ROW LEVEL SECURITY` en tablas de dominio
+
+> **ESTADO: PENDIENTE-HUMANO** — requiere migración de BD + decisión sobre rol de aplicación (opción A vs B). No aplicado.
 
 - **ID de referencia:** F002 C2
 - **Aplicabilidad:** DECISION HUMANA (migración de BD + decisión de rol de aplicación)
@@ -311,6 +329,8 @@ Los siguientes hallazgos son visibles únicamente con contexto global del reposi
 ---
 
 ### FIX-10 · Crear `MediaAssetRepository` y refactorizar `MediaService` para inyectar `TenantContext`
+
+> **ESTADO: PENDIENTE-HUMANO** — refactor estructural que afecta route handler + tests + service; debe coordinarse con F005 (auth-and-session) que está en rama sin mergear. No aplicado.
 
 - **ID de referencia:** F005 C1
 - **Aplicabilidad:** DECISION HUMANA (refactor estructural, afecta route handler + tests + service)
