@@ -123,16 +123,15 @@
   --spacing-gutter: var(--space-gutter);
 
   /* Z-index */
-  --z-index-base: var(--z-base);
-  --z-index-dropdown: var(--z-dropdown);
-  --z-index-sticky: var(--z-sticky);
-  --z-index-fixed: var(--z-fixed);
+  --z-index-base:           var(--z-base);
+  --z-index-above:          var(--z-above);
+  --z-index-sticky:         var(--z-sticky);
+  --z-index-nav:            var(--z-nav);
+  --z-index-dropdown:       var(--z-dropdown);
   --z-index-modal-backdrop: var(--z-modal-backdrop);
-  --z-index-modal: var(--z-modal);
-  --z-index-popover: var(--z-popover);
-  --z-index-tooltip: var(--z-tooltip);
-  --z-index-toast: var(--z-toast);
-  --z-index-nav: var(--z-nav);
+  --z-index-modal:          var(--z-modal);
+  --z-index-toast:          var(--z-toast);
+  --z-index-overlay-max:    var(--z-overlay-max);
 
   /* Motion: durations */
   --transition-duration-instant: var(--duration-instant);
@@ -282,16 +281,15 @@
   --space-gutter: 24px;
 
   /* Z-index scale */
-  --z-base: 0;
-  --z-dropdown: 10;
-  --z-sticky: 20;
-  --z-fixed: 30;
-  --z-modal-backdrop: 40;
-  --z-modal: 50;
-  --z-popover: 60;
-  --z-tooltip: 70;
-  --z-toast: 80;
-  --z-nav: 100;
+  --z-base:            0;
+  --z-above:           1;
+  --z-sticky:          10;
+  --z-nav:             100;
+  --z-dropdown:        200;
+  --z-modal-backdrop:  300;
+  --z-modal:           400;
+  --z-toast:           500;
+  --z-overlay-max:     9999;
 
   /* Motion: durations */
   --duration-instant: 0ms;
