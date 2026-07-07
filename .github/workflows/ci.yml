@@ -54,9 +54,15 @@ jobs:
 
       - name: CI grep check #2 — no raw db queries outside repositories/tenant
         run: |
-          matches=$(git ls-files '*.ts' | grep -vE '^src/infrastructure/db/repositories/' | grep -vE '^src/infrastructure/tenant/' | while read -r file; do
-            awk '{sub(/\/\/.*/,""); if ($0 ~ /db\.(select|insert|update|delete)/) print FILENAME":"NR":"$0}' "$file"
-          done)
+          matches=$(git ls-files '*.ts' \
+            | grep -vE '^src/infrastructure/db/repositories/' \
+            | grep -vE '^src/infrastructure/tenant/' \
+            | while read -r file; do
+              awk '{sub(/\/\/.*/,""); \
+                if ($0 ~ /db\.(select|insert|update|delete|transaction|execute)/ || \
+                    $0 ~ /\.database\.(select|insert|update|delete|transaction|execute)/) \
+                  print FILENAME":"NR":"$0}' "$file"
+            done)
           if [ -n "$matches" ]; then
             echo "Found raw db queries outside allowed paths:"
             echo "$matches"
