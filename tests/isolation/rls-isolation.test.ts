@@ -8,6 +8,11 @@ import {
   withTenant,
 } from "./db";
 
+const TENANT_A = "11111111-1111-1111-1111-111111111111";
+const TENANT_B = "22222222-2222-2222-2222-222222222222";
+const TENANT_C = "33333333-3333-3333-3333-333333333333";
+const TENANT_D = "44444444-4444-4444-4444-444444444444";
+
 describe.skipIf(!hasDatabaseUrl())("RLS tenant isolation", () => {
   let pool: Pool;
 
@@ -15,10 +20,10 @@ describe.skipIf(!hasDatabaseUrl())("RLS tenant isolation", () => {
     pool = createTestPool();
     await pool.query("SELECT 1");
     await resetTenantData(pool);
-    await seedTenant(pool, "11111111-1111-1111-1111-111111111111", "rls-tenant-a", "RLS Tenant A");
-    await seedTenant(pool, "22222222-2222-2222-2222-222222222222", "rls-tenant-b", "RLS Tenant B");
-    await seedTenant(pool, "33333333-3333-3333-3333-333333333333", "rls-tenant-c", "RLS Tenant C");
-    await seedTenant(pool, "44444444-4444-4444-4444-444444444444", "rls-tenant-d", "RLS Tenant D");
+    await seedTenant(pool, TENANT_A, "rls-tenant-a", "RLS Tenant A");
+    await seedTenant(pool, TENANT_B, "rls-tenant-b", "RLS Tenant B");
+    await seedTenant(pool, TENANT_C, "rls-tenant-c", "RLS Tenant C");
+    await seedTenant(pool, TENANT_D, "rls-tenant-d", "RLS Tenant D");
   });
 
   afterAll(async () => {
@@ -26,19 +31,16 @@ describe.skipIf(!hasDatabaseUrl())("RLS tenant isolation", () => {
   });
 
   it("hides tenant A promociones from tenant B", async () => {
-    const tenantA = "11111111-1111-1111-1111-111111111111";
-    const tenantB = "22222222-2222-2222-2222-222222222222";
-
-    await withTenant(pool, tenantA, async (client) => {
+    await withTenant(pool, TENANT_A, async (client) => {
       await client.query(
         `INSERT INTO promociones (
           tenant_id, slug, name, kind, status, location, location_approx, map_privacy_mode
         ) VALUES ($1, $2, $3, 'portfolio', 'PUBLISHED', 'POINT(0 0)', 'POINT(0 0)', 'EXACT')`,
-        [tenantA, "promo-a", "Promo A"],
+        [TENANT_A, "promo-a", "Promo A"],
       );
     });
 
-    const tenantBRows = await withTenant(pool, tenantB, async (client) => {
+    const tenantBRows = await withTenant(pool, TENANT_B, async (client) => {
       const result = await client.query("SELECT * FROM promociones");
       return result.rows;
     });
@@ -47,9 +49,7 @@ describe.skipIf(!hasDatabaseUrl())("RLS tenant isolation", () => {
   });
 
   it("returns tenant A promociones when queried from tenant A", async () => {
-    const tenantA = "11111111-1111-1111-1111-111111111111";
-
-    const tenantARows = await withTenant(pool, tenantA, async (client) => {
+    const tenantARows = await withTenant(pool, TENANT_A, async (client) => {
       const result = await client.query("SELECT * FROM promociones");
       return result.rows;
     });
@@ -58,23 +58,20 @@ describe.skipIf(!hasDatabaseUrl())("RLS tenant isolation", () => {
   });
 
   it("applies isolation to users table", async () => {
-    const tenantA = "33333333-3333-3333-3333-333333333333";
-    const tenantB = "44444444-4444-4444-4444-444444444444";
-
-    await withTenant(pool, tenantA, async (client) => {
+    await withTenant(pool, TENANT_C, async (client) => {
       await client.query(
         `INSERT INTO users (tenant_id, email, role) VALUES ($1, $2, 'ADMIN')`,
-        [tenantA, `admin-a-${Date.now()}@example.com`],
+        [TENANT_C, `admin-a-${Date.now()}@example.com`],
       );
     });
 
-    const tenantBUsers = await withTenant(pool, tenantB, async (client) => {
+    const tenantBUsers = await withTenant(pool, TENANT_D, async (client) => {
       const result = await client.query("SELECT * FROM users");
       return result.rows;
     });
 
     expect(
-      tenantBUsers.every((row) => row.tenant_id !== tenantA),
+      tenantBUsers.every((row) => row.tenant_id !== TENANT_C),
     ).toBe(true);
   });
 });
