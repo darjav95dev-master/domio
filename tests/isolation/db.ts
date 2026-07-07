@@ -25,7 +25,12 @@ export async function withTenant<T>(
 
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL app.current_tenant_id = $1", [tenantId]);
+    // set_config(..., true) = transaction-local (equivale a SET LOCAL) y
+    // admite parámetros bind; SET LOCAL ... = $1 es error de sintaxis en PG.
+    await client.query(
+      "SELECT set_config('app.current_tenant_id', $1, true)",
+      [tenantId],
+    );
     const result = await operation(client);
     await client.query("COMMIT");
 

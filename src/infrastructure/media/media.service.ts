@@ -76,7 +76,7 @@ export class MediaService {
 
     return this.database.transaction(async (tx) => {
       await tx.execute(
-        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
       );
       const rows = await tx.insert(mediaAssets).values({
         tenantId: this.tenantId,
@@ -99,7 +99,7 @@ export class MediaService {
   ): Promise<string> {
     const asset = await this.database.transaction(async (tx) => {
       await tx.execute(
-        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
       );
       const [found] = await tx.select().from(mediaAssets).where(
         and(eq(mediaAssets.id, assetId), eq(mediaAssets.tenantId, this.tenantId)),
@@ -137,7 +137,7 @@ export class MediaService {
 
     await this.database.transaction(async (tx) => {
       await tx.execute(
-        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
       );
 
       const existing = await tx
@@ -175,7 +175,7 @@ export class MediaService {
   async setCover(ownerId: string, assetId: string): Promise<void> {
     await this.database.transaction(async (tx) => {
       await tx.execute(
-        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
       );
 
       const [asset] = await tx
@@ -219,7 +219,7 @@ export class MediaService {
   async delete(assetId: string): Promise<void> {
     await this.database.transaction(async (tx) => {
       await tx.execute(
-        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
       );
 
       const [asset] = await tx.select().from(mediaAssets).where(

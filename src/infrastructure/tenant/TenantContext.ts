@@ -25,8 +25,11 @@ export abstract class TenantContext {
 
   async withTransaction<T>(fn: (tx: Transaction) => Promise<T>): Promise<T> {
     return db.transaction(async (tx) => {
+      // set_config(..., true) = transaction-local (equivale a SET LOCAL) y
+      // admite parámetros bind; SET LOCAL con placeholder es error de
+      // sintaxis en PostgreSQL (drizzle parametriza las interpolaciones).
       await tx.execute(
-        sql`SET LOCAL app.current_tenant_id = ${this.tenantId}`,
+        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
       );
       return fn(tx);
     });
