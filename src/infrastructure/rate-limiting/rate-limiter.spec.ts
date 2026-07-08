@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createRateLimiter } from "./rate-limiter.factory";
 import type { RateLimitConfig } from "./rate-limiter.types";
+import { logger } from "@/shared/utils/logger";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -69,66 +70,59 @@ describe("RateLimiter", () => {
       expect(result.remaining).toBeGreaterThanOrEqual(2);
     });
 
-    it("should deny requests over the limit", async () => {
-      mockRedis.get.mockReset().mockResolvedValue(config.limit);
-      mockRedis.incr.mockReset().mockResolvedValue(1);
-      mockRedis.expire.mockReset().mockResolvedValue(1);
+    it("should deny requests when counter exceeds the limit", async () => {
+      // Simulate counter at limit+1 (atomic consume uses increment directly)
+      mockRedis.incr.mockReset().mockResolvedValue(4);
 
       const limiter = createRateLimiter();
-      const result = await limiter.consume("user-2", config);
+      const result = await limiter.consume("user-over", config);
 
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
     });
 
+    it("should allow exactly `limit` requests and deny the (limit+1)th", async () => {
+      // With atomic consume, each call increments. Simulate sequential INCR results:
+      // 1st call → incr returns 1, allowed (1 <= 3)
+      // 2nd call → incr returns 2, allowed (2 <= 3)
+      // 3rd call → incr returns 3, allowed (3 <= 3)
+      // 4th call → incr returns 4, denied  (4 > 3)
+      const incrResults = [1, 2, 3, 4];
+      mockRedis.incr.mockReset().mockImplementation(() => {
+        const val = incrResults.shift() ?? 99;
+        return Promise.resolve(val);
+      });
+
+      const limiter = createRateLimiter();
+
+      // 3 requests within limit
+      for (let i = 0; i < 3; i++) {
+        const r = await limiter.consume("user-boundary", config);
+        expect(r.allowed).toBe(true);
+      }
+
+      // 4th request exceeds the limit
+      const denied = await limiter.consume("user-boundary", config);
+      expect(denied.allowed).toBe(false);
+      expect(denied.remaining).toBe(0);
+    });
+
     it("should return correct remaining and resetAt", async () => {
-      mockRedis.get.mockReset().mockResolvedValue(1);
       mockRedis.incr.mockReset().mockResolvedValue(2);
-      mockRedis.expire.mockReset().mockResolvedValue(1);
 
       const limiter = createRateLimiter();
       const result = await limiter.consume("user-3", config);
 
       expect(result.limit).toBe(config.limit);
+      expect(result.remaining).toBe(1); // 3 - 2 = 1
       expect(result.resetAt).toBeInstanceOf(Date);
       expect(result.resetAt.getTime()).toBeGreaterThan(Date.now());
     });
 
-    it("should NOT increment when over limit", async () => {
-      mockRedis.get.mockReset().mockResolvedValue(config.limit);
-      mockRedis.incr.mockReset().mockResolvedValue(1);
-      mockRedis.expire.mockReset().mockResolvedValue(1);
-
-      const limiter = createRateLimiter();
-      await limiter.consume("user-4", config);
-
-      // incr should not be called because check failed
-      expect(mockRedis.incr).not.toHaveBeenCalled();
-    });
-
-    it("should degrade gracefully when Redis throws on check", async () => {
-      // When the store is down, all operations fail
-      mockRedis.get.mockReset().mockRejectedValue(new Error("Connection refused"));
-      mockRedis.incr.mockReset().mockRejectedValue(new Error("Connection refused"));
-
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      const limiter = createRateLimiter();
-      const result = await limiter.consume("user-5", config);
-
-      expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(Infinity);
-      expect(warnSpy).toHaveBeenCalled();
-
-      warnSpy.mockRestore();
-    });
-
     it("should degrade gracefully when Redis throws on increment", async () => {
-      mockRedis.get.mockReset().mockResolvedValue(0);
       mockRedis.incr.mockReset().mockRejectedValue(new Error("Timeout"));
-      mockRedis.expire.mockReset().mockResolvedValue(1);
 
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const limiter = createRateLimiter();
       const result = await limiter.consume("user-6", config);
@@ -140,7 +134,7 @@ describe("RateLimiter", () => {
       warnSpy.mockRestore();
     });
 
-    it("should calculate sliding window with weighted previous window", async () => {
+    it("should calculate sliding window estimation in check()", async () => {
       // Pin time to a window boundary so that elapsed = 0 and weight = 1.0
       vi.useFakeTimers();
       vi.setSystemTime(new Date(1_000_000_000_000));
@@ -152,18 +146,31 @@ describe("RateLimiter", () => {
 
       mockRedis.get
         .mockReset()
-        .mockResolvedValueOnce(2)   // current window count
-        .mockResolvedValueOnce(4);  // previous window count
-      mockRedis.incr.mockReset().mockResolvedValue(3);
-      mockRedis.expire.mockReset().mockResolvedValue(1);
+        .mockResolvedValueOnce(2) // current window count
+        .mockResolvedValueOnce(4); // previous window count
 
       const limiter = createRateLimiter();
-      const result = await limiter.consume("user-sliding", shortConfig);
+      const result = await limiter.check("user-sliding", shortConfig);
 
       // With limit 5, estimated 6 → denied
       expect(result.allowed).toBe(false);
 
       vi.useRealTimers();
+    });
+
+    it("should return degraded result when check() encounters Redis error", async () => {
+      mockRedis.get.mockReset().mockRejectedValue(new Error("Connection refused"));
+
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const limiter = createRateLimiter();
+      const result = await limiter.check("user-check-fail", config);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(Infinity);
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { checkIpRateLimit } from "./ip-rate-limit";
+import { logger } from "@/shared/utils/logger";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ describe("checkIpRateLimit", () => {
       mockRedis.get.mockReset().mockResolvedValue(0);
       mockRedis.incr.mockReset().mockResolvedValue(1);
 
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const result = await checkIpRateLimit(TEST_IP, "login");
 
@@ -146,7 +147,7 @@ describe("checkIpRateLimit", () => {
       mockRedis.get.mockReset().mockRejectedValue(new Error("Timeout"));
       mockRedis.incr.mockReset().mockRejectedValue(new Error("Timeout"));
 
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const result = await checkIpRateLimit(TEST_IP, "login");
 

@@ -24,6 +24,7 @@ const {
   setTenantContext,
   addBreadcrumb,
   sanitizeEvent,
+  markSentryInitialized,
 } = await import("./sentry.wrapper");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ describe("captureError", () => {
     vi.clearAllMocks();
     vi.stubEnv("SENTRY_DSN", TEST_DSN);
     vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+    markSentryInitialized();
   });
 
   it("calls Sentry.captureException with the error", () => {
@@ -98,6 +100,7 @@ describe("setTenantContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("SENTRY_DSN", TEST_DSN);
+    markSentryInitialized();
   });
 
   it("sets tenant_id, user_id, role tags via Sentry.setTag", () => {
@@ -126,13 +129,14 @@ describe("addBreadcrumb", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("SENTRY_DSN", TEST_DSN);
+    markSentryInitialized();
   });
 
-  it("adds breadcrumb with message and data", () => {
-    addBreadcrumb("User logged in", { userId: USER_ID });
+  it("adds breadcrumb with message and sanitized data", () => {
+    addBreadcrumb("User logged in", { userId: USER_ID, api_key: "sk-123" });
     expect(mockAddBreadcrumb).toHaveBeenCalledWith({
       message: "User logged in",
-      data: { userId: USER_ID },
+      data: { userId: USER_ID, api_key: "[FILTERED]" },
     });
   });
 

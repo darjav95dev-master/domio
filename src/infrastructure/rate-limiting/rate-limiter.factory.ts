@@ -1,37 +1,6 @@
-import { Redis } from "@upstash/redis";
 import type { RateLimitConfig, RateLimitResult, RateLimiter } from "./rate-limiter.types";
 import { UpstashRateLimiter } from "./rate-limiter";
-
-/**
- * Extracts the Upstash REST URL and token from environment variables.
- *
- * `RATE_LIMIT_STORE_URL` can be a full Upstash REST URL (with embedded credentials
- * like `https://key:token@region.upstash.io`) or a plain endpoint URL.
- * If the URL contains embedded credentials, the token is extracted from it.
- * Otherwise, `RATE_LIMIT_STORE_TOKEN` is used as the bearer token.
- */
-function getUpstashCredentials(): { url: string; token: string } {
-  const rawUrl = process.env.RATE_LIMIT_STORE_URL ?? "";
-
-  const embeddedToken = process.env.RATE_LIMIT_STORE_TOKEN;
-  if (embeddedToken) {
-    return { url: rawUrl, token: embeddedToken };
-  }
-
-  // Try to extract token from embedded credentials in the URL
-  try {
-    const parsed = new URL(rawUrl);
-    const pw = parsed.password || parsed.username;
-    if (pw) {
-      const cleanUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}`;
-      return { url: cleanUrl, token: pw };
-    }
-  } catch {
-    // ignore parse errors
-  }
-
-  return { url: rawUrl, token: "" };
-}
+import { getRedisClient } from "./redis-client";
 
 /**
  * No-op rate limiter returned when the rate limit store URL is not configured.
@@ -70,13 +39,11 @@ class NoopRateLimiter implements RateLimiter {
  * with sliding window counter algorithm.
  */
 export function createRateLimiter(): RateLimiter {
-  const rawUrl = process.env.RATE_LIMIT_STORE_URL;
+  const redis = getRedisClient();
 
-  if (!rawUrl) {
+  if (!redis) {
     return new NoopRateLimiter();
   }
 
-  const { url, token } = getUpstashCredentials();
-  const redis = new Redis({ url, token });
   return new UpstashRateLimiter(redis);
 }

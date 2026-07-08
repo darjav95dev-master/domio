@@ -1,6 +1,7 @@
-import { Redis } from "@upstash/redis";
 import type { RateLimiter } from "./rate-limiter.types";
 import { createRateLimiter } from "./rate-limiter.factory";
+import { getRedisClient } from "./redis-client";
+import { logger } from "@/shared/utils/logger";
 import {
   LOGIN_MAX_ATTEMPTS,
   LOGIN_WINDOW_MINUTES,
@@ -29,33 +30,6 @@ const SCOPE_CONFIGS: Record<RateLimitScope, { limit: number; windowMs: number }>
 };
 
 const LOCKOUT_SECONDS = LOCKOUT_MINUTES * 60;
-
-// ─── Redis client (lazy singleton) ───────────────────────────────────────────
-
-let _redisClient: Redis | null = null;
-
-function getRedisClient(): Redis | null {
-  if (_redisClient) return _redisClient;
-
-  const rawUrl = process.env.RATE_LIMIT_STORE_URL;
-  if (!rawUrl) return null;
-
-  const token = parseToken(rawUrl);
-  _redisClient = new Redis({ url: rawUrl, token });
-  return _redisClient;
-}
-
-function parseToken(url: string): string {
-  const envToken = process.env.RATE_LIMIT_STORE_TOKEN;
-  if (envToken) return envToken;
-
-  try {
-    const parsed = new URL(url);
-    return parsed.password || parsed.username || "";
-  } catch {
-    return "";
-  }
-}
 
 // ─── Key builders ────────────────────────────────────────────────────────────
 
@@ -106,8 +80,8 @@ export async function checkIpRateLimit(
         };
       }
     } catch (error) {
-      console.warn(
-        `[IpRateLimit] Degraded lockout check for "${ip}" scope "${scope}":`,
+      logger.warn(
+        `Degraded lockout check for "${ip}" scope "${scope}":`,
         error instanceof Error ? error.message : String(error),
       );
       // Degrade gracefully: allow request to proceed
@@ -122,8 +96,8 @@ export async function checkIpRateLimit(
     try {
       await redis.set(buildLockoutKey(ip, scope), "1", { ex: LOCKOUT_SECONDS });
     } catch (error) {
-      console.warn(
-        `[IpRateLimit] Failed to set lockout for "${ip}" scope "${scope}":`,
+      logger.warn(
+        `Failed to set lockout for "${ip}" scope "${scope}":`,
         error instanceof Error ? error.message : String(error),
       );
       // Degrade gracefully: the rate limiter already denied this request

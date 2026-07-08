@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createRateLimiter } from "./rate-limiter.factory";
 import type { RateLimiter } from "./rate-limiter.types";
 import { DEFAULT_API_LIMIT_PER_MIN } from "@/shared/constants/rate-limits";
+import { logger } from "@/shared/utils/logger";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,8 @@ describe("API Key rate limiting middleware", () => {
     });
 
     it("should return denied result when over limit", async () => {
-      mockRedis.get.mockReset().mockResolvedValue(TEST_RATE_LIMIT);
+      // With atomic consume, incr determines the result
+      mockRedis.incr.mockReset().mockResolvedValue(TEST_RATE_LIMIT + 1);
 
       const { checkApiKeyRateLimit } = await import("./api-key-middleware");
       rateLimiter = createRateLimiter();
@@ -89,7 +91,7 @@ describe("API Key rate limiting middleware", () => {
       // Simulate a full Redis outage: both get and incr fail
       mockRedis.get.mockReset().mockRejectedValue(new Error("Connection refused"));
       mockRedis.incr.mockReset().mockRejectedValue(new Error("Connection refused"));
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const { checkApiKeyRateLimit } = await import("./api-key-middleware");
       rateLimiter = createRateLimiter();

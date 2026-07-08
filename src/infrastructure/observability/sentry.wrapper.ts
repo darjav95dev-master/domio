@@ -9,9 +9,26 @@ export interface SentryContext {
 
 const SECRET_PATTERN = /password|secret|token|api_?key|authorization|cookie|credit/i;
 
+/**
+ * Flag que se setea a true cuando los config files llaman a Sentry.init().
+ * isSentryConfigured() verifica este flag además de las env vars para
+ * evitar operaciones sobre un SDK no inicializado.
+ */
+let _sentryInitialized = false;
+
+/**
+ * Marca Sentry como inicializado.
+ * Debe llamarse desde sentry.client.config.ts y sentry.server.config.ts
+ * después de Sentry.init().
+ */
+export function markSentryInitialized(): void {
+  _sentryInitialized = true;
+}
+
 function isSentryConfigured(): boolean {
-  return !!(
-    process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN
+  return (
+    _sentryInitialized &&
+    !!(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN)
   );
 }
 
@@ -49,7 +66,8 @@ export function setTenantContext(context: SentryContext): void {
 
 /**
  * Añade un breadcrumb para el trail de debugging.
- * Los breadcrumbs se filtran para eliminar datos sensibles.
+ * Los datos se filtran localmente (no solo en beforeBreadcrumb del SDK)
+ * para eliminar información sensible antes de registrarlos.
  */
 export function addBreadcrumb(
   message: string,
@@ -57,7 +75,9 @@ export function addBreadcrumb(
 ): void {
   if (!isSentryConfigured()) return;
 
-  Sentry.addBreadcrumb({ message, data });
+  const cleanData = data ? sanitizeEvent({ data }).data as Record<string, unknown> | undefined : undefined;
+
+  Sentry.addBreadcrumb({ message, data: cleanData });
 }
 
 // ─── Filtrado de secrets ─────────────────────────────────────────────────────

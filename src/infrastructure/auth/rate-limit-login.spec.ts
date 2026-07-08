@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkLoginRateLimit, extractIpFromHeaders } from "./rate-limit-login";
+import { checkLoginRateLimit } from "./rate-limit-login";
+import { extractIpFromHeaders } from "@/shared/utils/extract-ip";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 

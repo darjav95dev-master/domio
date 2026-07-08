@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import type { RateLimitConfig, RateLimitResult, RateLimiter } from "./rate-limiter.types";
+import { logger } from "@/shared/utils/logger";
 
 /**
  * Upstash Redis-backed rate limiter with sliding window counter algorithm.
@@ -7,6 +8,9 @@ import type { RateLimitConfig, RateLimitResult, RateLimiter } from "./rate-limit
  * The sliding window uses 2 sub-windows (current and previous) and
  * weights the previous window by its overlap with the actual window.
  * This gives O(1) memory per key with good accuracy.
+ *
+ * `consume()` uses INCR as the atomic primitive (no TOCTOU race).
+ * `check()` is a read-only estimation for informational use.
  */
 export class UpstashRateLimiter implements RateLimiter {
   constructor(private readonly redis: Redis) {}
@@ -37,8 +41,8 @@ export class UpstashRateLimiter implements RateLimiter {
         resetAt,
       };
     } catch (error) {
-      console.warn(
-        `[RateLimiter] Degraded check for "${identifier}":`,
+      logger.warn(
+        `Degraded check for "${identifier}":`,
         error instanceof Error ? error.message : String(error),
       );
       return this.degradedResult(config);
@@ -59,25 +63,27 @@ export class UpstashRateLimiter implements RateLimiter {
       const resetAt = new Date(currentWindowStart + config.windowMs);
 
       return {
-        allowed: remaining > 0,
+        allowed: newCount <= config.limit,
         remaining,
         limit: config.limit,
         resetAt,
       };
     } catch (error) {
-      console.warn(
-        `[RateLimiter] Degraded increment for "${identifier}":`,
+      logger.warn(
+        `Degraded increment for "${identifier}":`,
         error instanceof Error ? error.message : String(error),
       );
       return this.degradedResult(config);
     }
   }
 
+  /**
+   * Consume de forma atómica usando INCR como primitiva.
+   * Incrementa el contador primero, luego decide si está permitido
+   * comparando newCount contra el límite. Esto elimina el TOCTOU
+   * entre check() e increment() porque INCR es atómico en Redis.
+   */
   async consume(identifier: string, config: RateLimitConfig): Promise<RateLimitResult> {
-    const checkResult = await this.check(identifier, config);
-    if (!checkResult.allowed) {
-      return checkResult;
-    }
     return this.increment(identifier, config);
   }
 

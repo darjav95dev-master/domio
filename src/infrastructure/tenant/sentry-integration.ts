@@ -1,5 +1,6 @@
 import { setTenantContext } from "@/infrastructure/observability/sentry.wrapper";
 import { getTenantContext } from "./context-middleware";
+import { AuthenticatedContext } from "./AuthenticatedContext";
 
 /**
  * Sincroniza el contexto de tenant activo con Sentry.
@@ -16,11 +17,14 @@ export function syncSentryWithTenant(): void {
 
   if (!ctx) return;
 
-  const ctxAny = ctx as { userId?: string | null; role?: string | null };
-
-  setTenantContext({
+  const context: { tenantId: string; userId?: string; role?: string } = {
     tenantId: ctx.getTenantId(),
-    ...(ctxAny.userId ? { userId: ctxAny.userId } : {}),
-    ...(ctxAny.role ? { role: ctxAny.role } : {}),
-  });
+  };
+
+  if (ctx instanceof AuthenticatedContext) {
+    context.userId = ctx.userId;
+    context.role = ctx.role;
+  }
+
+  setTenantContext(context);
 }
