@@ -294,3 +294,120 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
   - `scripts/worker-emails.ts` (58 líneas — entry point standalone)
 
 ---
+
+## Feature 008 · rate-limiting-and-observability
+*Mergeada el 2026-07-08. Rama: `feature/008-rate-limiting-and-observability`. Commits: `f6d17a5`, `40fc088`, `10f3283`.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 1779 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (checklist sin marcadores pendientes)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 28 (T001–T028 en 7 fases)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 6 (R1–R6: Upstash Redis, sliding window counter, Sentry SDK, ErrorBoundary class component, degradación graceful, filtrado de secrets)
+- Entidades de datos documentadas en data-model.md: 3 (RateLimitConfig, RateLimitResult, SentryContext)
+- Interfaces contractuales documentadas en contracts: 3 (RateLimiter, SentryWrapper, ErrorBoundary)
+
+### Métricas de implementación
+- Commits en la rama: 3 (1 spec/plan + 1 implementación + 1 fix post-review)
+- Líneas añadidas: 2.848 (excluyendo `pnpm-lock.yaml`)
+- Líneas eliminadas: 2
+- Archivos nuevos: 34 (incluyendo 13 test files, 21 archivos de código fuente)
+- Archivos modificados: 4 (`app/layout.tsx`, `src/shared/components/index.ts`, `vitest.config.ts`, `src/vitest-env.d.ts`)
+- Tests totales tras la feature: 309 pasando (45 test files)
+- Tests nuevos de la feature: ~80 en 13 test files
+- Cobertura global tras la feature: **91,23% statements**, 88,37% branches, 93% functions, 91,23% lines
+- Cobertura en módulos críticos de la feature:
+  - `rate-limiter.ts`: 100% statements, 75% branches, 100% functions, 100% lines
+  - `rate-limiter.factory.ts`: 100% statements, 75% branches, 100% functions, 100% lines
+  - `redis-client.ts`: 85,18% statements, 75% branches, 100% functions, 85,18% lines
+  - `api-key-middleware.ts`: 100% statements, 90,9% branches, 100% functions, 100% lines
+  - `ip-rate-limit.ts`: 100% statements, 94,73% branches, 100% functions, 100% lines
+  - `sentry.wrapper.ts`: 99,18% statements, 94,73% branches, 100% functions, 99,18% lines
+  - `sentry-common.ts`: 100% en todas las métricas
+  - `sentry-integration.ts`: 100% en todas las métricas
+  - `error-boundary.tsx`: 100% en todas las métricas
+  - `logger.ts`: 100% en todas las métricas
+  - `extract-ip.ts`: 100% statements, 85,71% branches, 100% functions, 100% lines
+  - `rate-limits.ts` (constantes): 100% en todas las métricas
+- Lint: clean (0 errores)
+- Typecheck: clean (0 errores)
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado; los tests se escribieron en cada fase antes de la implementación siguiendo el plan TDD)
+- **quality-reviewer:** APROBADA TRAS CORRECCIONES
+  - **1ª ronda:** 2 críticas — consumidores duplicaban lógica cliente/servidor de Sentry y usaban `console.warn` para logging — corregidas en commit `10f3283`
+  - **2ª ronda:** APROBADA (0 críticas, 2 menores cosméticas)
+  - Correcciones aplicadas: (1) Sentry config unificada en `sentry-common.ts` para evitar divergencia client/server; (2) `redis-client.ts` extraído como singleton; (3) `consume()` atómico; (4) `logger.ts` reemplaza `console.warn`; (5) `extract-ip.ts` extraído como utility; (6) flag `markSentryInitialized()` para verificación real de inicialización.
+- **contract-guardian:** NO APLICA (no hay API HTTP externa nueva en esta feature; los contratos internos del rate limiter y Sentry wrapper se documentaron en `contracts/rate-limiting-and-observability.md`)
+
+### Desvíos respecto al plan inicial
+- **Ninguno estructural.** Las 28 tareas en 7 fases se completaron según el plan. Las fases US1, US2, US3 y US4 se ejecutaron secuencialmente según las dependencias especificadas.
+- **Cambios operativos post-review:** Se añadieron 5 archivos no planificados (`redis-client.ts`, `sentry-common.ts`, `logger.ts`, `extract-ip.ts`, `sentry-common.spec.ts`) como resultado de la refactorización solicitada por quality-reviewer. El plan original incluía la lógica en línea dentro de `rate-limiter.ts` y `sentry.{client,server}.config.ts` por separado.
+- La implementación se entregó en un único commit (`40fc088`) que abarcó todas las fases, con un commit de fix posterior (`10f3283`) para las correcciones de revisión.
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Sliding window counter con dos sub-ventanas (D1):** Se implementó el algoritmo de ventana deslizante con dos claves Redis (contador actual + contador ponderado por solapamiento), en lugar de fixed window (burst en bordes) o sliding window log (O(N) memoria). Documentado en research.md R2.
+2. **consume() atómico vía INCR como primitiva (D2):** Se unificó `check()` e `increment()` en un solo método `consume()` que realiza la verificación y el incremento en una operación atómica, evitando race conditions entre la lectura y la escritura. Implementado tras revisión de quality-reviewer.
+3. **Cliente Redis compartido como singleton (D3):** Se extrajo `redis-client.ts` para evitar múltiples conexiones a Upstash desde distintos puntos de la aplicación. El cliente se instancia una sola vez y se reutiliza vía el factory del rate limiter. Implementado tras revisión de quality-reviewer.
+4. **Sentry config compartida (sentry-common.ts) (D4):** Se unificó la configuración de Sentry (beforeSend, beforeBreadcrumb, filtrado de secrets) en `sentry-common.ts`, eliminando la duplicación entre `sentry.client.config.ts` y `sentry.server.config.ts`. Implementado tras revisión de quality-reviewer.
+5. **Logger estructurado propio (D5):** Se creó `src/shared/utils/logger.ts` con niveles (error, warn, info, debug) en lugar de usar `console.warn` directo, permitiendo filtrado por nivel y formato consistente. Implementado tras revisión de quality-reviewer.
+6. **isSentryConfigured con flag de inicialización real (D6):** En lugar de verificar solo la existencia de `SENTRY_DSN`, se añadió un flag `markSentryInitialized()` que se activa tras `Sentry.init()` exitoso, permitiendo detectar casos donde el DSN existe pero la inicialización falló.
+7. **Degradación graceful con try/catch y fallback a allow (D7):** El rate limiter envuelve cada operación Redis en try/catch. Si el almacén falla, retorna `{ allowed: true }` con log warn. El consumidor nunca necesita manejar errores del rate limiter. Documentado en research.md R5.
+8. **Filtrado de secrets en Sentry con regex recursivo (D8):** Se implementó `sanitizeEvent()` que recorre recursivamente el payload del evento eliminando keys que matchean `password|secret|token|api_?key|authorization|cookie`. El `tenant_id` no se filtra — es un identificador de negocio requerido. Documentado en research.md R6.
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **TDD funcionó para infraestructura externa:** Los ~80 tests se escribieron siguiendo RED→GREEN, incluyendo mocks de `@upstash/redis` y `@sentry/nextjs`. La interfaz `RateLimiter` se diseñó como interfaz TypeScript para permitir mocking completo del almacén.
+- **Quality review atrapó duplicación crítica:** La primera revisión detectó que `sentry.client.config.ts` y `sentry.server.config.ts` duplicaban la misma lógica de filtrado de secrets y configuración. La extracción a `sentry-common.ts` redujo el código duplicado y previno divergencia futura entre cliente y servidor.
+- **Atomicidad del rate limiter como descubrimiento tardío:** El diseño inicial separaba `check()` e `increment()` como métodos independientes, pero la revisión identificó una race condition: entre check e increment, otra request podía incrementar. La unificación en `consume()` atómico fue la corrección más significativa del review.
+- **Logger como decisión transversal:** `logger.ts` en `src/shared/utils/` resultó ser una utilidad reutilizable más allá del rate limiting. Su nivelación (error, warn, info, debug) permite filtrado futuro sin cambiar las llamadas.
+- **Degradación graceful verificada en tests:** El test `rate-limiter.spec.ts` mockea un error de conexión de Upstash y verifica que `consume()` retorna `allowed: true` y se genera un log warn con el motivo. Este test verifica el contrato de degradación graceful (CA-3) sin depender de una instancia real de Upstash.
+- **Error boundary con 100% de cobertura:** El `error-boundary.tsx` alcanza 100% en statements, branches, functions y lines con 294 líneas de tests que verifican: captura de error, renderizado de fallback con mensaje y botón, reset del state, callback onError, y accesibilidad (role="alert").
+
+### Artefactos generados
+- spec.md: `specs/008-rate-limiting-and-observability/spec.md` (179 líneas, 6 RFs, 10 CA, 5 escenarios)
+- plan.md: `specs/008-rate-limiting-and-observability/plan.md` (99 líneas, constitution check 11/11 principios PASS)
+- research.md: `specs/008-rate-limiting-and-observability/research.md` (98 líneas, 6 decisiones técnicas)
+- data-model.md: `specs/008-rate-limiting-and-observability/data-model.md` (95 líneas, 3 entidades, 5 claves Redis)
+- contracts: `specs/008-rate-limiting-and-observability/contracts/rate-limiting-and-observability.md` (137 líneas, 4 interfaces)
+- checklist: `specs/008-rate-limiting-and-observability/checklists/requirements.md` (35 líneas, 0 NEEDS CLARIFICATION)
+- quickstart.md: `specs/008-rate-limiting-and-observability/quickstart.md` (88 líneas, 6 escenarios)
+- Tests: 13 test files, ~80 tests
+  - `src/infrastructure/rate-limiting/rate-limiter.spec.ts` (176 líneas)
+  - `src/infrastructure/rate-limiting/redis-client.spec.ts` (50 líneas)
+  - `src/infrastructure/rate-limiting/api-key-middleware.spec.ts` (240 líneas)
+  - `src/infrastructure/rate-limiting/ip-rate-limit.spec.ts` (214 líneas)
+  - `src/infrastructure/observability/sentry.wrapper.spec.ts` (263 líneas)
+  - `src/infrastructure/observability/sentry-common.spec.ts` (50 líneas)
+  - `src/infrastructure/tenant/sentry-integration.spec.ts` (78 líneas)
+  - `src/infrastructure/auth/rate-limit-login.spec.ts` (104 líneas)
+  - `src/features/api-public/with-rate-limit.spec.ts`
+  - `src/features/contact/contact-form-action.spec.ts`
+  - `src/shared/components/error-boundary.spec.tsx` (294 líneas)
+  - `src/shared/utils/extract-ip.spec.ts` (27 líneas)
+  - `src/shared/utils/logger.spec.ts` (32 líneas)
+- Código fuente (21 archivos nuevos):
+  - `src/infrastructure/rate-limiting/rate-limiter.types.ts` (38 líneas — interfaces RateLimitConfig, RateLimitResult, RateLimiter)
+  - `src/infrastructure/rate-limiting/rate-limiter.ts` (116 líneas — sliding window counter con degrade graceful)
+  - `src/infrastructure/rate-limiting/rate-limiter.factory.ts` (49 líneas — factory con no-op si no hay URL)
+  - `src/infrastructure/rate-limiting/redis-client.ts` (46 líneas — singleton Redis)
+  - `src/infrastructure/rate-limiting/api-key-middleware.ts` (79 líneas — middleware por API key)
+  - `src/infrastructure/rate-limiting/ip-rate-limit.ts` (114 líneas — rate limit por IP con lockout)
+  - `src/infrastructure/observability/sentry-common.ts` (52 líneas — config compartida)
+  - `src/infrastructure/observability/sentry.wrapper.ts` (126 líneas — captureError, setTenantContext, addBreadcrumb)
+  - `src/infrastructure/auth/rate-limit-login.ts` (45 líneas — integración Auth.js)
+  - `src/infrastructure/tenant/sentry-integration.ts` (30 líneas — integración con TenantContext)
+  - `src/features/api-public/with-rate-limit.ts` (helper para route handlers)
+  - `src/features/contact/contact-form-action.ts` (56 líneas — server action con rate limit)
+  - `src/shared/components/error-boundary.tsx` (100 líneas — class component con fallback a11y)
+  - `src/shared/constants/rate-limits.ts` (39 líneas — constantes de límites)
+  - `src/shared/utils/logger.ts` (30 líneas — log estructurado)
+  - `src/shared/utils/extract-ip.ts` (24 líneas — extracción de IP del request)
+  - `instrumentation.ts` — hook Next.js para inicializar Sentry
+  - `sentry.client.config.ts` — configuración client-side (refactorizada)
+  - `sentry.server.config.ts` — configuración server-side (refactorizada)
+  - `app/global-error.tsx` — global error handler Next.js
+  - `src/vitest-env.d.ts` — tipos adicionales de vitest
+
+---
