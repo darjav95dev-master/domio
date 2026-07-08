@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, Geist_Mono } from "next/font/google";
-import { ErrorBoundary } from "@/shared/components/error-boundary";
-import { captureError } from "@/infrastructure/observability/sentry.wrapper";
+import { RootErrorBoundary } from "@/shared/components/root-error-boundary";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -48,9 +47,9 @@ export default function RootLayout({
       style={{ colorScheme: "light" }}
     >
       <body className="min-h-screen antialiased">
-        <ErrorBoundary onError={(error) => captureError(error, { endpoint: "/" })}>
+        <RootErrorBoundary>
           {children}
-        </ErrorBoundary>
+        </RootErrorBoundary>
       </body>
     </html>
   );

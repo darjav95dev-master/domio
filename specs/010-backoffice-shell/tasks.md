@@ -18,8 +18,8 @@
 
 **Purpose**: Instalar dependencias y crear estructura de archivos base
 
-- [ ] T001 Instalar `next-auth@5` (Auth.js v5) como dependencia: `pnpm add next-auth@5`
-- [ ] T002 [P] Crear directorios vacíos: `src/features/backoffice/components/`, `src/features/backoffice/constants/`, `app/(auth)/panel/`, `app/api/internal/leads/unread-count/`
+- [x] T001 Instalar `next-auth@5` (Auth.js v5) como dependencia: `pnpm add next-auth@5`
+- [x] T002 [P] Crear directorios vacíos: `src/features/backoffice/components/`, `src/features/backoffice/constants/`, `app/(auth)/panel/`, `app/api/internal/leads/unread-count/`
 
 ---
 
@@ -29,11 +29,11 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Crear configuración de Auth.js en `src/infrastructure/auth/auth.config.ts`: credentials provider que valida contra tabla `users` con bcryptjs, JWT con claims `tenant_id`, `user_id`, `role`, `name`. Sesión 2h con renovación deslizante.
-- [ ] T004 [P] Crear helper de sesión server-side en `src/infrastructure/auth/session.ts`: función `getServerSession()` wrapper de Auth.js que devuelve `{ user_id, tenant_id, role, name } | null`.
-- [ ] T005 Crear middleware en `src/middleware.ts`: (a) proteger rutas `/panel/*` — si no hay sesión, redirect a `/panel/login`; (b) inyectar header `X-Robots-Tag: noindex, nofollow` en todas las respuestas bajo `(auth)/`; (c) excluir rutas públicas y API pública del auth guard.
-- [ ] T006 [P] Crear `app/robots.ts`: exportar configuración que permite `/` y bloquea `/panel` y `/api/internal`.
-- [ ] T007 Crear constante de navegación en `src/features/backoffice/constants/nav-items.ts`: array de `NavItem` con label, href, icon (Phosphor), allowedRoles. 7 items: Dashboard, Catálogo, Leads, Equipo, Contenidos, API Keys, ARSOP.
+- [x] T003 Crear configuración de Auth.js en `src/infrastructure/auth/auth.config.ts`: credentials provider que valida contra tabla `users` con bcryptjs, JWT con claims `tenant_id`, `user_id`, `role`, `name`. Sesión 2h con renovación deslizante.
+- [x] T004 [P] Crear helper de sesión server-side en `src/infrastructure/auth/session.ts`: función `getServerSession()` wrapper de Auth.js que devuelve `{ user_id, tenant_id, role, name } | null`.
+- [x] T005 Crear middleware en `src/middleware.ts`: (a) proteger rutas `/panel/*` — si no hay sesión, redirect a `/panel/login`; (b) inyectar header `X-Robots-Tag: noindex, nofollow` en todas las respuestas bajo `(auth)/`; (c) excluir rutas públicas y API pública del auth guard.
+- [x] T006 [P] Crear `app/robots.ts`: exportar configuración que permite `/` y bloquea `/panel` y `/api/internal`.
+- [x] T007 Crear constante de navegación en `src/features/backoffice/constants/nav-items.ts`: array de `NavItem` con label, href, icon (Phosphor), allowedRoles. 7 items: Dashboard, Catálogo, Leads, Equipo, Contenidos, API Keys, ARSOP.
 
 **Checkpoint**: Auth.js configurado. Middleware protege `/panel/*` e inyecta X-Robots-Tag. robots.ts bloquea /panel. Constante de navegación lista.
 
@@ -47,10 +47,10 @@
 
 ### Implementation
 
-- [ ] T008 [US1] Crear layout del panel en `app/(auth)/panel/layout.tsx`: estructura con sidebar a la izquierda (240px) y área de contenido a la derecha. Auth guard: si no hay sesión, redirect. Header superior con nombre de usuario y logout.
-- [ ] T009 [P] [US1] Crear componente Sidebar en `src/features/backoffice/components/sidebar.tsx`: sidebar fijo 240px con `bg.inverted`, logo Fraunces, lista de navegación filtrada por rol, indicador activo (border-left terracota 3px). Responsivo: drawer en móvil (< 768px) con botón hamburguesa.
-- [ ] T010 [P] [US1] Crear componente NavItem en `src/features/backoffice/components/nav-item.tsx`: item de navegación con icono Phosphor, label, estado activo (comparar href con pathname), `aria-current="page"` cuando activo. Estilo: `text.body-sm weight-medium`, color `fg.on-inverted`, hover `bg.slate-2`.
-- [ ] T011 [US1] Crear componente PanelHeader en `src/features/backoffice/components/panel-header.tsx`: header con nombre del usuario (de la sesión), botón logout con `aria-label="Cerrar sesión"`. Logout invalida sesión Auth.js y redirige a `/panel/login`.
+- [x] T008 [US1] Crear layout del panel en `app/(auth)/panel/layout.tsx`: estructura con sidebar a la izquierda (240px) y área de contenido a la derecha. Auth guard: si no hay sesión, redirect. Header superior con nombre de usuario y logout.
+- [x] T009 [P] [US1] Crear componente Sidebar en `src/features/backoffice/components/sidebar.tsx`: sidebar fijo 240px con `bg.inverted`, logo Fraunces, lista de navegación filtrada por rol, indicador activo (border-left terracota 3px). Responsivo: drawer en móvil (< 768px) con botón hamburguesa.
+- [x] T010 [P] [US1] Crear componente NavItem en `src/features/backoffice/components/nav-item.tsx`: item de navegación con icono Phosphor, label, estado activo (comparar href con pathname), `aria-current="page"` cuando activo. Estilo: `text.body-sm weight-medium`, color `fg.on-inverted`, hover `bg.slate-2`.
+- [x] T011 [US1] Crear componente PanelHeader en `src/features/backoffice/components/panel-header.tsx`: header con nombre del usuario (de la sesión), botón logout con `aria-label="Cerrar sesión"`. Logout invalida sesión Auth.js y redirige a `/panel/login`.
 
 **Checkpoint**: Layout con sidebar y header renderiza. Auth guard funciona. Nav items muestran estado activo.
 
@@ -64,8 +64,8 @@
 
 ### Implementation
 
-- [ ] T012 [US2] Implementar filtrado de nav items por rol en `src/features/backoffice/components/sidebar.tsx`: usar `allowedRoles` de cada NavItem y filtrar según `role` de la sesión. Verificar que AGENT no ve Equipo/Contenidos/API Keys/ARSOP, OPERATOR no ve Equipo/API Keys/ARSOP, ADMIN ve todo.
-- [ ] T013 [US2] Crear página placeholder para cada sección en `app/(auth)/panel/`: `catalogo/page.tsx`, `leads/page.tsx`, `equipo/page.tsx`, `contenidos/page.tsx`, `api-keys/page.tsx`, `arsop/page.tsx`. Cada página muestra solo el título de la sección (ej. "Catálogo") como placeholder hasta que la feature correspondiente la implemente.
+- [x] T012 [US2] Implementar filtrado de nav items por rol en `src/features/backoffice/components/sidebar.tsx`: usar `allowedRoles` de cada NavItem y filtrar según `role` de la sesión. Verificar que AGENT no ve Equipo/Contenidos/API Keys/ARSOP, OPERATOR no ve Equipo/API Keys/ARSOP, ADMIN ve todo.
+- [x] T013 [US2] Crear página placeholder para cada sección en `app/(auth)/panel/`: `catalogo/page.tsx`, `leads/page.tsx`, `equipo/page.tsx`, `contenidos/page.tsx`, `api-keys/page.tsx`, `arsop/page.tsx`. Cada página muestra solo el título de la sección (ej. "Catálogo") como placeholder hasta que la feature correspondiente la implemente.
 
 **Checkpoint**: Roles filtran secciones correctamente. Páginas placeholder navegables.
 
@@ -79,9 +79,9 @@
 
 ### Implementation
 
-- [ ] T014 [US3] Crear componente DashboardContent en `src/features/backoffice/components/dashboard-content.tsx`: layout con secciones: (a) saludo con nombre, (b) contador de leads no leídos (numeral-lg Fraunces), (c) enlaces rápidos a secciones disponibles, (d) lista de últimas 5 promociones editadas, (e) atajos "Nueva promoción" y "Ver bandeja".
-- [ ] T015 [US3] Crear página dashboard en `app/(auth)/panel/page.tsx`: server component que obtiene sesión y datos (unread count, recent promociones), renderiza DashboardContent.
-- [ ] T016 [P] [US3] Crear repositorio de consultas del dashboard en `src/infrastructure/db/repositories/dashboard.repository.ts`: método `getUnreadLeadsCount(userId, tenantId)` que consulta `leads` LEFT JOIN `lead_read_marks` filtrando por usuario y leads sin marca de lectura. Método `getRecentPromociones(userId, tenantId, limit=5)` que consulta `promociones` ordenadas por `updated_at DESC`.
+- [x] T014 [US3] Crear componente DashboardContent en `src/features/backoffice/components/dashboard-content.tsx`: layout con secciones: (a) saludo con nombre, (b) contador de leads no leídos (numeral-lg Fraunces), (c) enlaces rápidos a secciones disponibles, (d) lista de últimas 5 promociones editadas, (e) atajos "Nueva promoción" y "Ver bandeja".
+- [x] T015 [US3] Crear página dashboard en `app/(auth)/panel/page.tsx`: server component que obtiene sesión y datos (unread count, recent promociones), renderiza DashboardContent.
+- [x] T016 [P] [US3] Crear repositorio de consultas del dashboard en `src/infrastructure/db/repositories/dashboard.repository.ts`: método `getUnreadLeadsCount(userId, tenantId)` que consulta `leads` LEFT JOIN `lead_read_marks` filtrando por usuario y leads sin marca de lectura. Método `getRecentPromociones(userId, tenantId, limit=5)` que consulta `promociones` ordenadas por `updated_at DESC`.
 
 **Checkpoint**: Dashboard renderiza con datos reales. Contador de leads muestra número correcto. Últimas promociones listadas.
 
@@ -95,9 +95,9 @@
 
 ### Implementation
 
-- [ ] T017 [US4] Crear route handler `GET /api/internal/leads/unread-count/route.ts` en `app/api/internal/leads/unread-count/route.ts`: requiere sesión Auth.js, consulta `dashboard.repository.getUnreadLeadsCount`, devuelve `{ count: number }`. Si no hay sesión, 401.
-- [ ] T018 [US4] Crear componente UnreadBadge en `src/features/backoffice/components/unread-badge.tsx`: client component con `useEffect` + `setInterval` (30s) que hace fetch a `/api/internal/leads/unread-count`. Muestra número en pill pequeño (`bg.terracota`, `text.bone`, `text.meta`). Si count === 0, no muestra nada. `aria-live="polite"` en el contenedor. Skeleton mientras carga (usar componente Skeleton de shared).
-- [ ] T019 [US4] Integrar UnreadBadge en NavItem de Leads en `src/features/backoffice/components/sidebar.tsx`: renderizar UnreadBadge junto al label "Leads" cuando el item tiene `badgeKey === "unread-leads"`.
+- [x] T017 [US4] Crear route handler `GET /api/internal/leads/unread-count/route.ts` en `app/api/internal/leads/unread-count/route.ts`: requiere sesión Auth.js, consulta `dashboard.repository.getUnreadLeadsCount`, devuelve `{ count: number }`. Si no hay sesión, 401.
+- [x] T018 [US4] Crear componente UnreadBadge en `src/features/backoffice/components/unread-badge.tsx`: client component con `useEffect` + `setInterval` (30s) que hace fetch a `/api/internal/leads/unread-count`. Muestra número en pill pequeño (`bg.terracota`, `text.bone`, `text.meta`). Si count === 0, no muestra nada. `aria-live="polite"` en el contenedor. Skeleton mientras carga (usar componente Skeleton de shared).
+- [x] T019 [US4] Integrar UnreadBadge en NavItem de Leads en `src/features/backoffice/components/sidebar.tsx`: renderizar UnreadBadge junto al label "Leads" cuando el item tiene `badgeKey === "unread-leads"`.
 
 **Checkpoint**: Badge muestra conteo. Se actualiza cada 30s. Anuncia cambios a lectores de pantalla.
 
@@ -111,8 +111,8 @@
 
 ### Implementation
 
-- [ ] T020 [US5] Verificar que el middleware (creado en T005) inyecta correctamente `X-Robots-Tag: noindex, nofollow` en todas las respuestas bajo `/panel/*`. Si no lo hace, corregir.
-- [ ] T021 [US5] Verificar que `app/robots.ts` (creado en T006) incluye `Disallow: /panel` y `Disallow: /api/internal`. Si no lo incluye, corregir.
+- [x] T020 [US5] Verificar que el middleware (creado en T005) inyecta correctamente `X-Robots-Tag: noindex, nofollow` en todas las respuestas bajo `/panel/*`. Si no lo hace, corregir.
+- [x] T021 [US5] Verificar que `app/robots.ts` (creado en T006) incluye `Disallow: /panel` y `Disallow: /api/internal`. Si no lo incluye, corregir.
 
 **Checkpoint**: Headers y robots.txt verificados con curl.
 
@@ -126,8 +126,8 @@
 
 ### Implementation
 
-- [ ] T022 [US6] Verificar que PanelHeader (creado en T011) muestra el nombre del usuario desde la sesión y que el botón logout funciona correctamente. Si falta algo, completar.
-- [ ] T023 [US6] Crear ruta de login placeholder en `app/(auth)/panel/login/page.tsx`: formulario simple con email y password que usa Auth.js `signIn("credentials")`. Tras login exitoso, redirect a `/panel`. (Nota: el formulario completo de login con diseño editorial es de F005, aquí solo se necesita lo mínimo para que el auth guard funcione.)
+- [x] T022 [US6] Verificar que PanelHeader (creado en T011) muestra el nombre del usuario desde la sesión y que el botón logout funciona correctamente. Si falta algo, completar.
+- [x] T023 [US6] Crear ruta de login placeholder en `app/(auth)/panel/login/page.tsx`: formulario simple con email y password que usa Auth.js `signIn("credentials")`. Tras login exitoso, redirect a `/panel`. (Nota: el formulario completo de login con diseño editorial es de F005, aquí solo se necesita lo mínimo para que el auth guard funcione.)
 
 **Checkpoint**: Login funciona. Logout funciona. Nombre visible en header.
 
@@ -137,10 +137,10 @@
 
 **Purpose**: Verificación final, accesibilidad, limpieza
 
-- [ ] T024 Ejecutar `pnpm quality` (lint + typecheck + tests) — todo debe pasar en verde.
-- [ ] T025 Verificar accesibilidad: todos los nav items tienen foco visible, badge tiene `aria-live`, botón logout tiene `aria-label`, sidebar en móvil tiene focus trap en drawer.
-- [ ] T026 Verificar quickstart.md: ejecutar escenarios V-1 a V-10 y documentar resultados.
-- [ ] T027 Limpiar imports no usados, verificar que no hay archivos `.gitkeep` innecesarios tras crear los componentes.
+- [x] T024 Ejecutar `pnpm quality` (lint + typecheck + tests) — todo debe pasar en verde.
+- [x] T025 Verificar accesibilidad: todos los nav items tienen foco visible, badge tiene `aria-live`, botón logout tiene `aria-label`, sidebar en móvil tiene focus trap en drawer.
+- [x] T026 Verificar quickstart.md: ejecutar escenarios V-1 a V-10 y documentar resultados.
+- [x] T027 Limpiar imports no usados, verificar que no hay archivos `.gitkeep` innecesarios tras crear los componentes.
 
 ---
 

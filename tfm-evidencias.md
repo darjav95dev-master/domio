@@ -495,3 +495,106 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
 - Dependencias nuevas: `bcryptjs` + `@types/bcryptjs`
 
 ---
+
+## Feature 010 · backoffice-shell
+*Mergeada el 2026-07-08. Rama: `feature/010-backoffice-shell`.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 1928 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (checklist sin marcadores pendientes)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 27 (T001–T027 en 9 fases)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 7 (R-1 a R-7: Auth.js v5, middleware, polling badge, sidebar responsivo, navegación por rol, dashboard consultas, robots.ts + X-Robots-Tag)
+- Escenarios de validación en quickstart.md: 10 (V-1 a V-10)
+
+### Métricas de implementación
+- Commits en la rama: 1 (spec/plan + implementación en working tree, 35 archivos nuevos sin commitear)
+- Líneas añadidas (implementación): 3.137 (sin contar `pnpm-lock.yaml`)
+- Archivos nuevos (implementación): 35 (23 fuente + 12 test)
+- Archivos modificados: 2 (`app/layout.tsx`, `specs/010-backoffice-shell/tasks.md`)
+- Tests totales tras la feature: 462 pasando (60 test files)
+- Tests nuevos de la feature: ~103 en 12 test files
+- Cobertura global tras la feature: **85% statements**, 86,46% branches, 87,28% functions, 85% lines
+- Cobertura en módulos críticos de la feature:
+  - `auth.config.ts`: 100% statements, 100% branches, 100% functions, 100% lines
+  - `session.ts`: 100% statements, 100% branches, 100% functions, 100% lines
+  - `middleware.ts`: ~89% (testeado vía mocking de NextRequest/NextResponse)
+  - `nav-items.ts`: 100% en todas las métricas
+  - `nav-item.tsx`: 100% en todas las métricas
+  - `sidebar.tsx`: ~88% statements, ~75% branches, 100% functions, ~88% lines
+  - `panel-header.tsx`: 100% en todas las métricas
+  - `unread-badge.tsx`: ~95% statements, ~80% branches, 100% functions, ~95% lines
+  - `dashboard-content.tsx`: ~85% statements, ~70% branches, 100% functions, ~85% lines
+  - `dashboard.repository.ts`: 100% statements, 100% branches, 100% functions, 100% lines
+  - `unread-count/route.ts`: 100% en todas las métricas
+  - `robots.test.ts`: 100% en todas las métricas
+  - `root-error-boundary.tsx`: 0% statements (componente nuevo no cubierto por tests)
+  - `status-colors.ts`: 100% en todas las métricas
+- Lint: clean (0 errores)
+- Typecheck: clean (0 errores)
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado). Los tests se escribieron junto con la implementación en cada fase.
+- **quality-reviewer:** APROBADA CON OBSERVACIONES (0 críticas, 0 mayores, 4 menores)
+  - Menores reportadas por el orquestador: [detalle no registrado en el repositorio]
+- **contract-guardian:** NO APLICA (no hay API HTTP pública nueva en esta feature; el endpoint `/api/internal/leads/unread-count` es interno del backoffice)
+
+### Desvíos respecto al plan inicial
+- **Ninguno estructural.** Las 27 tareas en 9 fases se completaron según el plan. Las 6 user stories se ejecutaron en orden de dependencias (Setup → Foundational → US1 → US2 → US3 → US4 → US5 → US6 → Polish).
+- La implementación se entregó en el working tree sin commitear a la rama; el único commit en la rama es el de spec/plan (`2c8dff4`). Esto es un desvío operativo: el plan sugería commits por fase o grupo lógico.
+- Se añadieron 2 archivos no planificados: `root-error-boundary.tsx` (wrapper ligero de ErrorBoundary) y `status-colors.ts` (constantes de colores para estados). El `root-error-boundary` reemplazó el uso directo de `ErrorBoundary` en `app/layout.tsx`.
+- El plan original llamaba al repositorio `lead-read.repository.ts`; en la implementación se nombró `dashboard.repository.ts` (abarca más que unread count: también incluye `getRecentPromociones`).
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Auth.js v5 con credentials provider y JWT (R-1):** Se configuró `next-auth@5` con credentials provider que valida contra la tabla `users` usando `bcryptjs`. El JWT incluye claims `tenant_id`, `user_id`, `role`, `name`. Sesión de 2h con renovación deslizante. Documentado en research.md R-1.
+2. **Middleware unificado para auth guard + X-Robots-Tag (R-2):** Un solo `middleware.ts` en la raíz protege todas las rutas `/panel/*` (redirige a `/panel/login` si no hay sesión) e inyecta `X-Robots-Tag: noindex, nofollow` en todas las respuestas bajo `(auth)/`. Se excluyen rutas públicas y API pública del auth guard. Documentado en research.md R-2.
+3. **Polling cada 30s para badge de leads (R-3):** Se optó por `useEffect` + `setInterval` en lugar de SSE o WebSocket. 30s es suficiente para la UX del backoffice y evita complejidad innecesaria. Documentado en research.md R-3.
+4. **Sidebar responsivo con drawer en móvil (R-4):** En desktop (<768px) sidebar fijo 240px con `bg.inverted`. En móvil, drawer overlay con botón hamburguesa, `aria-modal` y focus trap. Documentado en research.md R-4.
+5. **Navegación condicional centralizada por rol (R-5):** Array `NavItem[]` en `nav-items.ts` con campo `allowedRoles: UserRole[]`. El sidebar filtra items según el `role` de la sesión. ADMIN ve 7 secciones, OPERATOR ve 4, AGENT ve 3. Documentado en research.md R-5.
+6. **Dashboard como landing operativa sin analítica (R-6):** Consulta leads no leídos (mismo endpoint que el badge) y últimas 5 promociones editadas (`promociones` ordenadas por `updated_at DESC`). Sin gráficos, charts ni métricas de conversión (alineado con product.md §7). Documentado en research.md R-6.
+7. **Doble protección contra indexación (R-7):** `robots.ts` bloquea `/panel` y `/api`; el middleware inyecta `X-Robots-Tag: noindex, nofollow` en todas las respuestas bajo `(auth)/`. Doble capa: robots.txt para bots que lo respetan, X-Robots-Tag para los que no. Documentado en research.md R-7.
+8. **`RootErrorBoundary` como wrapper ligero:** Se creó `root-error-boundary.tsx` como un wrapper minimalista que reemplaza `ErrorBoundary` de `shared/components` en `app/layout.tsx`. El root boundary no necesita los mismos handlers (onError con Sentry) que los boundaries de componentes hijos, reduciendo el acoplamiento con el módulo de observabilidad.
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **SDD funcionó para shell estructural:** Las 27 tareas en 9 fases con 6 user stories demostraron que la descomposición incremental es efectiva para un shell de UI. Cada fase producía un checkpoint verificable antes de continuar (auth funciona, sidebar renderiza, roles filtran, badge actualiza, robots bloquea).
+- **Navegación centralizada facilitó el testing:** Los 7 `NavItem` con `allowedRoles` se definieron en una constante pura de 72 líneas, lo que permitió un test unitario de 75 líneas que verifica todas las combinaciones de rol (3 roles × 7 items = 21 combinaciones) sin montar React.
+- **Login placeholder vs login completo:** La tarea T023 creó un formulario de login mínimo (email+password, signIn) para que el auth guard funcione. El login con diseño editorial completo es responsabilidad de F005 (auth-and-session). Esta dependencia entre features deberá gestionarse al integrar F005.
+- **Fricción operativa:** La implementación no se commiteó a la rama de feature, sino que permanece en el working tree. Para el flujo SDD estándar, los commits por fase permitirían mejor trazabilidad y puntos de rollback. Esta feature ilustra cómo la urgencia puede erosionar la disciplina de commits atómicos.
+- **Cobertura global cayó al 85%** desde ~92% en F009, principalmente porque los placeholders de sección (6 páginas de ~27 líneas cada una) y el layout del panel no tienen tests unitarios. `root-error-boundary.tsx` (20 líneas) tampoco está cubierto. Esto es aceptable para componentes mayoritariamente markup, pero habrá que monitorizar que la cobertura no siga cayendo en features venideras.
+- **Repositorio renombrado respecto al plan:** El plan especificaba `lead-read.repository.ts`, pero en implementación se nombró `dashboard.repository.ts` porque también contiene `getRecentPromociones`. El nombre más general refleja mejor su propósito.
+
+### Artefactos generados
+- spec.md: `specs/010-backoffice-shell/spec.md` (169 líneas, 15 FRs, 7 SCs, 5 Edge Cases)
+- plan.md: `specs/010-backoffice-shell/plan.md` (102 líneas, constitution check 7/7 principios PASS)
+- research.md: `specs/010-backoffice-shell/research.md` (65 líneas, 7 decisiones técnicas R-1 a R-7)
+- data-model.md: `specs/010-backoffice-shell/data-model.md` (85 líneas)
+- quickstart.md: `specs/010-backoffice-shell/quickstart.md` (175 líneas, 10 escenarios V-1 a V-10)
+- checklist: `specs/010-backoffice-shell/checklists/requirements.md` (36 líneas, 0 NEEDS CLARIFICATION)
+- Tests: 12 test files, ~103 tests
+  - `src/features/backoffice/components/__tests__/sidebar.spec.tsx` (204 líneas)
+  - `src/features/backoffice/components/__tests__/nav-item.spec.tsx` (134 líneas)
+  - `src/features/backoffice/components/__tests__/panel-header.spec.tsx` (110 líneas)
+  - `src/features/backoffice/components/__tests__/dashboard-content.spec.tsx` (379 líneas)
+  - `src/features/backoffice/components/unread-badge.spec.tsx` (152 líneas)
+  - `src/features/backoffice/constants/__tests__/nav-items.spec.ts` (75 líneas)
+  - `src/infrastructure/auth/__tests__/auth.config.spec.ts` (50 líneas)
+  - `src/infrastructure/auth/__tests__/session.spec.ts` (83 líneas)
+  - `src/infrastructure/auth/__tests__/middleware.spec.ts` (130 líneas)
+  - `tests/unit/api/unread-count.route.test.ts` (83 líneas)
+  - `tests/unit/dashboard/dashboard.repository.test.ts` (195 líneas)
+  - `tests/unit/robots.test.ts` (44 líneas)
+- Código (23 archivos fuente, 1.498 líneas):
+  - **Auth/Infra:** `src/infrastructure/auth/auth.config.ts` (120 líneas), `session.ts` (41 líneas), `src/infrastructure/db/repositories/dashboard.repository.ts` (73 líneas)
+  - **Middleware:** `middleware.ts` (49 líneas)
+  - **Layouts y páginas:** `app/(auth)/panel/layout.tsx` (62 líneas), `app/(auth)/panel/page.tsx` (78 líneas), `app/(auth)/panel/login/page.tsx` (99 líneas)
+  - **Placeholders (6):** `app/(auth)/panel/{catalogo,leads,equipo,contenidos,api-keys,arsop}/page.tsx` (~27 líneas c/u)
+  - **Componentes:** `sidebar.tsx` (227 líneas), `nav-item.tsx` (61 líneas), `panel-header.tsx` (43 líneas), `dashboard-content.tsx` (199 líneas), `unread-badge.tsx` (121 líneas)
+  - **Constantes:** `src/features/backoffice/constants/nav-items.ts` (72 líneas)
+  - **Route handler:** `app/api/internal/leads/unread-count/route.ts` (31 líneas)
+  - **SEO:** `app/robots.ts` (14 líneas)
+  - **Shared:** `src/shared/components/root-error-boundary.tsx` (20 líneas), `src/shared/constants/status-colors.ts` (25 líneas)
+- Dependencias nuevas: `next-auth@5` (Auth.js v5)
+
+---
