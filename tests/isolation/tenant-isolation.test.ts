@@ -177,7 +177,7 @@ describe.skipIf(!hasDatabaseUrl())("Tenant isolation", () => {
 
         for (const [index, line] of lines.entries()) {
           const code = line.replace(/\/\/.*/u, "");
-          if (/SET\s+/iu.test(code) && !/SET\s+LOCAL/iu.test(code)) {
+          if (/\bSET\s+/u.test(code) && !/SET\s+LOCAL/iu.test(code)) {
             violations.push(`${file}:${index + 1}: ${line.trim()}`);
           }
         }

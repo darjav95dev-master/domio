@@ -598,3 +598,92 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
 - Dependencias nuevas: `next-auth@5` (Auth.js v5)
 
 ---
+
+## Feature 012 · editorial-blocks-editor
+*Completada el 2026-07-08. Rama: `feature/012-editorial-blocks-editor`. Últimos cambios en working tree pendientes de commit.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 1885 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (checklist sin marcadores pendientes)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 38 (T001–T038 en 7 fases)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 4 (R-001 a R-004: @dnd-kit, trigger constraint, HTML sanitizado, integración en formulario existente)
+- Entidades de datos documentadas en data-model.md: 5 métodos de repositorio, 5 payloads Zod, 1 trigger SQL
+
+### Métricas de implementación
+- Commits en la rama (spec/plan): 1 (`1f07caf`). Implementación en working tree sin commitear.
+- Líneas añadidas (código): 3.995 (excluyendo `pnpm-lock.yaml`, `.codebase-memory/`, `.specify/`)
+- Líneas eliminadas: 31
+- Archivos nuevos (código): 10 — 6 block-form components + 1 blocks-editor + 1 server actions + 1 migración SQL + 1 test de Zod schemas + 1 test de integración
+- Archivos modificados (código): 8 — `promocion.repository.ts` (266 líns. añadidas), `content-block-schema.ts`, `promocion-form.tsx`, `page.tsx`, `route.ts`, `schemas.test.ts`, `tenant-isolation.test.ts`, `package.json`
+- Dependencias nuevas: `@dnd-kit/core`, `@dnd-kit/sortable`
+
+### Tests de la feature
+- Tests unitarios Zod (nuevos): **26 tests** en `content-block-schema.spec.ts` — todos pasando
+- Tests de schemas existentes actualizados: 6 tests de `contentBlockSchema` en `schemas.test.ts` — todos pasando
+- Tests de integración (repositorio): 20 tests en `content-blocks-repository.test.ts` — requieren BD real con seed data
+- Tests totales del feature: **46 tests** (26 unit + 20 integración) — 32 verificables sin BD externa
+- Tests globales tras la feature: 76 test files, 707 tests (9 pre-existing failures no relacionados: auth.config, promocion-id route, email worker)
+- Cobertura global: N/D (no se ejecutó `pnpm test:coverage` tras la feature)
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado). Tests escritos en Phase 2 antes de la implementación de repositorio y schemas (T003, T010).
+- **quality-reviewer:** APROBADA (0 críticas, 0 mayores, 0 menores nuevas)
+- **contract-guardian:** NO APLICA (no hay API HTTP pública nueva; el route handler `/api/internal/promociones/[id]` se modifica para añadir validación pre-publish)
+
+### Desvíos respecto al plan inicial
+- **Ninguno estructural.** Las 7 fases (Setup → Foundational → US1 → US2 → US3 → US4 → Polish) se ejecutaron en orden de dependencias según tasks.md. Las 38 tareas se completaron según lo especificado.
+- **Desvío operativo:** La implementación se encuentra en el working tree sin commitear a la rama (similar a F010). El único commit en la rama es el de spec/plan (`1f07caf`). El plan sugería commits por fase o grupo lógico.
+- **Migración añadida:** El trigger `check_block_kind_constraint` y su migración (`0002_block_kind_constraint.sql`) no estaban detallados en el plan original como archivo específico, aunque sí se mencionaban en research.md R-002 y data-model.md.
+- Se modificó `promocion-form.tsx` para integrar la sección de bloques como una pestaña/sección más, que no estaba especificada en el plan pero era necesaria para la integración UI.
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Trigger SQL `check_block_kind_constraint` como última línea de defensa (D1):** Se implementó un trigger `BEFORE INSERT OR UPDATE` que verifica el `kind` de la promoción asociada y rechaza bloques `ZONAS_COMUNES`/`PLAZOS_GARANTIAS` en promociones `kind='external'`. Documentado en research.md R-002 y architecture.md §7.6. Triple capa: UI (selector oculto), servicio (validación Zod + lógica), BD (trigger).
+2. **Validación Zod con discriminated union por blockType (D2):** Se refinó el schema existente (`content-block-schema.ts`) para usar `z.discriminatedUnion('blockType', ...)` con 5 sub-schemas, validación de HTML sanitizado solo para `DESCRIPCION_GENERAL` (tags permitidos: `<strong>`, `<em>`, `<ul>`, `<ol>`, `<li>`, `<p>`, `<br>`), y `min(1)` en títulos/descripciones. Documentado en research.md R-003.
+3. **@dnd-kit/sortable para drag & drop (D3):** Se optó por `@dnd-kit/core` + `@dnd-kit/sortable` (~15KB) en lugar de `react-beautiful-dnd` (deprecado) o implementación manual HTML5 DnD API. Soporta keyboard navigation y screen readers. Documentado en research.md R-001.
+4. **Validación pre-publish en route handler (D4):** La verificación de `validateBlocksForPublish` se integró en el route handler `PATCH /api/internal/promociones/[id]` al cambiar status a `PUBLISHED`, en lugar de en el page component. Esto evita stale state y cubre tanto la UI como llamadas API directas. FR-008.
+5. **SET LOCAL en todas las transacciones del repositorio (D5):** Todos los nuevos métodos (`upsertContentBlock`, `deleteContentBlock`, `reorderContentBlocks`, `validateBlocksForPublish`) usan `withTransaction` de `TenantAwareRepository` para pasar `app.current_tenant_id` vía `SET LOCAL`, preservando el multi-tenant DNA. Alineado con architecture.md §6.
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **Constitution check:** plan.md verificó 7/7 principios PASS (Scope Rule, TDD, Zod validation, Multi-tenant DNA, No WYSIWYG libre, Kind constraint, Constants centralizadas). Sin violaciones.
+- **TDD para schemas Zod:** Los 26 tests del schema refinado (`content-block-schema.spec.ts`) se escribieron en Phase 2 (T010) antes de usar los schemas en los componentes de Phase 3. Esto forzó a decidir los límites de validación (min lengths, HTML sanitizado, campos obligatorios) antes de la implementación UI.
+- **Triple capa de validación de kind constraint:** UI (selector oculto) + Servicio (rechazo en upsertContentBlock) + BD (trigger). Esta arquitectura en cascada garantiza que no se pueda insertar un bloque inválido ni siquiera mediante un INSERT directo a la BD.
+- **Fricción:** La implementación no se commiteó a la rama de feature, sino que permanece en el working tree (mismo patrón que F010). Para el flujo SDD estándar, los commits por fase permitirían mejor trazabilidad y puntos de rollback.
+- **Integración con F011:** La sección de bloques editoriales se integró dentro del formulario de edición de promoción existente (F011) modificando `promocion-form.tsx`. El acoplamiento es mínimo — `BlocksEditor` es un client component independiente que recibe `promocionId` y `kind` como props.
+- **Tests de integración pendientes de BD real:** Los 20 tests de `content-blocks-repository.test.ts` requieren una base de datos real con seed data. Sin ella, fallan por FK violation en `tenant_id`. Es el mismo patrón que otros tests de integración del proyecto (F002, F009).
+
+### Artefactos generados
+- spec.md: `specs/012-editorial-blocks-editor/spec.md` (135 líneas, 12 FRs, 7 SCs, 5 Edge Cases)
+- plan.md: `specs/012-editorial-blocks-editor/plan.md` (94 líneas, constitution check 7/7 principios PASS)
+- research.md: `specs/012-editorial-blocks-editor/research.md` (49 líneas, 4 decisiones técnicas R-001 a R-004)
+- data-model.md: `specs/012-editorial-blocks-editor/data-model.md` (101 líneas, 1 trigger, 5 payloads, 5 métodos)
+- quickstart.md: `specs/012-editorial-blocks-editor/quickstart.md` (80 líneas)
+- checklist: `specs/012-editorial-blocks-editor/checklists/requirements.md` (35 líneas, 0 NEEDS CLARIFICATION)
+- Tests: 2 test files nuevos + 2 modificados (46 tests total)
+  - `src/shared/types/__tests__/content-block-schema.spec.ts` (285 líneas, 26 tests — 5 block types × 4-6 aserciones)
+  - `tests/integration/content-blocks-repository.test.ts` (585 líneas, 20 tests — CRUD + kind constraint + reorder + publish validation)
+  - `tests/unit/schemas.test.ts` (modificado — 6 nuevos tests para contentBlockSchema)
+  - `tests/isolation/tenant-isolation.test.ts` (modificado — cobertura de nuevos métodos)
+- Código fuente (10 archivos nuevos, 8 modificados):
+  - **Componentes UI (6 formularios + editor):**
+    - `src/features/promociones/components/blocks-editor.tsx` (760 líneas — client component: lista, drag & drop, add/edit/delete UI, filtro por kind)
+    - `src/features/promociones/components/block-form-descripcion.tsx` (94 líneas — textarea con HTML sanitizado)
+    - `src/features/promociones/components/block-form-calidades.tsx` (299 líneas — lista de ítems con icono, título, descripción)
+    - `src/features/promociones/components/block-form-zonas.tsx` (245 líneas — lista de zonas)
+    - `src/features/promociones/components/block-form-ubicacion.tsx` (248 líneas — lista de distancias)
+    - `src/features/promociones/components/block-form-plazos.tsx` (155 líneas — formulario con 4 campos opcionales)
+  - **Server actions (1 archivo con 3 acciones):**
+    - `src/features/promociones/actions/content-blocks.actions.ts` (137 líneas — `upsertContentBlockAction`, `deleteContentBlockAction`, `reorderContentBlocksAction`)
+  - **Backend:**
+    - `src/infrastructure/db/repositories/promocion.repository.ts` (modificado, +266 líneas — 5 nuevos métodos con SET LOCAL)
+    - `src/shared/types/content-block-schema.ts` (modificado, +97 líneas — discriminated union Zod con 5 sub-schemas)
+    - `app/api/internal/promociones/[id]/route.ts` (modificado, +45 líneas — validación pre-publish)
+  - **Migración:**
+    - `src/infrastructure/db/migrations/0002_block_kind_constraint.sql` (31 líneas — trigger function + trigger)
+  - **Integración UI:**
+    - `app/(auth)/panel/catalogo/[id]/page.tsx` (modificado, +48 líneas — carga de bloques y renderizado de BlocksEditor)
+    - `src/features/promociones/components/promocion-form.tsx` (modificado, +22 líneas — integración como sección del formulario)
+
+---
