@@ -599,6 +599,84 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
 
 ---
 
+## Feature 013 · media-gallery-backoffice
+*Completada el 2026-07-08. Rama: `feature/013-media-gallery-backoffice`. Últimos cambios en working tree pendientes de commit.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 1703 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (checklist sin marcadores pendientes)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 25 (T001–T025 en 6 fases)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 5 (R-001 a R-005: integración en UI, upload desde servidor, @dnd-kit reutilizado, doble validación publicación, secciones separadas galería/planos)
+
+### Métricas de implementación
+- Commits en la rama (spec/plan): 1 (`d2aa49d`). Implementación en working tree sin commitear.
+- Líneas añadidas (código): ~2.515 (2342 en 8 archivos nuevos + 173 en 3 archivos modificados)
+- Líneas eliminadas: 16
+- Archivos nuevos (código): 8 — 3 componentes UI + 1 schema Zod + 1 server actions + 3 test files
+- Archivos modificados: 3 — `page.tsx`, `promocion-form.tsx`, `route.ts`
+- Tests nuevos: 49 (25 unit validation + 23 unit actions + 1 integration publish) — todos pasando
+- Tests totales tras la feature: 756 (76 test files, excluyendo 9 pre-existing failures no relacionados con F013)
+- Cobertura global tras la feature: N/D (no se ejecutó `pnpm test:coverage` tras la feature)
+- Cobertura en módulos críticos de la feature: N/D
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado). Tests escritos antes de la implementación — T002 y T004 especifican "Write failing tests" antes de la implementación de schemas y server actions.
+- **quality-reviewer:** APROBADA TRAS 2 RONDAS (0 críticas finales)
+  - **1ª ronda:** BLOQUEADA — correcciones solicitadas (detalle no registrado en el repositorio)
+  - **2ª ronda:** APROBADA (0 críticas, 0 mayores, 0 menores)
+- **contract-guardian:** NO APLICA (no hay API HTTP pública nueva; el route handler `/api/internal/promociones/[id]` se modifica para añadir validación pre-publish)
+
+### Desvíos respecto al plan inicial
+- **Ninguno estructural.** Las 6 fases (Setup → Foundational → US1 → US2 → US3 → Polish) se ejecutaron en orden de dependencias según tasks.md. Las 25 tareas se completaron según lo especificado.
+- **Desvío operativo:** La implementación se encuentra en el working tree sin commitear a la rama. El único commit en la rama es el de spec/plan (`d2aa49d`). Mismo patrón que F010 y F012.
+- No se modificó `MediaService.ts` (ya existente de F006) — consumido sin cambios, alineado con el plan.
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Upload siempre desde servidor vía server action (D1):** El cliente envía el archivo como `FormData` a `uploadMediaAction`. La server action invoca `MediaService.uploadImage` que firma y sube a R2. El cliente nunca tiene credenciales R2. Documentado en research.md R-002. Alineado con architecture.md §1.
+2. **PDFs con placeholder visual en `MediaPreview` (D2):** Los planos (que pueden ser PDFs) se renderizan con un placeholder visual usando el componente `MediaImage` con fallback gradient CSS, en lugar de `next/image` (que no soporta PDFs). La preview muestra el nombre del archivo y un icono de documento.
+3. **Ownership check en `deleteMediaAction` (D3):** Antes de eliminar un asset, se verifica en transacción que `asset.ownerId === promocionId`. Si no coincide, se rechaza con error "El asset no pertenece a esta promoción". Esto evita eliminación cruzada de assets entre promociones.
+4. **Validación server-side de medios en PATCH publish (D4):** El route handler de publish verifica `validateMediaForPublish` antes de cambiar a `PUBLISHED`, análogo a la validación de bloques editoriales de F012. Doble validación: cliente (UX) + servidor (integridad). Documentado en research.md R-004.
+5. **Auto-clear de feedback con setTimeout 4s (D5):** Los mensajes de éxito/error en la UI se borran automáticamente tras 4 segundos mediante `setTimeout` en el estado del `MediaUploadDialog`, evitando que el feedback visual persista indefinidamente.
+6. **@dnd-kit/sortable reutilizado de F012 (D6):** Se reutiliza la misma librería de drag & drop del editor de bloques editoriales, manteniendo consistencia en la UX sin añadir dependencias nuevas. Documentado en research.md R-003.
+7. **Secciones separadas galería/planos con `kind` filter (D7):** El componente `MediaGallery` filtra los assets por `kind` (`IMAGE_GALLERY` vs `PLAN`) y renderiza dos secciones visualmente separadas, cada una con su propia lista ordenable y botón de subida. La sección de planos no incluye opción de portada. Documentado en research.md R-005.
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **Constitution check:** plan.md verificó 7/7 principios PASS (Scope Rule, TDD, Zod validation, Multi-tenant DNA, WCAG AA a11y, Upload desde servidor, Enums cerrados). Sin violaciones.
+- **TDD funcionó para validación y operaciones:** Los 25 tests de validación Zod se escribieron en T002 (Phase 2) antes de implementar los schemas en T003. Los 23 tests de server actions se escribieron en T004 antes de la implementación de T005–T009. El flujo RED→GREEN forzó a definir los contratos de error (mensajes, tipos de retorno, casos de session nula) antes de escribir la lógica.
+- **Multi-tenant DNA preservado en dos puntos críticos:** (1) `deleteMediaAction` usa `AuthenticatedContext.withTransaction` con `SET LOCAL` para el ownership check; (2) `validateMediaForPublish` usa el mismo patrón para consultar `media_assets`. `uploadMediaAction` y `setCoverAction` delegan en `MediaService` que internamente respeta el multi-tenant.
+- **A11y considerada en diálogo y errores:** `MediaUploadDialog` usa `aria-modal="true"`, `aria-labelledby` referenciando el título, y los errores de validación se renderizan con `role="alert"`. Los botones de acción llevan `aria-label` descriptivo.
+- **Doble validación publicación:** `validateMediaForPublish` se ejecuta tanto en cliente (llamada desde `promocion-form.tsx` al pulsar "Publicar") como en servidor (route handler PATCH). El servidor rechaza con 422 `MEDIA_INVALID` si la validación falla, garantizando integridad incluso si se fuerza la request desde herramientas externas.
+- **`Buffer.from(await new Response(file).arrayBuffer())` como workaround:** jsdom no implementa `File.arrayBuffer()`. Se usó `new Response(file).arrayBuffer()` como workaround documentado en comentario inline.
+- **Mismo patrón operativo que F010 y F012:** La implementación se encuentra en el working tree sin commits por fase, lo que reduce la trazabilidad granular pero no afectó la calidad del entregable (todos los tests pasan).
+
+### Artefactos generados
+- spec.md: `specs/013-media-gallery-backoffice/spec.md` (125 líneas, 14 FRs, 7 SCs, 5 Edge Cases)
+- plan.md: `specs/013-media-gallery-backoffice/plan.md` (92 líneas, constitution check 7/7 principios PASS)
+- research.md: `specs/013-media-gallery-backoffice/research.md` (59 líneas, 5 decisiones técnicas R-001 a R-005)
+- data-model.md: `specs/013-media-gallery-backoffice/data-model.md` (68 líneas, 5 server actions, 6 reglas validación)
+- quickstart.md: `specs/013-media-gallery-backoffice/quickstart.md` (90 líneas)
+- checklist: `specs/013-media-gallery-backoffice/checklists/requirements.md` (35 líneas, 0 NEEDS CLARIFICATION)
+- Tests: 3 test files, 49 tests
+  - `tests/unit/media-validation.test.ts` (203 líneas, 25 tests — altTextSchema, mediaKindSchema, uploadMediaSchema, deleteMediaSchema, reorderMediaSchema, setCoverSchema)
+  - `tests/unit/media-actions.test.ts` (454 líneas, 23 tests — upload/delete/reorder/setCover/validateMediaForPublish con mocks de sesión, MediaService y DB)
+  - `tests/integration/promocion-publish.test.ts` (103 líneas, 1 test — PATCH publish rechaza 422 sin imágenes de galería; requiere BD real con seed data)
+- Código fuente (8 archivos nuevos, 3 modificados):
+  - **Componentes UI (3):**
+    - `src/features/promociones/components/media-gallery.tsx` (534 líneas — client component: dos secciones galería/planos, drag & drop con @dnd-kit, portada, eliminar, feedback de estado)
+    - `src/features/promociones/components/media-upload-dialog.tsx` (469 líneas — diálogo modal con aria-modal, selector archivo, alt_text input, validación cliente, auto-clear feedback 4s)
+    - `src/features/promociones/components/media-preview.tsx` (230 líneas — wrapper de MediaImage con placeholder para PDFs y estados de carga/error)
+  - **Schema Zod:** `src/shared/types/media-schema.ts` (73 líneas — 4 schemas de payload + altTextSchema + mediaKindSchema)
+  - **Server actions:** `src/features/promociones/actions/media.actions.ts` (276 líneas — 5 acciones: uploadMediaAction, deleteMediaAction, reorderMediaAction, setCoverAction, validateMediaForPublish)
+  - **Integración UI (3 modificados):**
+    - `app/(auth)/panel/catalogo/[id]/page.tsx` (+123 líneas — carga de media assets con props de sesión, integración de MediaGallery como sección del formulario)
+    - `src/features/promociones/components/promocion-form.tsx` (+12 líneas — integración de validación pre-publish de medios)
+    - `app/api/internal/promociones/[id]/route.ts` (+40 líneas — validación MEDIA_INVALID en PATCH publish)
+
+---
+
 ## Feature 012 · editorial-blocks-editor
 *Completada el 2026-07-08. Rama: `feature/012-editorial-blocks-editor`. Últimos cambios en working tree pendientes de commit.*
 

@@ -54,6 +54,8 @@ export interface SectionErrors {
 export interface PublishBlockedInfo {
   message: string;
   errors: Array<{ blockType: string; issues: string[] }>;
+  /** Media validation errors that block publishing. */
+  mediaErrors?: string[];
 }
 
 export interface PromocionFormProps {
@@ -437,7 +439,15 @@ export function PromocionForm({
               "border-status-success-default bg-status-success-subtle text-status-success-default",
           )}
         >
-          {submitState.message}
+          <p>{submitState.message}</p>
+          {/* Show media publish errors when they exist */}
+          {publishBlocked?.mediaErrors && publishBlocked.mediaErrors.length > 0 && (
+            <ul className="mt-2 list-inside list-disc space-y-1">
+              {publishBlocked.mediaErrors.map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

@@ -6,6 +6,9 @@ import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedConte
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
 import { db } from "@/infrastructure/db/client";
 import { users } from "@/infrastructure/db/schema/users";
+import { mediaAssets } from "@/infrastructure/db/schema/media-assets";
+import { MediaService } from "@/infrastructure/media/media.service";
+import { validateMediaForPublish } from "@/features/promociones/actions/media.actions";
 import {
   PromocionForm,
   type PromocionFormData,
@@ -15,6 +18,10 @@ import type { BlockEditorItem } from "@/features/promociones/components/blocks-e
 import type { TipologiaEditorItem } from "@/features/promociones/components/tipologia-editor";
 import type { AgentOption } from "@/features/promociones/components/promocion-section-agent";
 import type { ConstructionWarning } from "@/features/promociones/components/promocion-section-commercial-status";
+import {
+  MediaGallery,
+  type MediaAssetItem,
+} from "@/features/promociones/components/media-gallery";
 
 /**
  * Computes a soft warning when construction_status contradicts
@@ -58,6 +65,84 @@ function computeWarning(
     };
   }
   return null;
+}
+
+/**
+ * Loads media assets for a promotion and maps them into gallery/plan arrays.
+ */
+async function loadMediaAssets(
+  authCtx: AuthenticatedContext,
+  tenantId: string,
+  ownerId: string,
+): Promise<{ gallery: MediaAssetItem[]; plans: MediaAssetItem[] }> {
+  const gallery: MediaAssetItem[] = [];
+  const plans: MediaAssetItem[] = [];
+
+  try {
+    const rows = await authCtx.withTransaction(async (tx) => {
+      return tx
+        .select()
+        .from(mediaAssets)
+        .where(eq(mediaAssets.ownerId, ownerId))
+        .orderBy(mediaAssets.sortOrder);
+    });
+
+    const mediaService = new MediaService(tenantId);
+
+    for (const asset of rows) {
+      const previewUrl = mediaService.getPublicUrl(asset.r2Key);
+      const item: MediaAssetItem = {
+        id: asset.id,
+        r2Key: asset.r2Key,
+        kind: asset.kind,
+        altText: asset.altText,
+        sortOrder: asset.sortOrder,
+        isCover: asset.isCover ?? false,
+        previewUrl,
+        mimeType: asset.mimeType,
+      };
+      if (asset.kind === "IMAGE_GALLERY") {
+        gallery.push(item);
+      } else if (asset.kind === "PLAN") {
+        plans.push(item);
+      }
+    }
+  } catch {
+    // Non-blocking
+  }
+
+  return { gallery, plans };
+}
+
+/**
+ * Computes the publishBlocked info from block and media validation errors.
+ */
+function computePublishBlocked(
+  blockErrors: Array<{ blockType: string; issues: string[] }>,
+  mediaErrors: string[],
+) {
+  const hasBlockErrors = blockErrors.length > 0;
+  const hasMediaErrors = mediaErrors.length > 0;
+
+  if (!hasBlockErrors && !hasMediaErrors) return null;
+
+  let message: string;
+  if (hasBlockErrors && hasMediaErrors) {
+    message =
+      "Hay bloques editoriales y medios con datos inválidos. Corrígelos antes de publicar.";
+  } else if (hasBlockErrors) {
+    message =
+      "Hay bloques editoriales con datos inválidos. Corrígelos antes de publicar.";
+  } else {
+    message =
+      "Hay medios con datos inválidos. Corrígelos antes de publicar.";
+  }
+
+  return {
+    message,
+    errors: blockErrors,
+    mediaErrors: hasMediaErrors ? mediaErrors : undefined,
+  };
 }
 
 /**
@@ -194,14 +279,29 @@ export default async function EditPromocionPage({
     // Non-blocking — blocks are optional, fail silently
   }
 
-  const publishBlocked =
-    blockValidationErrors.length > 0
-      ? {
-          message:
-            "Hay bloques editoriales con datos inválidos. Corrígelos antes de publicar.",
-          errors: blockValidationErrors,
-        }
-      : null;
+  // ── Media publish validation ─────────────────────────────────────────
+  let mediaPublishErrors: string[] = [];
+  try {
+    const mediaValidation = await validateMediaForPublish(id);
+    if (!mediaValidation.valid) {
+      mediaPublishErrors = mediaValidation.errors;
+    }
+  } catch {
+    // Non-blocking
+  }
+
+  const publishBlocked = computePublishBlocked(
+    blockValidationErrors,
+    mediaPublishErrors,
+  );
+
+  // ── Fetch media assets ────────────────────────────────────────────────
+
+  const { gallery: galleryAssets, plans: planAssets } = await loadMediaAssets(
+    authCtx,
+    session.tenantId,
+    id,
+  );
 
   // ── Fetch agents from DB ──────────────────────────────────────────────
 
@@ -264,6 +364,13 @@ export default async function EditPromocionPage({
         promocionId={id}
         kind={raw.kind as "portfolio" | "external"}
         initialBlocks={initialBlocks}
+      />
+
+      {/* Media gallery section */}
+      <MediaGallery
+        promocionId={id}
+        initialGalleryAssets={galleryAssets}
+        initialPlanAssets={planAssets}
       />
     </div>
   );
