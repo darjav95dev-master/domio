@@ -94,6 +94,12 @@ export type ArsopRequestType = (typeof ARSOP_REQUEST_TYPES)[number];
 export const EMAIL_STATUSES = ["PENDING", "SENT", "FAILED"] as const;
 export type EmailStatus = (typeof EMAIL_STATUSES)[number];
 
+export const EMAIL_STATUS = {
+  PENDING: "PENDING",
+  SENT: "SENT",
+  FAILED: "FAILED",
+} as const;
+
 export const AMENITIES = [
   "ascensor",
   "terraza",

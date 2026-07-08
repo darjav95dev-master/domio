@@ -37,7 +37,7 @@ El worker de emails procesa la cola `email_queue` recogiendo los registros con `
 **Acceptance Scenarios**:
 
 1. **Given** una fila en `email_queue` con `status = PENDING` y `next_attempt_at` en el pasado, **When** el worker la procesa y el envío es exitoso, **Then** la fila queda con `status = SENT`, `sent_at` con timestamp actual, y `attempts` incrementado en 1.
-2. **Given** una fila con `status = PENDING` y `attempts = 0`, **When** el worker la procesa y el envío falla, **Then** la fila queda con `attempts = 1`, `last_error` con el mensaje de error, `next_attempt_at` calculado con backoff exponencial (2^1 × 60 = 120 segundos desde ahora), y `status` sigue `PENDING`.
+2. **Given** una fila con `status = PENDING` y `attempts = 0`, **When** el worker la procesa y el envío falla, **Then** la fila queda con `attempts = 1`, `last_error` con el mensaje de error, `next_attempt_at` calculado con backoff exponencial (2^(0+1) × 60 = 120 segundos desde ahora), y `status` sigue `PENDING`.
 3. **Given** una fila con `attempts = 4` (quinto intento), **When** el worker la procesa y el envío falla, **Then** la fila queda con `status = FAILED`, `attempts = 5`, `last_error` con el mensaje del error definitivo, y no se reintentará más.
 4. **Given** varias filas PENDING con distintos `next_attempt_at`, **When** el worker arranca, **Then** procesa primero las que tienen `next_attempt_at` más antiguo y solo procesa las cuyo `next_attempt_at` ya ha llegado.
 
@@ -94,7 +94,7 @@ El worker puede ejecutarse en dos modalidades: como script standalone en desarro
 - **FR-003**: El servicio de encolado DEBE validar que el payload cumple el schema del template antes de encolar.
 - **FR-004**: El servicio de encolado DEBE ser invocable dentro de una transacción existente sin forzar commit prematuro.
 - **FR-005**: El sistema DEBE proporcionar un worker que procese la cola `email_queue` recogiendo registros PENDING cuyo `next_attempt_at` sea anterior al momento actual.
-- **FR-006**: El worker DEBE aplicar backoff exponencial tras cada fallo: `next_attempt_at = now() + (2^attempts × 60 segundos)`.
+- **FR-006**: El worker DEBE aplicar backoff exponencial tras cada fallo: `next_attempt_at = now() + (2^(attempts+1) × 60 segundos)`, donde `attempts` es el valor actual antes de incrementar. Esto produce intervalos de 2, 4, 8 y 16 minutos.
 - **FR-007**: El worker DEBE marcar una fila como `status = FAILED` tras 5 intentos fallidos sin reintentar más.
 - **FR-008**: El worker DEBE invocar al proveedor de email (Resend) para cada fila procesada, usando el template y payload almacenados.
 - **FR-009**: El worker DEBE evitar el doble procesamiento de una misma fila mediante bloqueo a nivel de base de datos.
