@@ -589,7 +589,7 @@ const TENANT_SEED_UUID = "00000000-0000-0000-0000-000000000001";
 async function stepTenant(
   db: NodePgDatabase<typeof schema>,
 ): Promise<string> {
-  console.log("  [1/8] Tenant...");
+  console.log("  [1/9] Tenant...");
   await db
     .insert(schema.tenants)
     .values({
@@ -615,7 +615,7 @@ async function stepUsers(
   tid: string,
   passwordHash: string,
 ): Promise<Record<string, string>> {
-  console.log("  [2/8] Users...");
+  console.log("  [2/9] Users...");
   const userMap: Record<string, string> = {};
 
   for (const u of USER_SEED) {
@@ -646,7 +646,7 @@ async function stepPromociones(
   tid: string,
   userMap: Record<string, string>,
 ): Promise<Record<string, string>> {
-  console.log("  [3/8] Promociones...");
+  console.log("  [3/9] Promociones...");
   const promMap: Record<string, string> = {};
 
   for (const p of PROMOCION_SEED) {
@@ -695,7 +695,7 @@ async function stepTipologias(
   tid: string,
   promMap: Record<string, string>,
 ): Promise<void> {
-  console.log("  [4/8] Tipologias y unidades...");
+  console.log("  [4/9] Tipologias y unidades...");
   let tipoCount = 0;
   let unitCount = 0;
 
@@ -739,7 +739,7 @@ async function stepContentBlocks(
   tid: string,
   promMap: Record<string, string>,
 ): Promise<void> {
-  console.log("  [5/8] Content blocks...");
+  console.log("  [5/9] Promotion content blocks...");
   let blockCount = 0;
 
   for (const p of PROMOCION_SEED) {
@@ -760,12 +760,90 @@ async function stepContentBlocks(
   console.log(`    ${blockCount} content blocks.`);
 }
 
+const GLOBAL_CONTENT_BLOCKS_SEED = [
+  {
+    pageKey: "home" as const,
+    blockKey: "hero" as const,
+    payload: {
+      claim: "Tu hogar en Canarias empieza aquí",
+      lead: "Descubre las mejores propiedades en Tenerife. Venta y alquiler de pisos, áticos, chalets y locales comerciales con el respaldo de Domio.",
+      ctaPrimary: "Ver propiedades",
+      ctaSecondary: "Contactar",
+      backgroundImageId: null,
+    },
+  },
+  {
+    pageKey: "sobre" as const,
+    blockKey: "hero" as const,
+    payload: {
+      titulo: "Sobre Domio",
+      lead: "Somos una inmobiliaria canaria con más de 15 años de experiencia en el mercado de Tenerife. Nuestro compromiso es encontrar el hogar perfecto para cada cliente.",
+    },
+  },
+  {
+    pageKey: "equipo" as const,
+    blockKey: "hero" as const,
+    payload: {
+      titulo: "Nuestro equipo",
+      lead: "Profesionales apasionados del sector inmobiliario, dedicados a ofrecer un servicio cercano y transparente en cada operación.",
+    },
+  },
+  {
+    pageKey: "aviso-legal" as const,
+    blockKey: "contenido" as const,
+    payload: {
+      titulo: "Aviso Legal",
+      secciones: [
+        {
+          titulo: "Identificación del titular",
+          contenido:
+            "Domio Inmobiliaria, con CIF B-12345678 y domicilio en Calle de Ejemplo 123, 28001 Madrid, es la entidad titular del presente sitio web. La inscripción en el Registro Mercantil de Madrid se ha realizado en el Tomo 1234, Folio 56, Sección 8, Hoja M-12345.",
+        },
+        {
+          titulo: "Condiciones de uso",
+          contenido:
+            "El acceso y uso del portal domio.com atribuye la condición de usuario e implica la aceptación plena y sin reservas de todas las condiciones dispuestas en el presente aviso legal. El usuario se compromete a hacer un uso adecuado de los contenidos y servicios ofrecidos, con carácter enunciativo pero no limitativo, a no emplearlos para incurrir en actividades ilícitas, contrarias a la buena fe y al orden público.",
+        },
+        {
+          titulo: "Propiedad intelectual",
+          contenido:
+            "Todos los contenidos del sitio web, incluyendo a título enunciativo textos, imágenes, logotipos, iconos y software, son propiedad de Domio Inmobiliaria o de terceros que han autorizado su uso, y están protegidos por las leyes de propiedad intelectual e industrial. Queda prohibida la reproducción total o parcial sin autorización expresa de su titular.",
+        },
+      ],
+    },
+  },
+];
+
+async function stepGlobalContentBlocks(
+  tx: Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0],
+  tid: string,
+  userMap: Record<string, string>,
+): Promise<void> {
+  console.log("  [6/9] Global content blocks...");
+  let blockCount = 0;
+
+  for (const block of GLOBAL_CONTENT_BLOCKS_SEED) {
+    await tx
+      .insert(schema.contentBlocks)
+      .values({
+        tenantId: tid,
+        pageKey: block.pageKey,
+        blockKey: block.blockKey,
+        payload: block.payload,
+        updatedBy: userMap["admin@domio.dev"],
+      })
+      .onConflictDoNothing();
+    blockCount++;
+  }
+  console.log(`    ${blockCount} global content blocks.`);
+}
+
 async function stepMediaAssets(
   tx: Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0],
   tid: string,
   promMap: Record<string, string>,
 ): Promise<void> {
-  console.log("  [6/8] Media assets...");
+  console.log("  [7/9] Media assets...");
   let assetCount = 0;
 
   for (const p of PROMOCION_SEED) {
@@ -810,7 +888,7 @@ async function stepLeads(
   promMap: Record<string, string>,
   userMap: Record<string, string>,
 ): Promise<void> {
-  console.log("  [7/8] Leads...");
+  console.log("  [8/9] Leads...");
   let leadCount = 0;
 
   for (const l of LEAD_SEED) {
@@ -854,19 +932,21 @@ async function stepLeads(
 async function stepContactConfig(
   tx: Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0],
   tid: string,
+  userMap: Record<string, string>,
 ): Promise<void> {
-  console.log("  [8/8] Contact config...");
+  console.log("  [9/9] Contact config...");
   await tx
     .insert(schema.contactConfig)
     .values({
       tenantId: tid,
-      phone: "+34 922 123 456",
-      email: "info@domio.dev",
-      address: "Calle Castillo 42, 38002 Santa Cruz de Tenerife",
-      hours: "Lun-Vie 9:00-18:00",
-      whatsappNumber: "+34 622 987 654",
+      phone: "+34 912 345 678",
+      email: "info@domio.test",
+      address: "Calle de Ejemplo 123, 28001 Madrid",
+      hours: "Lunes a Viernes, 9:00 - 18:00",
+      whatsappNumber: "+34 612 345 678",
       whatsappPrefilledMessage:
-        "Hola, me gustaría recibir información sobre sus propiedades.",
+        "Hola, me gustaría recibir más información sobre sus propiedades.",
+      updatedBy: userMap["admin@domio.dev"],
     })
     .onConflictDoNothing({ target: schema.contactConfig.tenantId });
 
@@ -908,9 +988,10 @@ async function runSeed(db: NodePgDatabase<typeof schema>): Promise<void> {
       const promMap = await stepPromociones(tx, tid, userMap);
       await stepTipologias(tx, tid, promMap);
       await stepContentBlocks(tx, tid, promMap);
+      await stepGlobalContentBlocks(tx, tid, userMap);
       await stepMediaAssets(tx, tid, promMap);
       await stepLeads(tx, tid, promMap, userMap);
-      await stepContactConfig(tx, tid);
+      await stepContactConfig(tx, tid, userMap);
     });
 
     console.log("Seed completed successfully!");

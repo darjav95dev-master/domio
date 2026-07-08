@@ -1,27 +1,34 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/infrastructure/auth/session";
+import { ContenidosPageClient } from "@/features/contenidos/components/ContenidosPageClient";
+import { ErrorBoundary } from "@/shared/components/error-boundary";
 
 /**
- * Contenidos — placeholder page.
+ * ContenidosPage — panel de selección de páginas editables.
  *
- * Server component with defence-in-depth auth guard.
- * Will be replaced by the real contenidos feature.
+ * **Auth guard:** defence-in-depth — el layout ya protege /panel/*.
+ * **Role guard:** solo ADMIN y OPERATOR pueden acceder.
+ * **UI:** renderiza ContenidosPageClient que lista las páginas disponibles.
+ *
+ * @see spec.md — User Story 1
+ * @see tasks.md — T024
  */
 export default async function ContenidosPage() {
   const session = await getServerSession();
 
+  // ── Auth guard (defence-in-depth) ──────────────────────────────────
   if (!session) {
     redirect("/panel/login");
   }
 
+  // ── Role guard ─────────────────────────────────────────────────────
+  if (session.role !== "ADMIN" && session.role !== "OPERATOR") {
+    redirect("/panel");
+  }
+
   return (
-    <div className="flex flex-col items-start gap-4">
-      <h1 className="font-display text-4xl font-semibold tracking-tight text-fg-default">
-        Contenidos
-      </h1>
-      <p className="font-sans text-base text-fg-muted">
-        Esta sección será implementada en una feature futura.
-      </p>
-    </div>
+    <ErrorBoundary>
+      <ContenidosPageClient />
+    </ErrorBoundary>
   );
 }

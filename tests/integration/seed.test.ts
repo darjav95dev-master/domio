@@ -73,6 +73,7 @@ describe("seed integration", () => {
         expect(await countRows(client, "leads")).toBeGreaterThanOrEqual(5);
         expect(await countRows(client, "users")).toBeGreaterThanOrEqual(5);
         expect(await countRows(client, "contact_config")).toBeGreaterThanOrEqual(1);
+        expect(await countRows(client, "content_blocks")).toBeGreaterThanOrEqual(4);
       });
 
       // Tenant count (no RLS on tenants)
@@ -100,6 +101,7 @@ describe("seed integration", () => {
         "leads",
         "consent_records",
         "contact_config",
+        "content_blocks",
       ];
 
       // First, get the actual tenant ID from the seed
