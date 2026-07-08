@@ -3,7 +3,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MapPromocion } from "./MapPromocion";
-import type { PromocionDetail } from "@/infrastructure/db/repositories/promocion.repository";
 
 // ---------------------------------------------------------------------------
 // Mock maplibre-gl
@@ -54,43 +53,6 @@ const APPROX_LNG = -16.25;
 const APPROX_LAT = 28.47;
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function createMockPromocion(
-  overrides: Partial<PromocionDetail> = {},
-): PromocionDetail {
-  return {
-    id: "promo-1",
-    tenantId: "tenant-1",
-    slug: "test-promo",
-    name: "Test Promo",
-    kind: "portfolio",
-    status: "PUBLISHED",
-    operation: "SALE",
-    propertyType: "piso",
-    constructionStatus: null,
-    island: "Tenerife",
-    municipality: "Santa Cruz",
-    address: null,
-    location: [EXACT_LNG, EXACT_LAT] as [number, number],
-    locationApprox: [APPROX_LNG, APPROX_LAT] as [number, number],
-    mapPrivacyMode: "EXACT",
-    seoTitle: null,
-    seoDescription: null,
-    assignedAgentId: null,
-    assignedAgentName: null,
-    draftPayload: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    tipologias: [],
-    contentBlocks: [],
-    mediaAssets: [],
-    ...overrides,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -101,8 +63,13 @@ describe("MapPromocion", () => {
   });
 
   it("renders a map container with EXACT privacy mode", () => {
-    const promocion = createMockPromocion({ mapPrivacyMode: "EXACT" });
-    render(<MapPromocion promocion={promocion} />);
+    render(
+      <MapPromocion
+        coordinates={[EXACT_LNG, EXACT_LAT]}
+        mode="EXACT"
+        name="Test Promo"
+      />,
+    );
 
     const container = screen.getByTestId("map-promocion");
     expect(container).toBeInTheDocument();
@@ -110,8 +77,13 @@ describe("MapPromocion", () => {
   });
 
   it("renders a map container with AREA privacy mode", () => {
-    const promocion = createMockPromocion({ mapPrivacyMode: "AREA" });
-    render(<MapPromocion promocion={promocion} />);
+    render(
+      <MapPromocion
+        coordinates={[APPROX_LNG, APPROX_LAT]}
+        mode="AREA"
+        name="Test Promo"
+      />,
+    );
 
     const container = screen.getByTestId("map-promocion");
     expect(container).toBeInTheDocument();
@@ -119,15 +91,25 @@ describe("MapPromocion", () => {
   });
 
   it("has proper aria-label", () => {
-    const promocion = createMockPromocion({ mapPrivacyMode: "EXACT" });
-    render(<MapPromocion promocion={promocion} />);
+    render(
+      <MapPromocion
+        coordinates={[EXACT_LNG, EXACT_LAT]}
+        mode="EXACT"
+        name="Test Promo"
+      />,
+    );
 
     expect(screen.getByLabelText("Mapa de ubicación")).toBeInTheDocument();
   });
 
   it("cleans up map on unmount", () => {
-    const promocion = createMockPromocion({ mapPrivacyMode: "EXACT" });
-    const { unmount } = render(<MapPromocion promocion={promocion} />);
+    const { unmount } = render(
+      <MapPromocion
+        coordinates={[EXACT_LNG, EXACT_LAT]}
+        mode="EXACT"
+        name="Test Promo"
+      />,
+    );
     unmount();
 
     expect(mockRemove).toHaveBeenCalled();
@@ -137,13 +119,14 @@ describe("MapPromocion", () => {
   // Privacy mode — coordinate isolation
   // -------------------------------------------------------------------------
 
-  it("uses exact location coordinates when mapPrivacyMode is EXACT", () => {
-    const promocion = createMockPromocion({
-      mapPrivacyMode: "EXACT",
-      location: [EXACT_LNG, EXACT_LAT] as [number, number],
-      locationApprox: [APPROX_LNG, APPROX_LAT] as [number, number],
-    });
-    render(<MapPromocion promocion={promocion} />);
+  it("uses exact location coordinates when mode is EXACT", () => {
+    render(
+      <MapPromocion
+        coordinates={[EXACT_LNG, EXACT_LAT]}
+        mode="EXACT"
+        name="Test Promo"
+      />,
+    );
 
     expect(mapConstructorArgs).not.toBeNull();
     const center = mapConstructorArgs!.center as [number, number];
@@ -152,17 +135,18 @@ describe("MapPromocion", () => {
     expect(center[1]).toBe(EXACT_LAT);
   });
 
-  it("uses locationApprox (NOT exact location) when mapPrivacyMode is AREA", () => {
-    const promocion = createMockPromocion({
-      mapPrivacyMode: "AREA",
-      location: [EXACT_LNG, EXACT_LAT] as [number, number],
-      locationApprox: [APPROX_LNG, APPROX_LAT] as [number, number],
-    });
-    render(<MapPromocion promocion={promocion} />);
+  it("uses approximate coordinates when mode is AREA", () => {
+    render(
+      <MapPromocion
+        coordinates={[APPROX_LNG, APPROX_LAT]}
+        mode="AREA"
+        name="Test Promo"
+      />,
+    );
 
     expect(mapConstructorArgs).not.toBeNull();
     const center = mapConstructorArgs!.center as [number, number];
-    // AREA mode uses locationApprox — not the exact coordinates
+    // AREA mode uses approximate coordinates
     expect(center[0]).toBe(APPROX_LNG);
     expect(center[1]).toBe(APPROX_LAT);
     // Verify exact coordinates are NOT used
@@ -171,23 +155,35 @@ describe("MapPromocion", () => {
   });
 
   it("has larger zoom in EXACT mode (15) than AREA mode (13)", () => {
-    const exactPromo = createMockPromocion({ mapPrivacyMode: "EXACT" });
-    const { unmount } = render(<MapPromocion promocion={exactPromo} />);
+    const { unmount } = render(
+      <MapPromocion
+        coordinates={[EXACT_LNG, EXACT_LAT]}
+        mode="EXACT"
+        name="Test Promo"
+      />,
+    );
     expect(mapConstructorArgs!.zoom).toBe(15);
     unmount();
 
     mapConstructorArgs = null;
-    const areaPromo = createMockPromocion({ mapPrivacyMode: "AREA" });
-    render(<MapPromocion promocion={areaPromo} />);
+    render(
+      <MapPromocion
+        coordinates={[APPROX_LNG, APPROX_LAT]}
+        mode="AREA"
+        name="Test Promo"
+      />,
+    );
     expect(mapConstructorArgs!.zoom).toBe(13);
   });
 
-  it("renders aria-label with 'Zona aproximada' in AREA mode", () => {
-    const promocion = createMockPromocion({
-      mapPrivacyMode: "AREA",
-      name: "Test Residencial",
-    });
-    render(<MapPromocion promocion={promocion} />);
+  it("renders with proper attributes in AREA mode", () => {
+    render(
+      <MapPromocion
+        coordinates={[APPROX_LNG, APPROX_LAT]}
+        mode="AREA"
+        name="Test Residencial"
+      />,
+    );
 
     // The section has aria-label="Mapa de ubicación"
     expect(screen.getByLabelText("Mapa de ubicación")).toBeInTheDocument();

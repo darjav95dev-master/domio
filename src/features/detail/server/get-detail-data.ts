@@ -257,6 +257,30 @@ export function buildStructuredData(
 }
 
 // ---------------------------------------------------------------------------
+// Sanitization — prevents exact coordinates from reaching the client
+// ---------------------------------------------------------------------------
+
+/**
+ * Sanitizes a PromocionDetail for client-side consumption.
+ *
+ * When `mapPrivacyMode === "AREA"`, the exact `location` coordinates are
+ * overwritten with `locationApprox` (municipality centroid) so that they
+ * never appear in the RSC payload (Next.js Flight serialization), JSON-LD,
+ * or any server-rendered output.
+ *
+ * This is a pure function — it does not mutate the original object.
+ */
+export function sanitizeForClient(
+  detail: PromocionDetail,
+): PromocionDetail {
+  if (detail.mapPrivacyMode !== "AREA") {
+    return detail;
+  }
+
+  return { ...detail, location: detail.locationApprox };
+}
+
+// ---------------------------------------------------------------------------
 // Main orchestrator
 // ---------------------------------------------------------------------------
 
@@ -311,8 +335,12 @@ async function fetchPromocionDetail(
 
   const structuredData = buildStructuredData(detail);
 
+  // Sanitize exact coordinates if map privacy mode is AREA
+  // This ensures location is NEVER serialized into RSC payload, JSON-LD, or HTML
+  const promocion = sanitizeForClient(detail);
+
   return {
-    promocion: detail,
+    promocion,
     seo,
     structuredData,
   };

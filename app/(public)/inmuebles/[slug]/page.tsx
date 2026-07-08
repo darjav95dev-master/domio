@@ -80,6 +80,14 @@ export default async function DetailPage({ params }: DetailPageProps) {
 
   const { promocion, structuredData } = result;
 
+  // Compute map coordinates respecting privacy mode.
+  // sanitizeForClient already overwrites `location` with `locationApprox`
+  // in AREA mode, but we derive explicitly here for clarity and defense-in-depth.
+  const mapCoordinates: [number, number] =
+    promocion.mapPrivacyMode === "EXACT"
+      ? promocion.location
+      : promocion.locationApprox;
+
   return (
     <>
       {/* JSON-LD Structured Data */}
@@ -121,7 +129,7 @@ export default async function DetailPage({ params }: DetailPageProps) {
                   <TypologyTable promocion={promocion} />
                 </section>
 
-                {/* Map */}
+                {/* Map — only minimal props to Client Component */}
                 <section>
                   <div className="mb-6">
                     <p className="relative mb-3 pl-10 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-accent-default before:absolute before:left-0 before:top-1/2 before:h-px before:w-8 before:-translate-y-1/2 before:bg-[linear-gradient(90deg,var(--accent-default),transparent)]">
@@ -131,7 +139,11 @@ export default async function DetailPage({ params }: DetailPageProps) {
                       Mapa
                     </h2>
                   </div>
-                  <MapPromocion promocion={promocion} />
+                  <MapPromocion
+                    coordinates={mapCoordinates}
+                    mode={promocion.mapPrivacyMode as "EXACT" | "AREA"}
+                    name={promocion.name}
+                  />
                 </section>
               </div>
 

@@ -3,33 +3,39 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { PromocionDetail } from "@/infrastructure/db/repositories/promocion.repository";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface MapPromocionProps {
-  promocion: PromocionDetail;
+  /** [lng, lat] coordinates — exact or approximate depending on mode */
+  coordinates: [number, number];
+  /** Map privacy mode: "EXACT" for marker, "AREA" for circle */
+  mode: "EXACT" | "AREA";
+  /** Promotion name for aria-labels and popups */
+  name: string;
 }
 
 /**
  * MapPromocion — Client Component that renders a maplibre-gl map with OSM tiles.
  *
+ * Receives only the minimal data needed to render the map. The SERVER is
+ * responsible for determining which coordinates to send: exact `location`
+ * in EXACT mode, or `locationApprox` in AREA mode. This component NEVER
+ * receives exact coordinates in AREA mode.
+ *
  * Privacy mode:
- * - EXACT: renders a marker at the exact coordinates (detail.location).
- * - AREA: renders a circle centered at locationApprox with ~500m radius.
- *         Exact coordinates NEVER reach the client — the server only
- *         sends locationApprox in AREA mode.
+ * - EXACT: renders a marker at the exact coordinates.
+ * - AREA: renders a circle centered at approximate coordinates with ~500m radius.
+ *
+ * @see sanitizeForClient in get-detail-data.ts for server-side sanitization.
  */
-export function MapPromocion({ promocion }: MapPromocionProps) {
+export function MapPromocion({ coordinates, mode, name }: MapPromocionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
-  const isExact = promocion.mapPrivacyMode === "EXACT";
-  // In AREA mode, the server ensures locationApprox is sent but location
-  // is never exposed. We use whichever coordinates are available.
-  const coordinates = isExact ? promocion.location : promocion.locationApprox;
+  const isExact = mode === "EXACT";
   const [lng, lat] = coordinates;
 
   useEffect(() => {
@@ -83,12 +89,12 @@ export function MapPromocion({ promocion }: MapPromocionProps) {
           box-shadow: 0 2px 8px rgba(0,0,0,.3);
           cursor: pointer;
         `;
-        el.setAttribute("aria-label", `Ubicación de ${promocion.name}`);
+        el.setAttribute("aria-label", `Ubicación de ${name}`);
 
         new maplibregl.Marker({ element: el })
           .setLngLat([lng, lat])
           .setPopup(
-            new maplibregl.Popup({ offset: 25 }).setText(promocion.name),
+            new maplibregl.Popup({ offset: 25 }).setText(name),
           )
           .addTo(map);
       } else {
@@ -132,7 +138,7 @@ export function MapPromocion({ promocion }: MapPromocionProps) {
         `;
         el.setAttribute(
           "aria-label",
-          `Zona aproximada de ${promocion.name}`,
+          `Zona aproximada de ${name}`,
         );
 
         new maplibregl.Marker({ element: el })
@@ -147,14 +153,14 @@ export function MapPromocion({ promocion }: MapPromocionProps) {
       map.remove();
       mapRef.current = null;
     };
-  }, [lng, lat, isExact, promocion.name]);
+  }, [lng, lat, isExact, name]);
 
   return (
     <section aria-label="Mapa de ubicación" className="overflow-hidden rounded-surface">
       <div
         ref={containerRef}
         className="h-[320px] w-full md:h-[400px]"
-        data-privacy-mode={promocion.mapPrivacyMode}
+        data-privacy-mode={mode}
         data-testid="map-promocion"
       />
     </section>
