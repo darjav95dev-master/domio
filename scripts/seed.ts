@@ -8,6 +8,8 @@ import * as schema from "../src/infrastructure/db/schema";
 import type { EnergyCert, UnitStatus, ContentBlockType } from "../src/shared/constants/db-enums";
 
 // ─── Load .env.local if present (tsx does not auto-load env files) ──────
+// Manual parser instead of tsx --env-file because the seed script may be
+// invoked via `node -r tsx scripts/seed.ts` (which ignores --env-file).
 const envLocalPath = path.resolve(__dirname, "..", ".env.local");
 if (fs.existsSync(envLocalPath)) {
   const envContent = fs.readFileSync(envLocalPath, "utf8");
@@ -47,7 +49,6 @@ async function getDb() {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line sonarjs/no-duplicate-string -- seed data is inherently repetitive
 const USER_SEED = [
   { email: `admin${DEMO_EMAIL_DOMAIN}`, role: "ADMIN" as const, name: "Admin Domio" },
   { email: `agente1${DEMO_EMAIL_DOMAIN}`, role: "AGENT" as const, name: "Ana García" },
@@ -258,7 +259,11 @@ const TIPOLOGIAS_BY_SLUG: Record<string, TipologiaSeed[]> = {
       amenities: ["terraza", "garaje", "aire_acondicionado", "ascensor", "piscina"],
       energyCert: "A",
       referencePriceSale: 295000, referencePriceRent: null,
-      units: [{ identifier: "C-301", status: "AVAILABLE" }],
+      units: [
+        { identifier: "C-301", status: "AVAILABLE" },
+        { identifier: "C-302", status: "RESERVED" },
+        { identifier: "C-303", status: "AVAILABLE" },
+      ],
     },
   ],
   "apartamentos-costa-adeje": [
