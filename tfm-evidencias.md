@@ -210,3 +210,87 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
 - Evidencia visual: `.design-audit/f003-validation/home-desktop.png`, `home-mobile.png`, `results.json`
 
 ---
+
+## Feature 007 · email-queue-and-resend
+*Mergeada el 2026-07-08. Rama: `feature/007-email-queue-and-resend`. Commits: `8c6cd7b`, `582790e`.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 2179 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: N/D
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 42 (T001–T042 en 7 fases)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 6 (R1–R6: SDK Resend, FOR UPDATE SKIP LOCKED, backoff exponencial, templates funcionales, dual entry point del worker, validación Zod en encolado)
+- Escenarios de validación en quickstart.md: 6
+
+### Métricas de implementación
+- Commits en la rama: 2 (1 de spec/plan + 1 de implementación completa)
+- Líneas añadidas: 3.880 (de las cuales 46 son `pnpm-lock.yaml`)
+- Líneas eliminadas: 2
+- Archivos nuevos: 31 (incluyendo 9 de tests, 5 artefactos de spec, 14 de código fuente en `src/`, 2 scripts/entry points, 1 actualización a `db-enums.ts`)
+- Archivos de código fuente: 13 en `src/infrastructure/email/` + 1 en `src/shared/constants/` + 1 en `scripts/` = 14 archivos
+- Tests del módulo email: 91 tests (87 unit + 4 integration) en 9 test files — todos pasando
+- Tests globales tras la feature: 203 tests, 32 test files — todos pasando
+- Lint: clean (0 errores)
+- Typecheck: clean (0 errores)
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado). Las 42 tareas se completaron siguiendo TDD estricto (tests RED antes de implementación).
+- **quality-reviewer:** APROBADA TRAS CORRECCIONES (no se encontró archivo de reporte, la información es de reporte del orquestador)
+  - Correcciones solicitadas no documentadas en el repositorio.
+- **contract-guardian:** NO APLICA (no hay API HTTP pública en esta feature; el contraro de interfaz del servicio email se documentó en `contracts/email-service.md` como documento interno de diseño)
+
+### Desvíos respecto al plan inicial
+- **Ninguno.** Las 7 fases se ejecutaron según el plan. T001–T042 se completaron en orden de dependencias. La fase 7 (Polish) verificó lint, typecheck y tests de integración. El flujo completo (encolado → procesamiento → envío con backoff) funciona según lo especificado.
+- El único cambio operativo fue que la implementación se entregó en un solo commit (`582790e`) que abarcó todas las fases, mientras que el plan sugería commits por fase o grupo lógico.
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **FOR UPDATE SKIP LOCKED como mecanismo anti-doble-procesamiento (D1):** El worker reclama filas con `SELECT ... FOR UPDATE SKIP LOCKED` en lugar de usar un estado intermedio `PROCESSING`. Esto evita complejidades de timeouts de filas stuck y es compatible con Neon/PgBouncer transaction pooling.
+2. **Backoff exponencial con fórmula `2^(attempts+1) × 60s` (D2):** Produce intervalos de 2, 4, 8, 16, 32 minutos. Sin jitter (no necesario para volúmenes MVP). Máximo 5 intentos (~62 minutos hasta FAILED permanente). Documentado en research.md R3.
+3. **Templates como funciones puras con payload validado por Zod (D3):** Cada template es una función `(payload) => { subject, html, text }` con un schema Zod que define las variables requeridas. El HTML usa sustitución de placeholders `{{variable}}`. Interfaz compatible con migración futura a React Email.
+4. **Dos entry points que comparten lógica de procesamiento (D4):** `scripts/worker-emails.ts` (standalone con `tsx`, bucle configurable 30s, manejo de SIGTERM) y `src/infrastructure/email/worker-handler.ts` (handler para Vercel cron trigger). Ambos invocan `processQueue()` del mismo worker. Documentado en research.md R5.
+5. **Validación de email con Zod en el servicio de encolado, no en el worker (D5):** El worker confía en que la fila fue validada al encolar. Esto evita duplicar lógica de validación y ahorra un intento de backoff en caso de formato inválido. Documentado en research.md R6.
+6. **`email_queue` sin `tenant_id` como tabla de infraestructura (D6):** Decisión heredada de F002 (documentada en comentario del schema línea 12). El worker no filtra por tenant porque la cola es un mecanismo de infraestructura, no de dominio. Esta decisión **NO** está alineada con `architecture.md` §6.5, que lista `tenant_id` como columna de `email_queue` — ver Observaciones.
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **TDD funcionó para infraestructura externa:** Los 91 tests del módulo email se escribieron siguiendo RED→GREEN, incluyendo tests que mockean el SDK de Resend. La interfaz `ResendClient` se diseñó como interfaz TypeScript para permitir mocking — el worker nunca depende del SDK concreto, solo de la interfaz.
+- **Inconsistencia documental preexistente (architecture.md vs schema real):** `architecture.md` §6.5 (línea 340) lista `tenant_id` como columna de `email_queue`, pero el schema real (`src/infrastructure/db/schema/email-queue.ts`) no la incluye por decisión deliberada de F002 (comentario línea 12: "Infrastructure table — no tenant_id, no RLS by design"). Esta inconsistencia no fue causada por F007 pero es relevante para la memoria porque ilustra un desfase entre la documentación arquitectónica y la implementación. **No corregir dentro de F007** porque modificar `architecture.md` no está en el alcance de ninguna feature del MVP.
+- **Único commit de implementación:** Aunque el plan sugería commits por fase o grupo lógico, la implementación se entregó en un solo commit (`582790e`). Esto reduce la granularidad del historial pero no afectó la calidad del entregable, que pasó lint, typecheck y los 203 tests globales.
+- **SDD sin fricción:** El plan de 42 tareas en 7 fases se ejecutó sin desvíos. La separación US1–US4 con fases independientes (US3 ejecutable en paralelo con US2) demostró ser efectiva. El checkpoint de Phase 2 (foundational) antes de comenzar las user stories evitó duplicación de infraestructura.
+
+### Artefactos generados
+- spec.md: `specs/007-email-queue-and-resend/spec.md` (134 líneas, 15 FRs, 7 SCs, 4 US, 6 Edge Cases)
+- plan.md: `specs/007-email-queue-and-resend/plan.md` (107 líneas, 7 fases, constitution check)
+- research.md: `specs/007-email-queue-and-resend/research.md` (95 líneas, 6 decisiones técnicas documentadas)
+- data-model.md: `specs/007-email-queue-and-resend/data-model.md` (131 líneas)
+- quickstart.md: `specs/007-email-queue-and-resend/quickstart.md` (90 líneas, 6 escenarios)
+- contract: `specs/007-email-queue-and-resend/contracts/email-service.md` (167 líneas)
+- checklist: `specs/007-email-queue-and-resend/checklists/requirements.md` (37 líneas)
+- tests: 9 test files, 91 tests
+  - `tests/unit/email/types.test.ts` (34 líneas)
+  - `tests/unit/email/email-templates.test.ts` (167 líneas)
+  - `tests/unit/email/email.service.test.ts` (152 líneas)
+  - `tests/unit/email/email.repository.test.ts` (70 líneas)
+  - `tests/unit/email/resend.client.test.ts` (137 líneas)
+  - `tests/unit/email/templates.test.ts` (263 líneas)
+  - `tests/unit/email/worker.test.ts` (401 líneas)
+  - `tests/unit/email/worker-standalone.test.ts` (153 líneas)
+  - `tests/integration/email/email-queue.integration.test.ts` (531 líneas)
+- Código:
+  - `src/infrastructure/email/types.ts` (68 líneas — 4 interfaces, 4 clases de error)
+  - `src/infrastructure/email/email.repository.ts` (107 líneas — findPendingEligible, markSent, markFailed, markRetry)
+  - `src/infrastructure/email/email.service.ts` (80 líneas — enqueue con validación Zod)
+  - `src/infrastructure/email/resend.client.ts` (57 líneas — send con validación de API key al construir)
+  - `src/infrastructure/email/worker.ts` (94 líneas — processQueue, calculateNextAttempt)
+  - `src/infrastructure/email/worker-handler.ts` (113 líneas — handler serverless para Vercel cron)
+  - `src/infrastructure/email/templates/index.ts` (32 líneas — registry)
+  - `src/infrastructure/email/templates/utils.ts` (11 líneas — helpers de renderizado)
+  - `src/infrastructure/email/templates/lead-assigned-agent.ts` (67 líneas)
+  - `src/infrastructure/email/templates/lead-confirmation.ts` (63 líneas)
+  - `src/infrastructure/email/templates/team-invitation.ts` (63 líneas)
+  - `src/infrastructure/email/templates/password-recovery.ts` (68 líneas)
+  - `src/shared/constants/email-templates.ts` (47 líneas — nombres + schemas Zod)
+  - `scripts/worker-emails.ts` (58 líneas — entry point standalone)
+
+---

@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/005-media-service-r2/plan.md
+at specs/007-email-queue-and-resend/plan.md
 <!-- SPECKIT END -->
 
 <!-- codebase-memory-mcp:start -->
