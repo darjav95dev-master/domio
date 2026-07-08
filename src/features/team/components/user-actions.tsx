@@ -1,0 +1,296 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { PencilSimple, Warning, X } from "@phosphor-icons/react";
+import {
+  updateUserAction,
+  deactivateUserAction,
+} from "@/features/team/actions/team.actions";
+import { Button } from "@/shared/components/button";
+import { Input } from "@/shared/components/input";
+import { USER_ROLES, type UserRole } from "@/shared/constants/db-enums";
+import { ICON_SIZES } from "@/shared/constants/iconography";
+import { cn } from "@/shared/utils/cn";
+import type { UserResponse } from "@/shared/types/user-schema";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  ADMIN: "Administrador",
+  OPERATOR: "Operador",
+  AGENT: "Agente",
+};
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface UserActionsProps {
+  user: UserResponse;
+  onUpdated: () => void;
+  currentUserId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps) {
+  // ── State ──────────────────────────────────────────────────────────────
+  const [editing, setEditing] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+
+  // Edit form state
+  const [name, setName] = useState(user.name ?? "");
+  const [email, setEmail] = useState(user.email);
+  const [role, setRole] = useState<UserRole>(user.role);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+
+  // ── Edit handlers ──────────────────────────────────────────────────────
+
+  function handleCancelEdit() {
+    setEditing(false);
+    setName(user.name ?? "");
+    setEmail(user.email);
+    setRole(user.role);
+    setError(null);
+  }
+
+  async function handleEditSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+
+    const result = await updateUserAction(user.id, { name, email, role });
+
+    setSaving(false);
+
+    if (result.success) {
+      setEditing(false);
+      onUpdated();
+    } else {
+      setError(result.error);
+    }
+  }
+
+  // ── Deactivate handlers ────────────────────────────────────────────────
+
+  async function handleDeactivate() {
+    setDeactivating(true);
+    setWarning(null);
+    const result = await deactivateUserAction(user.id);
+    setDeactivating(false);
+
+    if (result.success) {
+      if ("warning" in result && result.warning) {
+        setWarning(result.warning);
+      }
+      setConfirmDeactivate(false);
+      onUpdated();
+    } else {
+      setError(result.error);
+    }
+  }
+
+  // ── Render: edit form ──────────────────────────────────────────────────
+
+  if (editing) {
+    return (
+      <div
+        aria-label="Editar usuario"
+        className="rounded-surface border border-border-default bg-bg-surface p-4"
+      >
+        <form onSubmit={handleEditSubmit}>
+          <div className="flex flex-col gap-3">
+            <Input
+              id={`edit-name-${user.id}`}
+              label="Nombre"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Input
+              id={`edit-email-${user.id}`}
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+
+            {/* Role select */}
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`edit-role-${user.id}`}
+                className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle"
+              >
+                Rol
+              </label>
+              <select
+                id={`edit-role-${user.id}`}
+                value={role}
+                onChange={(e) => setRole(e.target.value as UserRole)}
+                className="rounded-control border border-border-default bg-bg-surface px-4 py-3 font-sans text-base text-fg-default transition-colors hover:border-border-strong focus:border-accent-default focus:outline-none focus:ring-2 focus:ring-focus-ring focus:ring-offset-2"
+              >
+                {USER_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {error && (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="font-sans text-sm text-status-danger-default"
+              >
+                {error}
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={saving}
+                className="text-sm"
+              >
+                {saving ? "Guardando..." : "Guardar"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCancelEdit}
+                disabled={saving}
+                className="text-sm"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // ── Render: deactivate confirmation ────────────────────────────────────
+
+  if (confirmDeactivate) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirmar desactivación"
+        className="rounded-surface border border-border-default bg-bg-surface p-4"
+      >
+        <div className="flex items-start gap-3">
+          <Warning
+            size={ICON_SIZES.inline}
+            className="mt-0.5 shrink-0 text-status-warning-default"
+            aria-hidden="true"
+          />
+          <div className="flex-1">
+            <p className="font-sans text-sm font-medium text-fg-default">
+              ¿Desactivar a {user.name ?? user.email}?
+            </p>
+            <p className="mt-1 font-sans text-sm text-fg-subtle">
+              El usuario no podrá acceder al panel. Sus asignaciones históricas
+              se mantendrán.
+            </p>
+
+            {user.id === currentUserId && (
+              <p
+                role="alert"
+                className="mt-3 rounded-md border border-status-warning-default/40 bg-status-warning-subtle px-3 py-2 font-sans text-sm text-status-warning-default"
+              >
+                Te has desactivado a ti mismo. Si eras el último ADMIN, el
+                tenant queda sin acceso.
+              </p>
+            )}
+
+            {error && (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="mt-2 font-sans text-sm text-status-danger-default"
+              >
+                {error}
+              </p>
+            )}
+            <div className="mt-3 flex gap-2">
+              <Button
+                variant="primary"
+                onClick={handleDeactivate}
+                disabled={deactivating}
+                className="text-sm"
+              >
+                {deactivating ? "Desactivando..." : "Sí, desactivar"}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmDeactivate(false)}
+                disabled={deactivating}
+                className="text-sm"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render: default (action buttons) ───────────────────────────────────
+
+  return (
+    <div>
+      {warning && (
+        <p
+          role="alert"
+          className="mb-3 rounded-md border border-status-warning-default/40 bg-status-warning-subtle px-3 py-2 font-sans text-sm text-status-warning-default"
+        >
+          {warning}
+        </p>
+      )}
+      <div className="flex items-center justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={`Editar ${user.name ?? user.email}`}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5",
+          "font-sans text-sm text-fg-muted transition-colors duration-quick",
+          "hover:bg-accent-subtle hover:text-accent-default",
+          "focus-visible:outline-offset-[-2px]",
+        )}
+      >
+        <PencilSimple size={14} aria-hidden="true" />
+        Editar
+      </button>
+
+      {user.isActive && (
+        <button
+          type="button"
+          onClick={() => setConfirmDeactivate(true)}
+          aria-label={`Desactivar ${user.name ?? user.email}`}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5",
+            "font-sans text-sm text-status-danger-default transition-colors duration-quick",
+            "hover:bg-status-danger-subtle",
+            "focus-visible:outline-offset-[-2px]",
+          )}
+        >
+          <X size={14} aria-hidden="true" />
+          Desactivar
+        </button>
+      )}
+    </div>
+    </div>
+  );
+}

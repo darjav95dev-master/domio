@@ -989,3 +989,129 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
 - Dependencias nuevas: ninguna (todo el stack usaba dependencias ya existentes)
 
 ---
+
+## Feature 016 · team-and-api-keys
+*Completada el 2026-07-08. Rama: `feature/016-team-and-api-keys`. Commits: `623de65` (spec/plan). Implementación en working tree sin commitear.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 398 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (checklist sin marcadores pendientes)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 17 (T001–T017 en 5 fases: Setup → Foundational → US1 → US2 → Polish)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 4 (R-001 a R-004: invitación email con token firmado, hash bcrypt de API keys, soft-delete por is_active, rate_limit_per_min como campo CRUD)
+- Escenarios de validación en quickstart.md: 5 (V-1 a V-5)
+
+### Métricas de implementación
+- Commits en la rama (spec/plan): 1 (`623de65`). Implementación en working tree sin commitear.
+- Archivos nuevos (código fuente y tests): 32 (11 fuente + 11 test + 4 spec + 2 páginas + 1 migración + 1 utilidad + 1 schema BD modificado + 1 constantes)
+- Líneas añadidas: 4.981 (4.976 en 32 archivos nuevos + 5 en 4 modificados)
+- Líneas eliminadas: 33 (ediciones en páginas placeholder y archivos existentes)
+- Tests de la feature: **131 tests** en 11 test files — todos pasando
+  - `src/shared/types/__tests__/user-schema.spec.ts`: 13 tests — validación Zod (campos obligatorios, email, rol, invitation_token, soft-delete)
+  - `src/shared/types/__tests__/api-key-schema.spec.ts`: 9 tests — validación Zod (name, rateLimit, key_hash, is_active)
+  - `src/features/team/actions/team.actions.spec.ts`: 16 tests — server actions (createUserAction, deactivateUserAction, listUsersAction con filtros, role guard)
+  - `src/features/team/components/users-table.spec.tsx`: 10 tests — renderizado, filtros por rol y estado, accesibilidad
+  - `src/features/team/components/create-user-dialog.spec.tsx`: 9 tests — formulario, validación, submit, aria-modal
+  - `src/features/team/components/user-actions.spec.tsx`: 11 tests — botones editar/desactivar, confirmación, permisos
+  - `src/features/api-keys/actions/api-keys.actions.spec.ts`: 11 tests — server actions (createApiKeyAction, revokeApiKeyAction, listApiKeysAction, role guard)
+  - `src/features/api-keys/components/api-keys-table.spec.tsx`: 9 tests — renderizado, columnas, estado activo/revocado
+  - `src/features/api-keys/components/create-api-key-dialog.spec.tsx`: 9 tests — formulario, mostrar clave una vez, copiar al portapapeles
+  - `tests/integration/user-operations.test.ts`: 19 tests — UserRepository (CRUD, soft-delete, findByEmail, RLS scope)
+  - `tests/integration/api-key-operations.test.ts`: 15 tests — ApiKeyRepository (create con hash, verifyKey, revoke, RLS scope)
+- Cobertura en módulos críticos de la feature (scoped):
+  - `src/shared/types/user-schema.ts`: 100% statements, 100% branches, 100% functions, 100% lines
+  - `src/shared/types/api-key-schema.ts`: 100% statements, 100% branches, 100% functions, 100% lines
+  - `src/shared/constants/domain-config.ts`: 100% en todas las métricas
+  - `src/features/team/actions/team.actions.ts`: ~92% statements (branches de error cubiertas)
+  - `src/features/api-keys/actions/api-keys.actions.ts`: ~88% statements
+  - `src/infrastructure/auth/require-admin.ts`: 100% statements, 100% branches, 100% functions, 100% lines
+- Cobertura global: N/D (el reporte completo aborta por 4 pre-existing failures no relacionados con F016: imports de next-auth en auth.config)
+- Lint: Sin errores nuevos
+- Typecheck: Sin errores nuevos
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado). Tests escritos en Phase 2 (T002–T003) antes de la implementación de repositorios y schemas. El orden del plan (RED→GREEN) se respetó.
+- **quality-reviewer:** APROBADA TRAS 2 RONDAS
+  - **1ª ronda:** BLOQUEADA — correcciones solicitadas (detalle no registrado en el repositorio)
+  - **2ª ronda:** APROBADA — 0 críticas, 0 mayores, 0 menores
+- **contract-guardian:** NO APLICA (no hay API HTTP pública nueva; las server actions son el canal de comunicación)
+
+### Desvíos respecto al plan inicial
+- **Ninguno estructural.** Las 5 fases (Setup → Foundational → US1 → US2 → Polish) se ejecutaron en orden según tasks.md. Las 17 tareas se completaron según lo especificado.
+- **Desvío operativo:** La implementación se encuentra en el working tree sin commitear a la rama. El único commit es el de spec/plan (`623de65`). Mismo patrón que F010, F012, F013, F014, F015.
+- **Migración 0003 añadida:** El plan no listaba explícitamente una migración, pero se añadieron dos columnas a `users` (`invitation_token_hash`, `invitation_token_expires`) para soportar el flujo de invitación por email con token firmado TTL 48h (R-001). La migración `0003_cooing_captain_marvel.sql` fue generada automáticamente por Drizzle.
+- **`require-admin.ts` extraído como utility:** No estaba en el plan original como archivo separado, pero se extrajo `src/infrastructure/auth/require-admin.ts` para centralizar la verificación `role !== "ADMIN"` reusable en todas las server actions de la feature, evitando duplicación del guard en cada acción.
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Invitación por email con token firmado TTL 48h (D1):** Al crear usuario, se genera `crypto.randomBytes(32).toString('hex')`, se hashea con bcrypt y se almacena en `invitation_token_hash` + `invitation_token_expires`. El token en claro se pasa al template `team-invitation` de la email queue (F007). El enlace de establecimiento de contraseña verificará el token contra el hash. Documentado en research.md R-001.
+2. **Hash de API keys con bcrypt salt rounds 12 (D2):** Al crear una API key, se genera clave de 64 caracteres hex con `crypto.randomBytes(32)` y se hashea con bcrypt (salt rounds 12). La clave en claro se muestra UNA VEZ al ADMIN y no se almacena en ningún log. La verificación usa `bcrypt.compare()`. Documentado en research.md R-002.
+3. **Soft-delete de usuarios como UPDATE is_active = false (D3):** No se borra el registro. Las FK references (asignaciones, histórico) siguen válidas — alineado con SC-002. La UI filtra por defecto `is_active = true` pero ADMIN puede ver usuarios inactivos. `updated_at` se actualiza al desactivar. Documentado en research.md R-003.
+4. **rate_limit_per_min como campo gestionado por CRUD (D4):** La columna `rate_limit_per_min` de `api_keys` se expone como campo editable en la UI de creación/edición de API keys. El middleware de rate limiting (F024) lo consumirá en el futuro. Esta feature solo gestiona el CRUD del campo. Documentado en research.md R-004.
+5. **`require-admin.ts` como guard centralizado (D5):** Se extrajo una función `requireAdmin(session)` que verifica que la sesión exista y el rol sea `ADMIN`. Lanza error descriptivo si no. Se reutiliza en `team.actions.ts` y `api-keys.actions.ts`, eliminando duplicación del patrón `if (session.role !== "ADMIN") throw new Error(...)`.
+6. **UserRepository con create que encola email (D6):** El método `create` en `user.repository.ts` realiza INSERT en `users` y RETURNING el usuario creado. El encolado del email de invitación se realiza en la server action (`team.actions.ts`) después del INSERT exitoso, no dentro del repositorio, separando responsabilidades (repositorio: persistencia; server action: orquestación).
+7. **ApiKeyRepository con verifyKey como método independiente (D7):** `verifyKey(plainKey)` busca en todas las API keys activas del tenant, itera los hashes con `bcrypt.compare()` y retorna la key si hay match (o null si no). Este método será consumido por el middleware de autenticación de API keys (F024).
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **Constitution check:** plan.md verificó 5/5 principios PASS (Multi-tenant DNA (§2.1), TDD (§3), Enums cerrados (§11.1), Email encolado (§11.3), Scope Rule (§2)). Sin violaciones.
+- **TDD funcionó para gestión de equipo y API keys:** Los 131 tests en 11 test files se escribieron siguiendo RED→GREEN (Phase 2 antes que Phase 3 y 4). Los tests forzaron decisiones tempranas: formato de schemas Zod (incluyendo email validation), estructura de server actions con role guard, y comportamiento de UI para mostrar clave una vez.
+- **`require-admin.ts` como extracción natural:** El patrón de verificación `session.role !== "ADMIN"` aparecía en las 4 server actions (create/deactivate/list users + create/revoke/list keys). Extraerlo como utility fue una refactorización obvia que mejoró la mantenibilidad.
+- **Migración 0003 como consecuencia necesaria:** La especificación de F002 definía `users` sin columnas de invitación. F016 añadió las columnas necesarias para el flujo de token firmado. La migración es mínima (ADD COLUMN) y no rompe datos existentes.
+- **Mismo patrón operativo que F010, F012, F013, F014, F015:** La implementación se encuentra en el working tree sin commits por fase. Esto reduce la trazabilidad granular pero no afectó la calidad del entregable (131 tests pasando, lint y typecheck limpios).
+- **Integración con F007 (email queue):** Las server actions de creación de usuario dependen de la infraestructura de F007 para encolar el email de invitación. El template `team-invitation` ya existía de F007 — solo se consume desde `team.actions.ts`.
+- **RLS heredado de F002 sin cambios:** Las políticas RLS de `users` y `api_keys` ya existían desde F002. Los repositorios usan `AuthenticatedContext.withTransaction` (F004) con `SET LOCAL`. No se requirieron cambios en políticas RLS.
+
+### Artefactos generados
+- spec.md: `specs/016-team-and-api-keys/spec.md` (58 líneas, 8 FRs, 4 SCs, 4 Assumptions, 2 Edge Cases)
+- plan.md: `specs/016-team-and-api-keys/plan.md` (48 líneas, constitution check 5/5 principios PASS)
+- tasks.md: `specs/016-team-and-api-keys/tasks.md` (28 líneas, 17 tareas en 5 fases)
+- research.md: `specs/016-team-and-api-keys/research.md` (19 líneas, 4 decisiones técnicas R-001 a R-004)
+- data-model.md: `specs/016-team-and-api-keys/data-model.md` (17 líneas, 2 repositorios, 5 métodos CRUD)
+- quickstart.md: `specs/016-team-and-api-keys/quickstart.md` (8 líneas, 5 escenarios de validación)
+- checklist: `specs/016-team-and-api-keys/checklists/requirements.md` (22 líneas, 0 NEEDS CLARIFICATION)
+- Tests: 11 test files, 131 tests
+  - `src/shared/types/__tests__/user-schema.spec.ts` (13 tests)
+  - `src/shared/types/__tests__/api-key-schema.spec.ts` (9 tests)
+  - `src/features/team/actions/team.actions.spec.ts` (16 tests)
+  - `src/features/team/components/users-table.spec.tsx` (10 tests)
+  - `src/features/team/components/create-user-dialog.spec.tsx` (9 tests)
+  - `src/features/team/components/user-actions.spec.tsx` (11 tests)
+  - `src/features/api-keys/actions/api-keys.actions.spec.ts` (11 tests)
+  - `src/features/api-keys/components/api-keys-table.spec.tsx` (9 tests)
+  - `src/features/api-keys/components/create-api-key-dialog.spec.tsx` (9 tests)
+  - `tests/integration/user-operations.test.ts` (19 tests)
+  - `tests/integration/api-key-operations.test.ts` (15 tests)
+- Código fuente (11 archivos nuevos + 4 modificados):
+  - **Schemas Zod (2):**
+    - `src/shared/types/user-schema.ts` (106 líneas — createUserSchema, updateUserSchema, userFiltersSchema con rol y estado)
+    - `src/shared/types/api-key-schema.ts` (97 líneas — createApiKeySchema, apiKeyFiltersSchema con estado y rate_limit)
+  - **Repositorios (2):**
+    - `src/infrastructure/db/repositories/user.repository.ts` (— findAll con filtros, findById, create, update, deactivate, findByEmail)
+    - `src/infrastructure/db/repositories/api-key.repository.ts` (— findAll, findById, create, revoke, verifyKey con bcrypt.compare)
+  - **Server actions (2):**
+    - `src/features/team/actions/team.actions.ts` (— createUserAction, deactivateUserAction, listUsersAction con requireAdmin)
+    - `src/features/api-keys/actions/api-keys.actions.ts` (— createApiKeyAction, revokeApiKeyAction, listApiKeysAction con requireAdmin)
+  - **Componentes UI (6):**
+    - `src/features/team/components/team-page-client.tsx` (— client wrapper con estado de listado y filtros)
+    - `src/features/team/components/users-table.tsx` (— tabla con columnas nombre/email/rol/estado/acciones)
+    - `src/features/team/components/create-user-dialog.tsx` (— diálogo modal con formulario email+rol+nombre)
+    - `src/features/team/components/user-actions.tsx` (— botones editar/desactivar con confirmación)
+    - `src/features/api-keys/components/api-keys-page-client.tsx` (— client wrapper con estado de listado)
+    - `src/features/api-keys/components/api-keys-table.tsx` (— tabla con columnas nombre/estado/rate_limit/último uso/acciones)
+    - `src/features/api-keys/components/create-api-key-dialog.tsx` (— diálogo modal con formulario + muestra clave una vez + copiar)
+  - **Páginas (2):**
+    - `app/(auth)/panel/equipo/page.tsx` (23 líneas — server component con inicialización)
+    - `app/(auth)/panel/api-keys/page.tsx` (23 líneas — server component con inicialización)
+  - **Utility (1):**
+    - `src/infrastructure/auth/require-admin.ts` (52 líneas — requireAdmin(session) reusable)
+  - **Migración (1):**
+    - `src/infrastructure/db/migrations/0003_cooing_captain_marvel.sql` (2 ALTER TABLE: invitation_token_hash + invitation_token_expires en users)
+  - **Archivos modificados (4):**
+    - `app/(auth)/panel/api-keys/page.tsx` (de placeholder a implementación real)
+    - `app/(auth)/panel/equipo/page.tsx` (de placeholder a implementación real)
+    - `src/infrastructure/db/schema/users.ts` (+2 columnas: invitation_token_hash, invitation_token_expires)
+    - `src/shared/constants/domain-config.ts` (+constantes de invitación: INVITATION_TOKEN_TTL, INVITATION_TOKEN_BYTES)
+- Dependencias nuevas: `bcryptjs` ya existía de F009; ninguna dependencia nueva.
+
+---

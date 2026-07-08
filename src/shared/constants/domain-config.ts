@@ -32,3 +32,21 @@ export const THUMBNAIL_WIDTH = 400;
 
 /** Alto por defecto de thumbnails en px. */
 export const THUMBNAIL_HEIGHT = 300;
+
+/** Longitud máxima del nombre de un usuario del equipo. */
+export const USER_NAME_MAX_LENGTH = 200;
+
+/** Longitud máxima del email de un usuario (estándar RFC 5321). */
+export const USER_EMAIL_MAX_LENGTH = 254;
+
+/** Longitud máxima del nombre de una API key. */
+export const API_KEY_NAME_MAX_LENGTH = 100;
+
+/** Salt rounds para bcrypt en API keys. */
+export const BCRYPT_SALT_ROUNDS = 12;
+
+/** Longitud de la clave API generada (bytes aleatorios en hex). */
+export const API_KEY_BYTE_LENGTH = 32;
+
+/** TTL del token de invitación en milisegundos (48 horas). */
+export const INVITATION_TOKEN_TTL_MS = 48 * 60 * 60 * 1000;
