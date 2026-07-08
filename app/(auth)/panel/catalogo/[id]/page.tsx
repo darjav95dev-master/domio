@@ -1,0 +1,222 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { eq, and } from "drizzle-orm";
+import { getServerSession } from "@/infrastructure/auth/session";
+import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { db } from "@/infrastructure/db/client";
+import { users } from "@/infrastructure/db/schema/users";
+import {
+  PromocionForm,
+  type PromocionFormData,
+} from "@/features/promociones/components/promocion-form";
+import type { TipologiaEditorItem } from "@/features/promociones/components/tipologia-editor";
+import type { AgentOption } from "@/features/promociones/components/promocion-section-agent";
+import type { ConstructionWarning } from "@/features/promociones/components/promocion-section-commercial-status";
+
+/**
+ * Computes a soft warning when construction_status contradicts
+ * the entrega_estimada from the PLAZOS_GARANTIAS content block.
+ * Extracted to reduce cognitive complexity of the page component.
+ */
+function computeWarning(
+  constructionStatus: string | null,
+  blockPayload: Record<string, unknown> | null,
+): ConstructionWarning | null {
+  if (!constructionStatus || !blockPayload?.entrega_estimada) return null;
+
+  const dateStr = String(blockPayload.entrega_estimada);
+  const entregaEstimada = new Date(dateStr);
+  if (Number.isNaN(entregaEstimada.getTime())) return null;
+
+  const now = new Date();
+  const formattedDate = entregaEstimada.toISOString().slice(0, 10);
+  const isPast = entregaEstimada < now;
+  const isFuture = entregaEstimada > now;
+
+  if (constructionStatus === "ON_PLAN" && isPast) {
+    return {
+      type: "CONSTRUCTION_WARNING",
+      message: `Marcado como sobre plano pero la fecha de entrega (${formattedDate}) ya ha pasado`,
+      entregaEstimada: formattedDate,
+    };
+  }
+  if (constructionStatus === "READY" && isFuture) {
+    return {
+      type: "CONSTRUCTION_WARNING",
+      message: `Marcado como terminado pero la fecha de entrega (${formattedDate}) está en el futuro`,
+      entregaEstimada: formattedDate,
+    };
+  }
+  if (constructionStatus === "IN_CONSTRUCTION" && isPast) {
+    return {
+      type: "CONSTRUCTION_WARNING",
+      message: `Marcado como en construcción pero la fecha de entrega (${formattedDate}) ya ha pasado`,
+      entregaEstimada: formattedDate,
+    };
+  }
+  return null;
+}
+
+/**
+ * EditPromocionPage — página de edición de promoción.
+ *
+ * Server component con auth guard. Obtiene los datos directamente desde
+ * PromocionRepository (más fiable que fetch interno) y la lista de
+ * agentes del tenant desde la base de datos.
+ *
+ * Renderiza:
+ * 1. Back link al catálogo + heading con nombre
+ * 2. PromocionForm (incluye el editor de tipologías internamente)
+ *
+ * **A11y:** navegación semántica, back link con icono, heading con role.
+ */
+export default async function EditPromocionPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const session = await getServerSession();
+  if (!session) {
+    redirect("/panel/login");
+  }
+
+  const { id } = await params;
+
+  // ── Fetch promoción via repository ────────────────────────────────────
+  const authCtx = new AuthenticatedContext(
+    session.tenantId,
+    session.userId,
+    session.role,
+  );
+  const repository = new PromocionRepository(authCtx);
+  const raw = await repository.findById(id);
+
+  if (!raw) {
+    redirect("/panel/catalogo");
+  }
+
+  // AGENT role scope: only assigned promociones
+  if (
+    session.role === "AGENT" &&
+    raw.assignedAgentId !== session.userId
+  ) {
+    redirect("/panel/catalogo");
+  }
+
+  // ── Compute constructionWarning server-side ───────────────────────────
+
+  let constructionWarning: ConstructionWarning | null = null;
+  try {
+    const blockPayload = await repository.findContentBlock(
+      id,
+      "PLAZOS_GARANTIAS",
+    );
+    const payload = blockPayload as Record<string, unknown> | null;
+    constructionWarning = computeWarning(raw.constructionStatus, payload);
+  } catch {
+    // Non-blocking — warning is optional, fail silently
+  }
+
+  // ── Build tipología editor items ──────────────────────────────────────
+
+  const tipologiaItems: TipologiaEditorItem[] = (raw.tipologias ?? []).map(
+    (t) => ({
+      _tempId: t.id,
+      name: t.name,
+      usefulArea: t.usefulArea,
+      builtArea: t.builtArea,
+      floors: t.floors,
+      bedrooms: t.bedrooms,
+      bathrooms: t.bathrooms,
+      yearBuilt: t.yearBuilt,
+      energyCert: t.energyCert,
+      referencePriceSale: t.referencePriceSale,
+      referencePriceRent: t.referencePriceRent,
+      communityFee: t.communityFee,
+      deposit: t.deposit,
+      amenities: t.amenities ?? [],
+      unidades: (t.unidades ?? []).map((u) => ({
+        _tempId: u.id,
+        identifier: u.identifier,
+        status: u.status,
+      })),
+    }),
+  );
+
+  // ── Build form data (includes tipologias) ──────────────────────────────
+
+  const formData: PromocionFormData = {
+    name: raw.name,
+    kind: raw.kind,
+    status: raw.status,
+    propertyType: raw.propertyType,
+    operation: raw.operation,
+    constructionStatus: raw.constructionStatus,
+    island: raw.island,
+    municipality: raw.municipality,
+    address: raw.address,
+    mapPrivacyMode: raw.mapPrivacyMode ?? "AREA",
+    seoTitle: raw.seoTitle,
+    seoDescription: raw.seoDescription,
+    assignedAgentId: raw.assignedAgentId,
+    tipologias: tipologiaItems,
+  };
+
+  // ── Fetch agents from DB ──────────────────────────────────────────────
+
+  const agentsList: AgentOption[] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+    })
+    .from(users)
+    .where(
+      and(eq(users.tenantId, session.tenantId), eq(users.role, "AGENT")),
+    );
+
+  // ── Render ────────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-8">
+      {/* Back link */}
+      <Link
+        href="/panel/catalogo"
+        className="inline-flex items-center gap-1 font-sans text-sm text-fg-subtle underline underline-offset-4 transition-colors duration-standard ease-standard hover:text-accent-default"
+      >
+        <svg
+          aria-hidden="true"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        Volver al catálogo
+      </Link>
+
+      {/* Heading */}
+      <h1 className="font-display text-3xl font-semibold tracking-[-0.035em] text-fg-default">
+        {raw.name}
+      </h1>
+
+      {/* Main form — includes identity, commercial status, location, SEO,
+          agent, and tipologías editor */}
+      <PromocionForm
+        promocionId={id}
+        initialData={formData}
+        agents={agentsList}
+        constructionWarning={constructionWarning}
+        initialDraftPayload={raw.draftPayload as Record<string, unknown> | null}
+        currentStatus={raw.status}
+      />
+    </div>
+  );
+}

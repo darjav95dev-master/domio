@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/shared/components/button";
 import { cn } from "@/shared/utils/cn";
 import { PROMOTION_STATUS_LABELS } from "@/shared/constants/domain-labels";
@@ -114,7 +115,7 @@ export function DashboardContent({
           {quickLinks.map((link) => {
             const Icon = link.icon;
             return (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 className={cn(
@@ -127,7 +128,7 @@ export function DashboardContent({
                 <span className="text-base font-medium text-fg-default">
                   {link.label}
                 </span>
-              </a>
+              </Link>
             );
           })}
         </div>
@@ -143,7 +144,7 @@ export function DashboardContent({
           <ul className="mt-4 divide-y divide-border-subtle rounded-card border border-border-subtle bg-bg-surface">
             {recentPromociones.slice(0, 5).map((promo) => (
               <li key={promo.id}>
-                <a
+                <Link
                   href={`/panel/catalogo/${promo.id}`}
                   className={cn(
                     "flex items-center justify-between gap-4 px-5 py-3",
@@ -170,7 +171,7 @@ export function DashboardContent({
                       {relativeTime(promo.updatedAt)}
                     </span>
                   </span>
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -186,12 +187,12 @@ export function DashboardContent({
         <SectionHeading id="shortcuts-heading">Atajos rápidos</SectionHeading>
 
         <div className="mt-4 flex flex-wrap gap-4">
-          <a href="/panel/catalogo/nueva">
+          <Link href="/panel/catalogo/nueva">
             <Button variant="primary">Nueva promoción</Button>
-          </a>
-          <a href="/panel/leads">
+          </Link>
+          <Link href="/panel/leads">
             <Button variant="secondary">Ver bandeja</Button>
-          </a>
+          </Link>
         </div>
       </section>
     </div>
