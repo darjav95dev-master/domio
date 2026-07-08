@@ -1,4 +1,4 @@
-import { eq, and, inArray, desc, count, sql } from "drizzle-orm";
+import { eq, and, inArray, desc, count, or, lt, sql } from "drizzle-orm";
 import {
   promociones,
   tipologias,
@@ -13,12 +13,15 @@ import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion
 import { TipologiaRepository } from "@/infrastructure/db/repositories/tipologia.repository";
 import { UnidadRepository } from "@/infrastructure/db/repositories/unidad.repository";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
-import type { Transaction } from "@/infrastructure/tenant/TenantContext";
+import type { TenantContext, Transaction } from "@/infrastructure/tenant/TenantContext";
 import type {
   PromocionStatus,
   PromocionKind,
   ConstructionStatus,
   ContentBlockType,
+  PropertyType,
+  OperationType,
+  Amenity,
 } from "@/shared/constants/db-enums";
 
 // ---------------------------------------------------------------------------
@@ -37,6 +40,52 @@ export interface PromocionFilters {
 export interface PaginatedResult<T> {
   items: T[];
   total: number;
+}
+
+// ---------------------------------------------------------------------------
+// Public Catalog Types (cursor pagination)
+// ---------------------------------------------------------------------------
+
+export interface PublicCatalogFilters {
+  island?: string;
+  municipality?: string;
+  propertyType?: PropertyType;
+  operation?: OperationType;
+  priceMin?: number;
+  priceMax?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  amenities?: Amenity[];
+  constructionStatus?: ConstructionStatus;
+}
+
+export type CatalogSortOption = "price_asc" | "price_desc" | "published";
+
+export interface CatalogCursorResult {
+  items: PromocionListRow[];
+  nextCursor: string | null;
+  total: number;
+}
+
+interface CursorPayload {
+  sortKey: string;
+  id: string;
+}
+
+function encodeCursor(sortKey: string, id: string): string {
+  return Buffer.from(`${sortKey}|${id}`).toString("base64url");
+}
+
+function decodeCursor(cursor: string): CursorPayload {
+  const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
+  const separatorIndex = decoded.lastIndexOf("|");
+  if (separatorIndex === -1) {
+    throw new Error("Invalid cursor format");
+  }
+  return {
+    sortKey: decoded.slice(0, separatorIndex),
+    id: decoded.slice(separatorIndex + 1),
+  };
 }
 
 export interface PromocionWithRelations {
@@ -165,11 +214,11 @@ export interface HistoryEntryWithAuthor extends HistoryEntry {
 // ---------------------------------------------------------------------------
 
 export class PromocionRepository extends TenantAwareRepository {
-  private readonly authCtx: AuthenticatedContext;
+  private readonly authCtx: AuthenticatedContext | null;
 
-  constructor(ctx: AuthenticatedContext) {
+  constructor(ctx: TenantContext) {
     super(ctx);
-    this.authCtx = ctx;
+    this.authCtx = ctx.type === "authenticated" ? (ctx as AuthenticatedContext) : null;
   }
 
   async findAll(
@@ -179,7 +228,7 @@ export class PromocionRepository extends TenantAwareRepository {
   ): Promise<PaginatedResult<PromocionListRow>> {
     return this.withTransaction(async (tx) => {
       const conditions: ReturnType<typeof eq>[] = [
-        eq(promociones.tenantId, this.authCtx.getTenantId()),
+        eq(promociones.tenantId, this.ctx.getTenantId()),
       ];
 
       if (filters.status) {
@@ -201,9 +250,9 @@ export class PromocionRepository extends TenantAwareRepository {
       }
 
       // AGENT role: always filter by assignedAgentId = current user
-      if (this.authCtx.role === "AGENT") {
+      if (this.authCtx!.role === "AGENT") {
         conditions.push(
-          eq(promociones.assignedAgentId, this.authCtx.userId),
+          eq(promociones.assignedAgentId, this.authCtx!.userId),
         );
       } else if (filters.assignedAgentId) {
         // For ADMIN/OPERATOR, use the explicit filter if provided
@@ -258,6 +307,287 @@ export class PromocionRepository extends TenantAwareRepository {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Public Catalog — cursor pagination
+  // ---------------------------------------------------------------------------
+
+  async findPublicWithCursor(
+    filters: PublicCatalogFilters,
+    options?: {
+      cursor?: string;
+      limit?: number;
+      sort?: CatalogSortOption;
+    },
+  ): Promise<CatalogCursorResult> {
+    return this.ctx.withTransaction(async (tx) => {
+      const limit = options?.limit ?? 12;
+      const sort = options?.sort ?? "published";
+
+      // -- Build WHERE conditions ---------------------------------------------
+
+      const conditions: (ReturnType<typeof eq> | ReturnType<typeof sql>)[] = [
+        eq(promociones.tenantId, this.ctx.getTenantId()),
+        eq(promociones.status, "PUBLISHED"),
+      ];
+
+      // Direct promocion-level filters
+      if (filters.island)
+        conditions.push(eq(promociones.island, filters.island));
+      if (filters.municipality)
+        conditions.push(eq(promociones.municipality, filters.municipality));
+      if (filters.propertyType)
+        conditions.push(eq(promociones.propertyType, filters.propertyType));
+      if (filters.operation)
+        conditions.push(eq(promociones.operation, filters.operation));
+      if (filters.constructionStatus)
+        conditions.push(
+          eq(promociones.constructionStatus, filters.constructionStatus),
+        );
+
+      // Tipologia-dependent filters via EXISTS subqueries
+      if (filters.bedrooms) {
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bedrooms >= ${filters.bedrooms})`,
+        );
+      }
+      if (filters.bathrooms) {
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bathrooms >= ${filters.bathrooms})`,
+        );
+      }
+      if (filters.priceMin) {
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale >= ${filters.priceMin})`,
+        );
+      }
+      if (filters.priceMax) {
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale <= ${filters.priceMax})`,
+        );
+      }
+      if (filters.amenities && filters.amenities.length > 0) {
+        for (const amenity of filters.amenities) {
+          const amenityJson = JSON.stringify([amenity]);
+          conditions.push(
+            sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.amenities @> ${amenityJson}::jsonb)`,
+          );
+        }
+      }
+
+      const whereClause = and(...conditions);
+
+      // -- Count total --------------------------------------------------------
+
+      const [totalRow] = await tx
+        .select({ count: count() })
+        .from(promociones)
+        .where(whereClause);
+
+      const total = Number(totalRow?.count ?? 0);
+      if (total === 0) {
+        return { items: [], nextCursor: null, total: 0 };
+      }
+
+      // -- Fetch items with cursor pagination ---------------------------------
+
+      if (sort === "price_asc" || sort === "price_desc") {
+        return this.fetchPublicWithPriceSort(
+          tx, whereClause, filters, sort, limit, options?.cursor, total,
+        );
+      }
+
+      // Default: published sort (created_at DESC, id DESC)
+      return this.fetchPublicWithPublishedSort(
+        tx, whereClause, limit, options?.cursor, total,
+      );
+    });
+  }
+
+  /**
+   * Fetches catalog page ordered by created_at DESC, id DESC (published sort).
+   */
+  private async fetchPublicWithPublishedSort(
+    tx: Transaction,
+    whereClause: ReturnType<typeof and>,
+    limit: number,
+    cursor: string | undefined,
+    total: number,
+  ): Promise<CatalogCursorResult> {
+    const conditions = [];
+
+    if (cursor) {
+      const { sortKey, id } = decodeCursor(cursor);
+      const cursorDate = new Date(sortKey);
+      conditions.push(
+        or(
+          lt(promociones.createdAt, cursorDate),
+          and(eq(promociones.createdAt, cursorDate), lt(promociones.id, id)),
+        ),
+      );
+    }
+
+    const items = await tx
+      .select({
+        id: promociones.id,
+        tenantId: promociones.tenantId,
+        slug: promociones.slug,
+        name: promociones.name,
+        kind: promociones.kind,
+        status: promociones.status,
+        operation: promociones.operation,
+        propertyType: promociones.propertyType,
+        constructionStatus: promociones.constructionStatus,
+        island: promociones.island,
+        municipality: promociones.municipality,
+        address: promociones.address,
+        location: promociones.location,
+        locationApprox: promociones.locationApprox,
+        mapPrivacyMode: promociones.mapPrivacyMode,
+        seoTitle: promociones.seoTitle,
+        seoDescription: promociones.seoDescription,
+        assignedAgentId: promociones.assignedAgentId,
+        assignedAgentName: users.name,
+        draftPayload: promociones.draftPayload,
+        createdAt: promociones.createdAt,
+        updatedAt: promociones.updatedAt,
+      })
+      .from(promociones)
+      .leftJoin(users, eq(promociones.assignedAgentId, users.id))
+      .where(and(whereClause, ...conditions))
+      .orderBy(desc(promociones.createdAt), desc(promociones.id))
+      .limit(limit + 1);
+
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+
+    let nextCursor: string | null = null;
+    if (hasMore && pageItems.length > 0) {
+      const last = pageItems[pageItems.length - 1]!;
+      nextCursor = encodeCursor(last.createdAt.toISOString(), last.id);
+    }
+
+    return { items: pageItems, nextCursor, total };
+  }
+
+  /**
+   * Fetches catalog page ordered by minimum reference price.
+   */
+  private async fetchPublicWithPriceSort(
+    tx: Transaction,
+    whereClause: ReturnType<typeof and>,
+    _filters: PublicCatalogFilters,
+    sort: CatalogSortOption,
+    limit: number,
+    cursor: string | undefined,
+    total: number,
+  ): Promise<CatalogCursorResult> {
+    // Build a price aggregation subquery
+    const priceAgg = tx
+      .select({
+        promocionId: tipologias.promocionId,
+        minPrice: sql<number>`MIN(${tipologias.referencePriceSale})`.as(
+          "min_price",
+        ),
+        maxPrice: sql<number>`MAX(${tipologias.referencePriceSale})`.as(
+          "max_price",
+        ),
+      })
+      .from(tipologias)
+      .groupBy(tipologias.promocionId)
+      .as("price_agg");
+
+    // For price_asc: ORDER BY min_price ASC NULLS LAST, id ASC
+    // For price_desc: ORDER BY max_price DESC NULLS FIRST, id DESC
+    const priceCol =
+      sort === "price_asc"
+        ? sql`COALESCE(${priceAgg.minPrice}, 0)`
+        : sql`COALESCE(${priceAgg.maxPrice}, 0)`;
+
+    const orderExpr =
+      sort === "price_asc"
+        ? sql`${priceCol} ASC NULLS LAST, ${promociones.id} ASC`
+        : sql`${priceCol} DESC NULLS FIRST, ${promociones.id} DESC`;
+
+    // Build cursor condition
+    const cursorConditions: ReturnType<typeof sql>[] = [];
+    if (cursor) {
+      const { sortKey, id } = decodeCursor(cursor);
+      const cursorPrice = Number(sortKey);
+
+      if (sort === "price_asc") {
+        cursorConditions.push(
+          sql`(COALESCE(${priceAgg.minPrice}, 0) > ${cursorPrice} OR (COALESCE(${priceAgg.minPrice}, 0) = ${cursorPrice} AND ${promociones.id} > ${id}))`,
+        );
+      } else {
+        cursorConditions.push(
+          sql`(COALESCE(${priceAgg.maxPrice}, 0) < ${cursorPrice} OR (COALESCE(${priceAgg.maxPrice}, 0) = ${cursorPrice} AND ${promociones.id} < ${id}))`,
+        );
+      }
+    }
+
+    const cursorClause = cursorConditions.length > 0
+      ? and(...cursorConditions)
+      : undefined;
+
+    const fullWhere = cursorClause
+      ? and(whereClause, cursorClause)
+      : whereClause;
+
+    const rows = await tx
+      .select({
+        id: promociones.id,
+        tenantId: promociones.tenantId,
+        slug: promociones.slug,
+        name: promociones.name,
+        kind: promociones.kind,
+        status: promociones.status,
+        operation: promociones.operation,
+        propertyType: promociones.propertyType,
+        constructionStatus: promociones.constructionStatus,
+        island: promociones.island,
+        municipality: promociones.municipality,
+        address: promociones.address,
+        location: promociones.location,
+        locationApprox: promociones.locationApprox,
+        mapPrivacyMode: promociones.mapPrivacyMode,
+        seoTitle: promociones.seoTitle,
+        seoDescription: promociones.seoDescription,
+        assignedAgentId: promociones.assignedAgentId,
+        assignedAgentName: users.name,
+        draftPayload: promociones.draftPayload,
+        createdAt: promociones.createdAt,
+        updatedAt: promociones.updatedAt,
+      })
+      .from(promociones)
+      .leftJoin(users, eq(promociones.assignedAgentId, users.id))
+      .leftJoin(priceAgg, eq(priceAgg.promocionId, promociones.id))
+      .where(fullWhere)
+      .orderBy(orderExpr)
+      .limit(limit + 1);
+
+    // Map the Drizzle raw rows to PromocionListRow (strip computed columns)
+    const items = rows.slice(0, limit) as unknown as PromocionListRow[];
+
+    let nextCursor: string | null = null;
+    if (rows.length > limit && items.length > 0) {
+      const last = items[items.length - 1]!;
+
+      if (sort === "price_asc") {
+        // Need to get the actual minPrice for this item. Re-fetch from the row data.
+        // Since rows has the raw result with price_agg columns, extract it
+        const lastRow = rows[limit - 1] as Record<string, unknown>;
+        const lastPrice = String(lastRow?.min_price ?? "0");
+        nextCursor = encodeCursor(lastPrice, last.id);
+      } else {
+        const lastRow = rows[limit - 1] as Record<string, unknown>;
+        const lastPrice = String(lastRow?.max_price ?? "0");
+        nextCursor = encodeCursor(lastPrice, last.id);
+      }
+    }
+
+    return { items, nextCursor, total };
+  }
+
   async findById(
     id: string,
   ): Promise<PromocionWithRelations | null> {
@@ -292,7 +622,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promociones.id, id),
-            eq(promociones.tenantId, this.authCtx.getTenantId()),
+            eq(promociones.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -318,7 +648,7 @@ export class PromocionRepository extends TenantAwareRepository {
       .where(
         and(
           eq(tipologias.promocionId, promocionId),
-          eq(tipologias.tenantId, this.authCtx.getTenantId()),
+          eq(tipologias.tenantId, this.ctx.getTenantId()),
         ),
       );
 
@@ -331,7 +661,7 @@ export class PromocionRepository extends TenantAwareRepository {
       .where(
         and(
           inArray(unidades.tipologiaId, tipologiaIds),
-          eq(unidades.tenantId, this.authCtx.getTenantId()),
+          eq(unidades.tenantId, this.ctx.getTenantId()),
         ),
       );
 
@@ -374,12 +704,12 @@ export class PromocionRepository extends TenantAwareRepository {
 
       if (oldJson !== newJson) {
         await tx.insert(promocionHistory).values({
-          tenantId: this.authCtx.getTenantId(),
+          tenantId: this.ctx.getTenantId(),
           promocionId: id,
           field: fieldName,
           oldValue: oldJson,
           newValue: newJson,
-          authorId: this.authCtx.userId,
+          authorId: this.authCtx!.userId,
         });
       }
     }
@@ -392,7 +722,7 @@ export class PromocionRepository extends TenantAwareRepository {
       const [row] = await tx
         .insert(promociones)
         .values({
-          tenantId: this.authCtx.getTenantId(),
+          tenantId: this.ctx.getTenantId(),
           slug: "",
           name: data.name,
           kind: data.kind as "portfolio" | "external",
@@ -423,7 +753,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promociones.id, id),
-            eq(promociones.tenantId, this.authCtx.getTenantId()),
+            eq(promociones.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -474,7 +804,7 @@ export class PromocionRepository extends TenantAwareRepository {
           .where(
             and(
               eq(promociones.id, id),
-              eq(promociones.tenantId, this.authCtx.getTenantId()),
+              eq(promociones.tenantId, this.ctx.getTenantId()),
             ),
           )
           .returning();
@@ -509,7 +839,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promociones.id, id),
-            eq(promociones.tenantId, this.authCtx.getTenantId()),
+            eq(promociones.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -532,7 +862,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promociones.id, id),
-            eq(promociones.tenantId, this.authCtx.getTenantId()),
+            eq(promociones.tenantId, this.ctx.getTenantId()),
           ),
         )
         .returning();
@@ -552,7 +882,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promociones.id, id),
-            eq(promociones.tenantId, this.authCtx.getTenantId()),
+            eq(promociones.tenantId, this.ctx.getTenantId()),
           ),
         )
         .returning();
@@ -577,7 +907,7 @@ export class PromocionRepository extends TenantAwareRepository {
           and(
             eq(promocionContentBlocks.promocionId, promocionId),
             eq(promocionContentBlocks.blockType, blockType),
-            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
           ),
         )
         .limit(1);
@@ -604,7 +934,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promocionContentBlocks.promocionId, promocionId),
-            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
           ),
         )
         .orderBy(promocionContentBlocks.sortOrder);
@@ -634,7 +964,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promociones.id, promocionId),
-            eq(promociones.tenantId, this.authCtx.getTenantId()),
+            eq(promociones.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -659,7 +989,7 @@ export class PromocionRepository extends TenantAwareRepository {
           and(
             eq(promocionContentBlocks.promocionId, promocionId),
             eq(promocionContentBlocks.blockType, blockType),
-            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
           ),
         )
         .limit(1);
@@ -676,7 +1006,7 @@ export class PromocionRepository extends TenantAwareRepository {
           .where(
             and(
               eq(promocionContentBlocks.id, existing.id),
-              eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+              eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
             ),
           )
           .returning();
@@ -695,7 +1025,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promocionContentBlocks.promocionId, promocionId),
-            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -705,7 +1035,7 @@ export class PromocionRepository extends TenantAwareRepository {
       const [created] = await tx
         .insert(promocionContentBlocks)
         .values({
-          tenantId: this.authCtx.getTenantId(),
+          tenantId: this.ctx.getTenantId(),
           promocionId,
           blockType,
           payload,
@@ -737,7 +1067,7 @@ export class PromocionRepository extends TenantAwareRepository {
           and(
             eq(promocionContentBlocks.id, blockId),
             eq(promocionContentBlocks.promocionId, promocionId),
-            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -748,7 +1078,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promocionContentBlocks.promocionId, promocionId),
-            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
           ),
         )
         .orderBy(promocionContentBlocks.sortOrder);
@@ -762,7 +1092,7 @@ export class PromocionRepository extends TenantAwareRepository {
               eq(promocionContentBlocks.id, remaining[i]!.id),
               eq(
                 promocionContentBlocks.tenantId,
-                this.authCtx.getTenantId(),
+                this.ctx.getTenantId(),
               ),
             ),
           );
@@ -787,7 +1117,7 @@ export class PromocionRepository extends TenantAwareRepository {
             and(
               eq(promocionContentBlocks.id, orderedBlockIds[i]!),
               eq(promocionContentBlocks.promocionId, promocionId),
-              eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+              eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
             ),
           );
       }
@@ -815,7 +1145,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promocionContentBlocks.promocionId, promocionId),
-            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -870,7 +1200,7 @@ export class PromocionRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promocionHistory.promocionId, promocionId),
-            eq(promocionHistory.tenantId, this.authCtx.getTenantId()),
+            eq(promocionHistory.tenantId, this.ctx.getTenantId()),
           ),
         )
         .orderBy(desc(promocionHistory.createdAt));
@@ -892,8 +1222,8 @@ export class PromocionRepository extends TenantAwareRepository {
     promocionId: string,
     tipologiasPayload: TipologiaPayload[],
   ): Promise<void> {
-    const tipologiaRepo = new TipologiaRepository(this.authCtx);
-    const unidadRepo = new UnidadRepository(this.authCtx);
+    const tipologiaRepo = new TipologiaRepository(this.authCtx!);
+    const unidadRepo = new UnidadRepository(this.authCtx!);
 
     // Fetch existing tipologías for this promoción
     const existingTipologiasRows = await tx
@@ -902,7 +1232,7 @@ export class PromocionRepository extends TenantAwareRepository {
       .where(
         and(
           eq(tipologias.promocionId, promocionId),
-          eq(tipologias.tenantId, this.authCtx.getTenantId()),
+          eq(tipologias.tenantId, this.ctx.getTenantId()),
         ),
       );
 
@@ -1033,7 +1363,7 @@ export class PromocionRepository extends TenantAwareRepository {
       .where(
         and(
           eq(unidades.tipologiaId, tipologiaId),
-          eq(unidades.tenantId, this.authCtx.getTenantId()),
+          eq(unidades.tenantId, this.ctx.getTenantId()),
         ),
       );
 
