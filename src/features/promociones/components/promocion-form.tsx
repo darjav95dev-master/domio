@@ -51,6 +51,11 @@ export interface SectionErrors {
   agent?: AgentSectionErrors;
 }
 
+export interface PublishBlockedInfo {
+  message: string;
+  errors: Array<{ blockType: string; issues: string[] }>;
+}
+
 export interface PromocionFormProps {
   promocionId: string;
   initialData: PromocionFormData;
@@ -66,6 +71,11 @@ export interface PromocionFormProps {
   initialDraftPayload: Record<string, unknown> | null;
   /** Current status before editing (used to detect first-publish). */
   currentStatus: string;
+  /**
+   * If the promotion has blocks with invalid data, publishing is blocked.
+   * Comes from server-side validation (T030-T031).
+   */
+  publishBlocked?: PublishBlockedInfo | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +142,7 @@ export function PromocionForm({
   initialDraftPayload,
   currentStatus,
   initialTipologias = [],
+  publishBlocked = null,
 }: PromocionFormProps) {
   // ── Track whether draft was restored on mount ─────────────────────────
   const draftRestoredRef = useRef(false);
@@ -344,6 +355,15 @@ export function PromocionForm({
   // ── Publish ───────────────────────────────────────────────────────────
 
   const handlePublish = useCallback(async () => {
+    // Check block validation before publishing (T030-T031)
+    if (publishBlocked) {
+      setSubmitState({
+        status: "error",
+        message: publishBlocked.message,
+      });
+      return;
+    }
+
     // If there is a draft, apply it over the current form data
     const mergedData = hasDraft
       ? ({ ...formState, ...applyDraft() } as PromocionFormData)
@@ -387,7 +407,7 @@ export function PromocionForm({
     }
 
     await sendPatch(payload);
-  }, [formState, hasDraft, applyDraft, sendPatch]);
+  }, [formState, hasDraft, applyDraft, sendPatch, publishBlocked]);
 
   // ── Discard draft ─────────────────────────────────────────────────────
 

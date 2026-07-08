@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/011-catalog-management/plan.md
+at specs/012-editorial-blocks-editor/plan.md
 <!-- SPECKIT END -->
 
 <!-- codebase-memory-mcp:start -->

@@ -10,6 +10,8 @@ import {
   PromocionForm,
   type PromocionFormData,
 } from "@/features/promociones/components/promocion-form";
+import { BlocksEditor } from "@/features/promociones/components/blocks-editor";
+import type { BlockEditorItem } from "@/features/promociones/components/blocks-editor";
 import type { TipologiaEditorItem } from "@/features/promociones/components/tipologia-editor";
 import type { AgentOption } from "@/features/promociones/components/promocion-section-agent";
 import type { ConstructionWarning } from "@/features/promociones/components/promocion-section-commercial-status";
@@ -163,6 +165,44 @@ export default async function EditPromocionPage({
     tipologias: tipologiaItems,
   };
 
+  // ── Fetch and validate content blocks for publish check (T030) ───────
+
+  let initialBlocks: BlockEditorItem[] = [];
+  let blockValidationErrors: Array<{
+    blockType: string;
+    issues: string[];
+  }> = [];
+
+  try {
+    const dbBlocks = await repository.findAllContentBlocks(id);
+    initialBlocks = dbBlocks.map((b) => ({
+      id: b.id,
+      blockType: b.blockType as BlockEditorItem["blockType"],
+      payload: (b.payload ?? {}) as Record<string, unknown>,
+      sortOrder: b.sortOrder,
+    }));
+
+    // Run publish validation server-side
+    const validated = await repository.validateBlocksForPublish(id);
+    if (!validated.valid) {
+      blockValidationErrors = validated.errors.map((e) => ({
+        blockType: e.blockType,
+        issues: e.issues,
+      }));
+    }
+  } catch {
+    // Non-blocking — blocks are optional, fail silently
+  }
+
+  const publishBlocked =
+    blockValidationErrors.length > 0
+      ? {
+          message:
+            "Hay bloques editoriales con datos inválidos. Corrígelos antes de publicar.",
+          errors: blockValidationErrors,
+        }
+      : null;
+
   // ── Fetch agents from DB ──────────────────────────────────────────────
 
   const agentsList: AgentOption[] = await db
@@ -216,6 +256,14 @@ export default async function EditPromocionPage({
         constructionWarning={constructionWarning}
         initialDraftPayload={raw.draftPayload as Record<string, unknown> | null}
         currentStatus={raw.status}
+        publishBlocked={publishBlocked}
+      />
+
+      {/* Editorial blocks section */}
+      <BlocksEditor
+        promocionId={id}
+        kind={raw.kind as "portfolio" | "external"}
+        initialBlocks={initialBlocks}
       />
     </div>
   );

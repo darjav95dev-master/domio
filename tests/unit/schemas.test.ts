@@ -207,10 +207,22 @@ describe("contentBlockSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("acepta ZONAS_COMUNES con items vacíos (array vacío es válido)", () => {
+  it("rechaza ZONAS_COMUNES con items vacíos (mínimo un elemento)", () => {
     const result = contentBlockSchema.safeParse({
       blockType: "ZONAS_COMUNES",
       payload: { items: [] },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("acepta ZONAS_COMUNES con items (uno o más elementos)", () => {
+    const result = contentBlockSchema.safeParse({
+      blockType: "ZONAS_COMUNES",
+      payload: {
+        items: [
+          { name: "Zona 1", description: "Descripción zona común" },
+        ],
+      },
     });
     expect(result.success).toBe(true);
   });

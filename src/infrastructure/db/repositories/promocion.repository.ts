@@ -1,4 +1,4 @@
-import { eq, and, inArray, desc, count } from "drizzle-orm";
+import { eq, and, inArray, desc, count, sql } from "drizzle-orm";
 import {
   promociones,
   tipologias,
@@ -8,6 +8,8 @@ import {
   users,
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
+import { contentBlockSchema } from "@/shared/types/content-block-schema";
+import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion-content-blocks";
 import { TipologiaRepository } from "@/infrastructure/db/repositories/tipologia.repository";
 import { UnidadRepository } from "@/infrastructure/db/repositories/unidad.repository";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
@@ -582,6 +584,268 @@ export class PromocionRepository extends TenantAwareRepository {
 
       if (!block) return null;
       return (block.payload ?? null) as Record<string, unknown> | null;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Content Block methods
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns all content blocks for a promotion, ordered by sort_order ascending.
+   */
+  async findAllContentBlocks(
+    promocionId: string,
+  ): Promise<PromocionContentBlock[]> {
+    return this.withTransaction(async (tx) => {
+      return tx
+        .select()
+        .from(promocionContentBlocks)
+        .where(
+          and(
+            eq(promocionContentBlocks.promocionId, promocionId),
+            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+          ),
+        )
+        .orderBy(promocionContentBlocks.sortOrder);
+    });
+  }
+
+  /**
+   * Creates or updates a content block for the given promotion.
+   *
+   * - Validates kind constraint: ZONAS_COMUNES and PLAZOS_GARANTIAS are
+   *   rejected for kind='external' BEFORE the INSERT (the SQL trigger is
+   *   the last line of defense).
+   * - If a block with the same block_type already exists, updates its payload.
+   * - Otherwise, creates a new block with the next available sort_order.
+   */
+  async upsertContentBlock(
+    promocionId: string,
+    blockType: ContentBlockType,
+    payload: Record<string, unknown>,
+    userId: string,
+  ): Promise<PromocionContentBlock> {
+    return this.withTransaction(async (tx) => {
+      // 1. Validate kind constraint: reject restricted block types for external promos
+      const [promo] = await tx
+        .select({ kind: promociones.kind })
+        .from(promociones)
+        .where(
+          and(
+            eq(promociones.id, promocionId),
+            eq(promociones.tenantId, this.authCtx.getTenantId()),
+          ),
+        );
+
+      if (!promo) {
+        throw new Error(`Promoción with id ${promocionId} not found`);
+      }
+
+      if (
+        promo.kind === "external" &&
+        (blockType === "ZONAS_COMUNES" || blockType === "PLAZOS_GARANTIAS")
+      ) {
+        throw new Error(
+          `Blocks of type ${blockType} are not allowed for external promotions`,
+        );
+      }
+
+      // 2. Check if a block with this block_type already exists
+      const [existing] = await tx
+        .select()
+        .from(promocionContentBlocks)
+        .where(
+          and(
+            eq(promocionContentBlocks.promocionId, promocionId),
+            eq(promocionContentBlocks.blockType, blockType),
+            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // Update existing block
+        const [updated] = await tx
+          .update(promocionContentBlocks)
+          .set({
+            payload,
+            updatedBy: userId,
+            updatedAt: sql`now()`,
+          })
+          .where(
+            and(
+              eq(promocionContentBlocks.id, existing.id),
+              eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            ),
+          )
+          .returning();
+
+        if (!updated) {
+          throw new Error("Failed to update content block");
+        }
+
+        return updated;
+      }
+
+      // 3. Calculate next sort_order
+      const [maxOrder] = await tx
+        .select({ maxSort: sql<number>`COALESCE(MAX(sort_order), -1) + 1` })
+        .from(promocionContentBlocks)
+        .where(
+          and(
+            eq(promocionContentBlocks.promocionId, promocionId),
+            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+          ),
+        );
+
+      const nextSortOrder = maxOrder?.maxSort ?? 0;
+
+      // 4. Create new block
+      const [created] = await tx
+        .insert(promocionContentBlocks)
+        .values({
+          tenantId: this.authCtx.getTenantId(),
+          promocionId,
+          blockType,
+          payload,
+          sortOrder: nextSortOrder,
+          updatedBy: userId,
+        })
+        .returning();
+
+      if (!created) {
+        throw new Error("Failed to create content block");
+      }
+
+      return created;
+    });
+  }
+
+  /**
+   * Deletes a content block and reindexes the sort_order of remaining blocks.
+   */
+  async deleteContentBlock(
+    promocionId: string,
+    blockId: string,
+  ): Promise<void> {
+    return this.withTransaction(async (tx) => {
+      // 1. Delete the block
+      await tx
+        .delete(promocionContentBlocks)
+        .where(
+          and(
+            eq(promocionContentBlocks.id, blockId),
+            eq(promocionContentBlocks.promocionId, promocionId),
+            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+          ),
+        );
+
+      // 2. Reindex sort_order of remaining blocks
+      const remaining = await tx
+        .select({ id: promocionContentBlocks.id })
+        .from(promocionContentBlocks)
+        .where(
+          and(
+            eq(promocionContentBlocks.promocionId, promocionId),
+            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+          ),
+        )
+        .orderBy(promocionContentBlocks.sortOrder);
+
+      for (let i = 0; i < remaining.length; i++) {
+        await tx
+          .update(promocionContentBlocks)
+          .set({ sortOrder: i })
+          .where(
+            and(
+              eq(promocionContentBlocks.id, remaining[i]!.id),
+              eq(
+                promocionContentBlocks.tenantId,
+                this.authCtx.getTenantId(),
+              ),
+            ),
+          );
+      }
+    });
+  }
+
+  /**
+   * Reorders content blocks atomically by setting sort_order based on the
+   * position of each block ID in the provided array.
+   */
+  async reorderContentBlocks(
+    promocionId: string,
+    orderedBlockIds: string[],
+  ): Promise<void> {
+    return this.withTransaction(async (tx) => {
+      for (let i = 0; i < orderedBlockIds.length; i++) {
+        await tx
+          .update(promocionContentBlocks)
+          .set({ sortOrder: i })
+          .where(
+            and(
+              eq(promocionContentBlocks.id, orderedBlockIds[i]!),
+              eq(promocionContentBlocks.promocionId, promocionId),
+              eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+            ),
+          );
+      }
+    });
+  }
+
+  /**
+   * Validates all content blocks for a promotion against their respective Zod schemas.
+   * Used to block publishing if any block has invalid payload data.
+   *
+   * Returns an object with:
+   * - `valid`: true if all blocks pass Zod validation
+   * - `errors`: array of { blockId, blockType, issues } for each invalid block
+   */
+  async validateBlocksForPublish(
+    promocionId: string,
+  ): Promise<{
+    valid: boolean;
+    errors: Array<{ blockId: string; blockType: string; issues: string[] }>;
+  }> {
+    return this.withTransaction(async (tx) => {
+      const blocks = await tx
+        .select()
+        .from(promocionContentBlocks)
+        .where(
+          and(
+            eq(promocionContentBlocks.promocionId, promocionId),
+            eq(promocionContentBlocks.tenantId, this.authCtx.getTenantId()),
+          ),
+        );
+
+      const errors: Array<{
+        blockId: string;
+        blockType: string;
+        issues: string[];
+      }> = [];
+
+      for (const block of blocks) {
+        const result = contentBlockSchema.safeParse({
+          blockType: block.blockType,
+          payload: block.payload ?? {},
+        });
+
+        if (!result.success) {
+          errors.push({
+            blockId: block.id,
+            blockType: block.blockType,
+            issues: result.error.issues.map(
+              (issue) => `${issue.path.join(".")}: ${issue.message}`,
+            ),
+          });
+        }
+      }
+
+      return {
+        valid: errors.length === 0,
+        errors,
+      };
     });
   }
 

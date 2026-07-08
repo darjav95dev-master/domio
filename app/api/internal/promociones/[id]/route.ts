@@ -187,6 +187,43 @@ function validationErrorResponse(
   );
 }
 
+/**
+ * Checks whether the PATCH is a publish action and if so, verifies that
+ * all content blocks have valid payloads. Returns a 422 Response with
+ * code "BLOCKS_INVALID" if any block is invalid, or null to proceed.
+ *
+ * Extracted to reduce cognitive complexity of the PATCH handler (FR-008).
+ */
+async function validateBlocksOnPublish(
+  repository: PromocionRepository,
+  promocionId: string,
+  parsedData: PromocionUpdatePayload,
+  current: PromocionWithRelations,
+): Promise<Response | null> {
+  const isPublishing =
+    parsedData.status === "PUBLISHED" && current.status !== "PUBLISHED";
+
+  if (!isPublishing) return null;
+
+  const blockValidation = await repository.validateBlocksForPublish(promocionId);
+
+  if (blockValidation.valid) return null;
+
+  return Response.json(
+    {
+      code: "BLOCKS_INVALID",
+      message:
+        "Hay bloques editoriales con datos inválidos. Corrígelos antes de publicar.",
+      details: blockValidation.errors.map((e) => ({
+        blockId: e.blockId,
+        blockType: e.blockType,
+        issues: e.issues,
+      })),
+    },
+    { status: 422 },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
@@ -326,6 +363,14 @@ export async function PATCH(
       current,
       id,
     });
+
+    // FR-008: Re-check block validation on publish — the server component
+    // computes publishBlocked on page-load, but the operator may have edited
+    // blocks client-side since then, making the initial check stale.
+    const blockResponse = await validateBlocksOnPublish(
+      repository, id, parsed.data, current,
+    );
+    if (blockResponse) return blockResponse;
 
     const updated = await repository.update(
       id,
