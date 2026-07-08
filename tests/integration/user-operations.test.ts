@@ -1,6 +1,6 @@
 /* eslint-disable sonarjs/no-duplicate-string */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { UserRepository } from "@/infrastructure/db/repositories/user.repository";
 import {
   createMockAuthCtx,
