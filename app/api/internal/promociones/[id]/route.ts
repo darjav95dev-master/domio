@@ -5,6 +5,7 @@ import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedConte
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
 import { PromocionWithTipologiasUpdateSchema } from "@/shared/schemas/promocion.schema";
 import { generateSlug } from "@/infrastructure/slug/generate-slug";
+import { validateMediaForPublish } from "@/features/promociones/actions/media.actions";
 import type { PromocionWithRelations } from "@/infrastructure/db/repositories/promocion.repository";
 import type { PromocionUpdatePayload } from "@/shared/schemas/promocion.schema";
 
@@ -167,6 +168,39 @@ function prepareUpdateData(params: PrepareUpdateParams): PreparedUpdate {
   const resultingSlug = newSlug ?? current.slug;
 
   return { data: updateData, resultingSlug };
+}
+
+/**
+ * Checks whether the PATCH is a publish action and if so, verifies that
+ * the promotion has valid media assets (at least one gallery image, all
+ * images and plans have alt_text). Returns a 422 Response with
+ * code "MEDIA_INVALID" if media is invalid, or null to proceed.
+ *
+ * FR-009 / FR-010: Media validation on publish.
+ */
+async function validateMediaOnPublish(
+  promocionId: string,
+  parsedData: PromocionUpdatePayload,
+  current: PromocionWithRelations,
+): Promise<Response | null> {
+  const isPublishing =
+    parsedData.status === "PUBLISHED" && current.status !== "PUBLISHED";
+
+  if (!isPublishing) return null;
+
+  const mediaValidation = await validateMediaForPublish(promocionId);
+
+  if (mediaValidation.valid) return null;
+
+  return Response.json(
+    {
+      code: "MEDIA_INVALID",
+      message:
+        "Hay medios con datos inválidos. Corrígelos antes de publicar.",
+      details: mediaValidation.errors,
+    },
+    { status: 422 },
+  );
 }
 
 /**
@@ -371,6 +405,12 @@ export async function PATCH(
       repository, id, parsed.data, current,
     );
     if (blockResponse) return blockResponse;
+
+    // FR-009 / FR-010: Reject publish if media assets are invalid
+    const mediaResponse = await validateMediaOnPublish(
+      id, parsed.data, current,
+    );
+    if (mediaResponse) return mediaResponse;
 
     const updated = await repository.update(
       id,
