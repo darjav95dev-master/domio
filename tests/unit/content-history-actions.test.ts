@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be defined before any imports
 // ---------------------------------------------------------------------------
-const { mockSession, mockFindByContent, mockRevert, mockContentServiceInstance } =
+const { mockSession, mockFindByContentWithUser, mockRevert, mockContentServiceInstance } =
   vi.hoisted(() => {
-    const findByContent = vi.fn();
+    const findByContentWithUser = vi.fn();
     const revert = vi.fn();
 
     return {
@@ -15,7 +15,7 @@ const { mockSession, mockFindByContent, mockRevert, mockContentServiceInstance }
         role: "ADMIN" as const,
         name: "Test Admin",
       },
-      mockFindByContent: findByContent,
+      mockFindByContentWithUser: findByContentWithUser,
       mockRevert: revert,
       mockContentServiceInstance: {
         saveBlock: vi.fn(),
@@ -58,7 +58,7 @@ const mockHistoryEntries = [
     contentType: "block",
     contentKey: "home:hero",
     payloadSnapshot: { claim: "Updated claim" },
-    updatedBy: "user-2",
+    updatedByName: "User Two",
     createdAt: new Date("2026-07-08T12:00:00Z"),
   },
   {
@@ -67,7 +67,7 @@ const mockHistoryEntries = [
     contentType: "block",
     contentKey: "home:hero",
     payloadSnapshot: { claim: "Original claim" },
-    updatedBy: "user-1",
+    updatedByName: "User One",
     createdAt: new Date("2026-07-08T10:00:00Z"),
   },
 ];
@@ -79,7 +79,7 @@ const mockHistoryEntries = [
 describe("getContentHistory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindByContent.mockReset();
+    mockFindByContentWithUser.mockReset();
     mockRevert.mockReset();
     // Restore default session mock
     vi.mocked(getServerSession).mockResolvedValue(mockSession);
@@ -92,7 +92,7 @@ describe("getContentHistory", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("No autorizado");
-    expect(mockFindByContent).not.toHaveBeenCalled();
+    expect(mockFindByContentWithUser).not.toHaveBeenCalled();
   });
 
   it("rejects AGENT role", async () => {
@@ -107,24 +107,41 @@ describe("getContentHistory", () => {
     expect(result.error).toBe(
       "No tienes permiso para realizar esta acción",
     );
-    expect(mockFindByContent).not.toHaveBeenCalled();
+    expect(mockFindByContentWithUser).not.toHaveBeenCalled();
   });
 
   it("returns list of history entries for ADMIN", async () => {
-    mockFindByContent.mockResolvedValue(mockHistoryEntries);
+    mockFindByContentWithUser.mockResolvedValue(mockHistoryEntries);
     vi.mocked(ContentHistoryRepository).mockImplementation(
       () =>
         ({
-          findByContent: mockFindByContent,
+          findByContentWithUser: mockFindByContentWithUser,
         }) as unknown as InstanceType<typeof ContentHistoryRepository>,
     );
 
     const result = await getContentHistory(CONTENT_TYPE, CONTENT_KEY);
 
     expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockHistoryEntries);
+    expect(result.data).toEqual([
+      {
+        id: "history-2",
+        contentType: "block",
+        contentKey: "home:hero",
+        payloadSnapshot: { claim: "Updated claim" },
+        updatedBy: { name: "User Two" },
+        createdAt: "2026-07-08T12:00:00.000Z",
+      },
+      {
+        id: HISTORY_ID,
+        contentType: "block",
+        contentKey: "home:hero",
+        payloadSnapshot: { claim: "Original claim" },
+        updatedBy: { name: "User One" },
+        createdAt: "2026-07-08T10:00:00.000Z",
+      },
+    ]);
     expect(result.data).toHaveLength(2);
-    expect(mockFindByContent).toHaveBeenCalledWith(
+    expect(mockFindByContentWithUser).toHaveBeenCalledWith(
       mockSession.tenantId,
       CONTENT_TYPE,
       CONTENT_KEY,
@@ -137,11 +154,11 @@ describe("getContentHistory", () => {
       ...mockSession,
       role: "OPERATOR",
     });
-    mockFindByContent.mockResolvedValue(mockHistoryEntries);
+    mockFindByContentWithUser.mockResolvedValue(mockHistoryEntries);
     vi.mocked(ContentHistoryRepository).mockImplementation(
       () =>
         ({
-          findByContent: mockFindByContent,
+          findByContentWithUser: mockFindByContentWithUser,
         }) as unknown as InstanceType<typeof ContentHistoryRepository>,
     );
 
@@ -149,7 +166,7 @@ describe("getContentHistory", () => {
 
     expect(result.success).toBe(true);
     expect(result.data).toHaveLength(2);
-    expect(mockFindByContent).toHaveBeenCalledWith(
+    expect(mockFindByContentWithUser).toHaveBeenCalledWith(
       mockSession.tenantId,
       CONTENT_TYPE,
       CONTENT_KEY,
@@ -165,7 +182,7 @@ describe("getContentHistory", () => {
 describe("revertContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindByContent.mockReset();
+    mockFindByContentWithUser.mockReset();
     mockRevert.mockReset();
     // Restore default session mock
     vi.mocked(getServerSession).mockResolvedValue(mockSession);
