@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/017-global-content-editor/plan.md
+at specs/021-detalle-inmueble-core/plan.md
 <!-- SPECKIT END -->
 
 <!-- codebase-memory-mcp:start -->
