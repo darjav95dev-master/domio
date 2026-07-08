@@ -22,6 +22,10 @@ export const users = pgTable(
     name: text("name"),
     role: roleEnum("role").notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    invitationTokenHash: text("invitation_token_hash"),
+    invitationTokenExpires: timestamp("invitation_token_expires", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

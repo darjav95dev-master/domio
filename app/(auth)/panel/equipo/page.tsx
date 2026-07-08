@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/infrastructure/auth/session";
+import { TeamPageClient } from "@/features/team/components/team-page-client";
 
 /**
- * Equipo — placeholder page.
+ * Equipo — Gestión de usuarios del tenant.
  *
- * Server component with defence-in-depth auth guard.
- * Will be replaced by the real equipo feature.
+ * Only ADMIN can view this page.
+ * The TeamPageClient component handles all client-side interactivity.
  */
 export default async function EquipoPage() {
   const session = await getServerSession();
@@ -14,14 +15,9 @@ export default async function EquipoPage() {
     redirect("/panel/login");
   }
 
-  return (
-    <div className="flex flex-col items-start gap-4">
-      <h1 className="font-display text-4xl font-semibold tracking-tight text-fg-default">
-        Equipo
-      </h1>
-      <p className="font-sans text-base text-fg-muted">
-        Esta sección será implementada en una feature futura.
-      </p>
-    </div>
-  );
+  if (session.role !== "ADMIN") {
+    redirect("/panel");
+  }
+
+  return <TeamPageClient />;
 }
