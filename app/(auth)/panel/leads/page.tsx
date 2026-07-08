@@ -1,27 +1,55 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/infrastructure/auth/session";
+import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { LeadRepository } from "@/infrastructure/db/repositories/lead.repository";
+import { LeadsPageContent } from "@/features/leads/components/leads-page-content";
+import { DEFAULT_PAGE_SIZE } from "@/shared/constants/domain-config";
+import { logger } from "@/shared/utils/logger";
+import type { LeadRow } from "@/infrastructure/db/repositories/lead.repository";
 
 /**
- * Leads — placeholder page.
+ * LeadsPage — server component que carga los leads iniciales y delega
+ * la interactividad (filtros, paginación, exportación) a LeadsPageContent.
  *
- * Server component with defence-in-depth auth guard.
- * Will be replaced by the real leads feature (F014).
+ * Auth guard: defence-in-depth (el layout ya redirige si no hay sesión).
  */
 export default async function LeadsPage() {
   const session = await getServerSession();
-
   if (!session) {
-    redirect("/panel/login");
+    return null;
+  }
+
+  // OPERATOR role is not allowed to access leads
+  if (session.role === "OPERATOR") {
+    redirect("/panel");
+  }
+
+  const ctx = new AuthenticatedContext(
+    session.tenantId,
+    session.userId,
+    session.role,
+  );
+  const repo = new LeadRepository(ctx);
+
+  let initialLeads: LeadRow[] = [];
+  let initialTotal = 0;
+  let initialUnreadIds: string[] = [];
+
+  try {
+    const result = await repo.findAll({}, { page: 1, limit: DEFAULT_PAGE_SIZE });
+    initialLeads = result.items;
+    initialTotal = result.total;
+    initialUnreadIds = await repo.getUnreadLeadIds(session.userId);
+  } catch (err) {
+    logger.error("Failed to load leads:", err);
   }
 
   return (
-    <div className="flex flex-col items-start gap-4">
-      <h1 className="font-display text-4xl font-semibold tracking-tight text-fg-default">
-        Leads
-      </h1>
-      <p className="font-sans text-base text-fg-muted">
-        Esta sección será implementada en una feature futura.
-      </p>
-    </div>
+    <LeadsPageContent
+      initialLeads={initialLeads}
+      initialTotal={initialTotal}
+      initialPage={1}
+      initialUnreadIds={initialUnreadIds}
+    />
   );
 }

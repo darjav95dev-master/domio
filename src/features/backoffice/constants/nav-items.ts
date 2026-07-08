@@ -38,7 +38,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Leads",
     href: "/panel/leads",
     icon: EnvelopeSimple,
-    allowedRoles: ["ADMIN", "OPERATOR", "AGENT"],
+    allowedRoles: ["ADMIN", "AGENT"],
     badgeKey: "unread-leads",
   },
   {
