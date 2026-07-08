@@ -411,3 +411,87 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
   - `src/vitest-env.d.ts` — tipos adicionales de vitest
 
 ---
+
+## Feature 009 · domain-constants-and-seed
+*Mergeada el 2026-07-08. Rama: `feature/009-domain-constants-and-seed`. Commits: `eb81b28`, `b4cf455`, `ba97ef1`.*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 2225 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (checklist sin marcadores pendientes)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 16 (T001–T016 en 5 fases)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 6 (R-1 a R-6: estado de constantes, formato labels, seed idempotente, hash bcryptjs, coordenadas demo, estructura payloads editoriales)
+- Escenarios de validación en quickstart.md: 7 (V-1 a V-7)
+
+### Métricas de implementación
+- Commits en la rama: 3 (1 feat spec/plan + 1 feat implement + 1 fix post-review)
+- Líneas añadidas: 2.564 (excluyendo `pnpm-lock.yaml` y `.codebase-memory/`)
+- Líneas eliminadas: 2
+- Archivos nuevos (código): 10 — `domain-labels.ts`, `domain-config.ts`, `promocion-schema.ts`, `tipologia-schema.ts`, `lead-schema.ts`, `content-block-schema.ts`, `seed.ts`, `constants.test.ts`, `schemas.test.ts`, `seed.test.ts`
+- Archivos nuevos (spec): 7 — spec.md, plan.md, tasks.md, research.md, data-model.md, quickstart.md, checklists/requirements.md
+- Tests totales tras la feature: 351 pasando (48 test files)
+- Tests nuevos de la feature: 42 (19 unit constants + 19 unit schemas + 4 integration seed)
+- Cobertura global tras la feature: **91,92% statements**, 88,37% branches, 93% functions, 91,92% lines
+- Cobertura en módulos críticos de la feature:
+  - `src/shared/constants/domain-labels.ts`: 100% en todas las métricas
+  - `src/shared/constants/domain-config.ts`: 100% en todas las métricas
+  - `src/shared/types/content-block-schema.ts`: 100% en todas las métricas
+  - `src/shared/types/lead-schema.ts`: 100% en todas las métricas
+  - `src/shared/types/promocion-schema.ts`: 100% en todas las métricas
+  - `src/shared/types/tipologia-schema.ts`: 100% en todas las métricas
+  - `scripts/seed.ts`: no instrumentado (script CLI ejecutado con tsx, fuera de cobertura Vitest)
+- Lint: clean (0 errores)
+- Typecheck: clean (0 errores)
+- `pnpm db:seed`: ejecuta sin errores, idempotente verificado (segunda ejecución reporta "Seed data already exists for this tenant. Skipping.")
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado; tests escritos conjuntamente con la implementación siguiendo TDD del plan)
+- **quality-reviewer:** APROBADA TRAS CORRECCIONES MENORES
+  - 1ª ronda: 0 críticas, 0 mayores, 3 menores — corregidas en commit `ba97ef1`
+  - Correcciones aplicadas: (1) tipología C-301 ampliada con 2 unidades adicionales (C-302, C-303) para datos demo más realistas; (2) eliminado `eslint-disable-next-line` genérico para regla sonarjs/no-duplicate-string; (3) añadido comentario explicativo sobre carga manual de `.env.local` como alternativa a `tsx --env-file`.
+  - 2ª ronda (implícita tras fix): APROBADA
+- **contract-guardian:** NO APLICA (no hay API HTTP pública en esta feature)
+
+### Desvíos respecto al plan inicial
+- **Ninguno estructural.** Las 16 tareas en 5 fases se completaron según el plan. El orden de dependencias (US1 → US2 → US3) se respetó. Los tests de constantes y schemas se escribieron antes o junto con la implementación.
+- Único cambio operativo: la implementación se entregó en un solo commit (`b4cf455`) que abarcó el código de todas las fases, con un commit de fix posterior (`ba97ef1`) para las observaciones de quality-reviewer.
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Labels de dominio como `Record<EnumValue, string>` con `as const` (D1):** Se adoptó el formato de objeto `Record<EnumValue, string>` en lugar de arrays de `{ value, label }`. Cada mapa (`PROPERTY_TYPE_LABELS`, `CONSTRUCTION_STATUS_LABELS`, etc.) se exporta con `as const` — inmutabilidad en tiempo de compilación y acceso O(1) por clave. Si se necesita un array para selects, se deriva con `Object.entries()`. Documentado en research.md R-2.
+2. **Zod schemas usan `z.enum()` referenciando `db-enums.ts` como fuente única (D2):** Los 4 schemas Zod (`promocionSchema`, `tipologiaSchema`, `leadSchema`, `contentBlockSchema`) importan los arrays `as const` de `db-enums.ts` y los usan directamente en `z.enum()`, sin duplicar los valores como strings literales. Esto garantiza que la validación esté alineada con los tipos TypeScript y los enums de BD. Alineado con architecture.md §7.7.
+3. **Seed idempotente con early-return + transacción única con `set_config` para RLS (D3):** El script verifica si el tenant `domio` ya existe al inicio y retorna temprano si es así, evitando duplicación. La transacción usa `set_config('app.current_tenant_id', ...)` para establecer el contexto RLS antes de cada INSERT, en lugar de `SET LOCAL` (que causaba errores de sintaxis en versiones anteriores de PostgreSQL). Las contraseñas se hashean una sola vez incluso si el seed se ejecuta múltiples veces.
+4. **`bcryptjs` para hash de contraseñas en seed (D4):** Se añadió `bcryptjs` como devDependency en lugar de depender del `bcrypt` transitivo de Auth.js. `bcryptjs` es pure JavaScript, no requiere compilación nativa (node-gyp), y se ejecuta correctamente con `tsx` fuera del contexto de Next.js. Documentado en research.md R-4.
+5. **`DEFAULT_ISLAND` constante para evitar duplicación de strings (D5):** Se definió `const DEFAULT_ISLAND = "Tenerife"` al inicio de `seed.ts` y se referencia en las 8 promociones demo, evitando el string literal repetido. Alineado con constitution.md §2 (scope rule, sin magic numbers).
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **SDD funcionó para constantes y schemas:** Los 38 tests unitarios (19 constants + 19 schemas) verificaron exhaustividad de labels, inmutabilidad, y validación de payloads. La decisión de centralizar constantes en `db-enums.ts` como fuente única permitió que los schemas Zod referenciaran tipos ya existentes sin duplicación.
+- **Seed como script idempotente testeable:** El test de integración (`seed.test.ts`) verifica CA-4 (ejecución sin errores), CA-5 (conteo de registros), CA-6 (todos los registros llevan tenant_id) y CA-7 (idempotencia) en un solo archivo de 166 líneas con 4 tests. La función `seed()` se exporta como función pura que acepta la conexión, lo que permite testing sin efectos secundarios globales.
+- **`set_config` vs `SET LOCAL` como hallazgo técnico:** El seed usa `set_config('app.current_tenant_id', ...)` en lugar de `SET LOCAL` porque este último causaba error de sintaxis en ciertas versiones de PostgreSQL cuando se usaba dentro de transacciones Drizzle. Este hallazgo se documentó en el propio código (comentario en `scripts/seed.ts`).
+- **Quality review atrapó omisiones menores:** Las 3 observaciones (unidades insuficientes en una tipología, eslint-disable genérico, falta de comentario sobre env loading) fueron correcciones rápidas pero útiles para mantener la calidad del código.
+- **Fricción:** Los tests de integración del seed requieren una base de datos real y RLS configurado. El test de idempotencia (CA-7) ejecuta el seed dos veces, lo que duplica el tiempo del test (~300ms para 2 ejecuciones). No se pudo mockear porque la lógica de `ON CONFLICT DO NOTHING` necesita una BD real.
+
+### Artefactos generados
+- spec.md: `specs/009-domain-constants-and-seed/spec.md` (214 líneas, 6 RFs, 10 CA, 5 escenarios)
+- plan.md: `specs/009-domain-constants-and-seed/plan.md` (88 líneas, constitution check 6/6 principios PASS)
+- research.md: `specs/009-domain-constants-and-seed/research.md` (85 líneas, 6 decisiones técnicas)
+- data-model.md: `specs/009-domain-constants-and-seed/data-model.md` (132 líneas)
+- quickstart.md: `specs/009-domain-constants-and-seed/quickstart.md` (89 líneas, 7 escenarios V-1 a V-7)
+- checklist: `specs/009-domain-constants-and-seed/checklists/requirements.md` (35 líneas, 0 NEEDS CLARIFICATION)
+- Tests: 3 test files, 42 tests
+  - `tests/unit/constants.test.ts` (157 líneas, 19 tests — exhaustividad labels, inmutabilidad, valores positivos)
+  - `tests/unit/schemas.test.ts` (233 líneas, 19 tests — aceptación/rechazo por schema)
+  - `tests/integration/seed.test.ts` (166 líneas, 4 tests — CA-4, CA-5, CA-6, CA-7)
+- Código:
+  - `src/shared/constants/domain-labels.ts` (86 líneas — 7 mapas label: PROPERTY_TYPE, CONSTRUCTION_STATUS, OPERATION_TYPE, LEAD_STATUS, PROMOTION_STATUS, USER_ROLE, AMENITY)
+  - `src/shared/constants/domain-config.ts` (34 líneas — 10 constantes de configuración: DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, PROMOCION_NAME_MAX_LENGTH, LEAD_MESSAGE_MAX_LENGTH, LEAD_NAME_MAX_LENGTH, LEAD_EMAIL_MAX_LENGTH, SEO_TITLE_MAX_LENGTH, SEO_DESCRIPTION_MAX_LENGTH, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
+  - `src/shared/types/promocion-schema.ts` (31 líneas — schema Zod con z.enum() desde db-enums)
+  - `src/shared/types/tipologia-schema.ts` (20 líneas — schema Zod con z.enum(AMENITIES) y z.enum(ENERGY_CERTS))
+  - `src/shared/types/lead-schema.ts` (31 líneas — schema Zod con consentimiento RGPD)
+  - `src/shared/types/content-block-schema.ts` (78 líneas — schema discriminado por block_type, 5 sub-schemas)
+  - `scripts/seed.ts` (932 líneas — seed idempotente con 8 fases, 1 tenant, 5 usuarios, 8 promociones, 16 tipologías, 38 unidades, 32 content blocks, 16 media assets, 5 leads, contact config)
+- Scripts: `"db:seed": "tsx scripts/seed.ts"` en `package.json`
+- Dependencias nuevas: `bcryptjs` + `@types/bcryptjs`
+
+---
