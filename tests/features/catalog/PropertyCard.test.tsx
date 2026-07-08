@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { PropertyCard } from "@/features/catalog/components/PropertyCard";
