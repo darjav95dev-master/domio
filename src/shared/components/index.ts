@@ -1,6 +1,10 @@
 export { Button, type ButtonProps } from "./button";
 export { ErrorBoundary, type ErrorBoundaryProps } from "./error-boundary";
+export { Footer } from "./footer";
 export { Input, type InputProps } from "./input";
-export { Skeleton, type SkeletonProps } from "./skeleton";
-export { Toast, type ToastProps } from "./toast";
 export { MediaImage, type MediaImageProps } from "./media-image";
+export { Nav } from "./nav";
+export { Skeleton, type SkeletonProps } from "./skeleton";
+export { SkipToContent } from "./skip-to-content";
+export type { SkipToContentProps } from "./skip-to-content";
+export { Toast, type ToastProps } from "./toast";
