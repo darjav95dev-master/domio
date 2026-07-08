@@ -4,6 +4,7 @@ export const ALLOWED_UPLOAD_MIME_TYPES = [
   "image/webp",
   "image/avif",
   "application/pdf",
+  "text/csv",
 ] as const;
 
 export const ALLOWED_MEDIA_KINDS = [
