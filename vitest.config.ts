@@ -21,7 +21,7 @@ export default defineConfig({
     },
     fileParallelism: false,
     environment: "jsdom",
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/**/*.test.{ts,tsx}", "src/**/*.spec.{ts,tsx}"],
     globals: true,
     setupFiles: ["./tests/setup.ts"],
     coverage: {
