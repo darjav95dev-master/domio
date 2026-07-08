@@ -130,7 +130,7 @@ El seed data permite que todas las features posteriores trabajen contra datos de
 | CA-2 | Los labels cubren todos los valores de cada enum sin omisiones.                                                                       | Test unitario de exhaustividad (Object.keys(labels).length === enum.length). |
 | CA-3 | Los schemas Zod usan `z.enum()` referenciando las constantes, no strings literales duplicados.                                        | Revisión de código + test que verifica que un valor inválido del enum es rechazado. |
 | CA-4 | `pnpm db:seed` ejecuta sin errores contra la BD de desarrollo y los datos son consultables.                                           | Ejecución manual del script + verificación con query directa.   |
-| CA-5 | El seed inserta al menos 8 promociones (4 portfolio + 4 external), 5 leads, 1 tenant, 6 usuarios, y configuración de contacto.        | Query de verificación tras seed.                                |
+| CA-5 | El seed inserta al menos 8 promociones (4 portfolio + 4 external), 5 leads, 1 tenant, 5 usuarios, y configuración de contacto.        | Query de verificación tras seed.                                |
 | CA-6 | Todo registro de dominio en el seed lleva `tenant_id` del tenant por defecto.                                                         | Query verifica que no hay registros con `tenant_id` NULL o de otro tenant. |
 | CA-7 | El seed es idempotente: ejecutarlo dos veces no duplica datos.                                                                        | Ejecutar seed dos veces + verificar conteo de registros.        |
 | CA-8 | Los schemas Zod aceptan un payload válido de ejemplo para cada entidad (promoción, tipología, lead, content block).                   | Test unitario con payload válido.                               |
@@ -164,7 +164,7 @@ El formulario de edición de promoción en el backoffice (F011) valida el payloa
 
 ### Escenario 3: Script de seed puebla la BD de desarrollo
 
-Un desarrollador clona el repositorio y ejecuta `pnpm db:migrate` seguido de `pnpm db:seed`. La base de datos queda poblada con un tenant, 6 usuarios, 8 promociones con tipologías, unidades, bloques editoriales y media assets placeholder, 5 leads y configuración de contacto. Puede empezar a desarrollar inmediatamente con datos realistas.
+Un desarrollador clona el repositorio y ejecuta `pnpm db:migrate` seguido de `pnpm db:seed`. La base de datos queda poblada con un tenant, 5 usuarios, 8 promociones con tipologías, unidades, bloques editoriales y media assets placeholder, 5 leads y configuración de contacto. Puede empezar a desarrollar inmediatamente con datos realistas.
 
 ### Escenario 4: Seed idempotente en CI
 
