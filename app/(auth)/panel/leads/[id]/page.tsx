@@ -3,6 +3,7 @@ import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import { LeadRepository } from "@/infrastructure/db/repositories/lead.repository";
 import { LeadDetail } from "@/features/leads/components/lead-detail";
+import { ArsopButtons } from "@/features/leads/components/arsop-buttons";
 
 interface LeadDetailPageProps {
   params: Promise<{ id: string }>;
@@ -61,11 +62,19 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
   const history = await repo.getLeadHistory(id);
 
   return (
-    <LeadDetail
-      lead={lead}
-      notes={notes}
-      history={history}
-      currentUserRole={session.role}
-    />
+    <>
+      <LeadDetail
+        lead={lead}
+        notes={notes}
+        history={history}
+        currentUserRole={session.role}
+      />
+
+      {session.role === "ADMIN" && (
+        <div className="mt-8">
+          <ArsopButtons leadId={id} />
+        </div>
+      )}
+    </>
   );
 }

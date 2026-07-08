@@ -7,8 +7,9 @@ import {
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
 import { validateStatusTransition } from "@/shared/types/lead-schema";
-import type { LeadStatus, UserRole } from "@/shared/constants/db-enums";
-import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import type { LeadStatus, UserRole, LeadSource, LeadChannel } from "@/shared/constants/db-enums";
+import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,11 +83,28 @@ export interface LeadReadMarkRow {
 // ---------------------------------------------------------------------------
 
 export class LeadRepository extends TenantAwareRepository {
-  private readonly authCtx: AuthenticatedContext;
+  private readonly authCtx?: AuthenticatedContext;
 
-  constructor(ctx: AuthenticatedContext) {
+  /**
+   * @param ctx Puede ser AuthenticatedContext (para operaciones con rol)
+   *            o TenantContext (para operaciones publicas como create).
+   */
+  constructor(ctx: TenantContext) {
     super(ctx);
-    this.authCtx = ctx;
+    if (ctx instanceof AuthenticatedContext) {
+      this.authCtx = ctx;
+    }
+  }
+
+  /**
+   * Lanza error si el contexto no es AuthenticatedContext
+   * (operaciones que requieren rol no pueden ejecutarse en contexto publico).
+   */
+  private requireAuthCtx(): AuthenticatedContext {
+    if (!this.authCtx) {
+      throw new Error("Authentication required for this operation");
+    }
+    return this.authCtx;
   }
 
   /**
@@ -96,18 +114,19 @@ export class LeadRepository extends TenantAwareRepository {
   private buildBaseConditions(
     filters: LeadFilters,
   ): ReturnType<typeof eq>[] {
+    const authCtx = this.requireAuthCtx();
     const conditions: ReturnType<typeof eq>[] = [
-      eq(leads.tenantId, this.authCtx.getTenantId()),
+      eq(leads.tenantId, authCtx.getTenantId()),
     ];
 
     // OPERATOR role is not allowed to access leads data
-    if (this.authCtx.role === "OPERATOR") {
+    if (authCtx.role === "OPERATOR") {
       throw new Error("Forbidden");
     }
 
     // AGENT role: always filter by assignedAgentId = current user
-    if (this.authCtx.role === "AGENT") {
-      conditions.push(eq(leads.assignedAgentId, this.authCtx.userId));
+    if (authCtx.role === "AGENT") {
+      conditions.push(eq(leads.assignedAgentId, authCtx.userId));
     } else if (filters.assignedAgentId) {
       // ADMIN/OPERATOR: use explicit filter if provided
       conditions.push(eq(leads.assignedAgentId, filters.assignedAgentId));
@@ -193,7 +212,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.id, id),
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -218,7 +237,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.id, id),
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -242,7 +261,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.id, id),
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
           ),
         )
         .returning();
@@ -253,7 +272,7 @@ export class LeadRepository extends TenantAwareRepository {
 
       // 4. Record history entry (immutable)
       await tx.insert(leadHistory).values({
-        tenantId: this.authCtx.getTenantId(),
+        tenantId: this.ctx.getTenantId(),
         leadId: id,
         fromStatus: current.status as LeadStatus,
         toStatus: newStatus,
@@ -267,7 +286,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.id, id),
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -292,7 +311,7 @@ export class LeadRepository extends TenantAwareRepository {
       const [note] = await tx
         .insert(leadNotes)
         .values({
-          tenantId: this.authCtx.getTenantId(),
+          tenantId: this.ctx.getTenantId(),
           leadId,
           authorId,
           body: text,
@@ -319,7 +338,7 @@ export class LeadRepository extends TenantAwareRepository {
       const [mark] = await tx
         .insert(leadReadMarks)
         .values({
-          tenantId: this.authCtx.getTenantId(),
+          tenantId: this.ctx.getTenantId(),
           leadId,
           userId,
           readAt: sql`now()`,
@@ -351,7 +370,7 @@ export class LeadRepository extends TenantAwareRepository {
         .from(leads)
         .where(
           and(
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
             eq(leads.assignedAgentId, userId),
             sql`${leads.id} NOT IN (
               SELECT ${leadReadMarks.leadId}
@@ -384,7 +403,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.id, leadId),
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
           ),
         )
         .returning();
@@ -399,7 +418,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leadReadMarks.leadId, leadId),
-            eq(leadReadMarks.tenantId, this.authCtx.getTenantId()),
+            eq(leadReadMarks.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -410,7 +429,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.id, leadId),
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
           ),
         );
 
@@ -431,9 +450,10 @@ export class LeadRepository extends TenantAwareRepository {
     userId: string,
     role: UserRole,
   ): Promise<LeadRow[]> {
+    const authCtx = this.requireAuthCtx();
     return this.withTransaction(async (tx) => {
       const conditions: ReturnType<typeof eq | typeof like | typeof gte | typeof lte>[] = [
-        eq(leads.tenantId, this.authCtx.getTenantId()),
+        eq(leads.tenantId, authCtx.getTenantId()),
       ];
 
       // Scope by role: AGENT only their leads, ADMIN/OPERATOR all leads
@@ -465,7 +485,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leadHistory.leadId, leadId),
-            eq(leadHistory.tenantId, this.authCtx.getTenantId()),
+            eq(leadHistory.tenantId, this.ctx.getTenantId()),
           ),
         )
         .orderBy(desc(leadHistory.createdAt));
@@ -484,7 +504,7 @@ export class LeadRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leadNotes.leadId, leadId),
-            eq(leadNotes.tenantId, this.authCtx.getTenantId()),
+            eq(leadNotes.tenantId, this.ctx.getTenantId()),
           ),
         )
         .orderBy(desc(leadNotes.createdAt));
@@ -502,7 +522,7 @@ export class LeadRepository extends TenantAwareRepository {
         .from(leads)
         .where(
           and(
-            eq(leads.tenantId, this.authCtx.getTenantId()),
+            eq(leads.tenantId, this.ctx.getTenantId()),
             eq(leads.assignedAgentId, userId),
             sql`${leads.id} NOT IN (
               SELECT ${leadReadMarks.leadId}
@@ -537,6 +557,46 @@ export class LeadRepository extends TenantAwareRepository {
         .limit(1);
 
       return mark !== undefined;
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // create — insert a new lead
+  // -----------------------------------------------------------------------
+
+  async create(data: {
+    promocionId: string;
+    tipologiaId?: string | null;
+    source: LeadSource;
+    channel?: LeadChannel | null;
+    name: string;
+    email: string;
+    phone?: string | null;
+    message?: string | null;
+    assignedAgentId?: string | null;
+  }): Promise<LeadRow> {
+    return this.withTransaction(async (tx) => {
+      const [lead] = await tx
+        .insert(leads)
+        .values({
+          tenantId: this.ctx.getTenantId(),
+          promocionId: data.promocionId,
+          tipologiaId: data.tipologiaId ?? null,
+          source: data.source,
+          channel: data.channel ?? null,
+          name: data.name,
+          email: data.email,
+          phone: data.phone ?? null,
+          message: data.message ?? null,
+          assignedAgentId: data.assignedAgentId ?? null,
+        })
+        .returning();
+
+      if (!lead) {
+        throw new Error("Failed to create lead");
+      }
+
+      return lead;
     });
   }
 }

@@ -522,6 +522,69 @@ describe("LeadRepository", () => {
     });
   });
 
+  describe("create", () => {
+    it("inserts a new lead and returns it with all fields", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        role: "ADMIN",
+      });
+      const repo = new LeadRepository(ctx);
+      const createdLead = {
+        ...baseLeadRow,
+        id: "new-lead-id",
+        name: "New Lead",
+        email: "new@example.com",
+      };
+      setupMockTransaction(mockWithTx, [[createdLead]]);
+
+      const result = await repo.create({
+        promocionId: PROMOCION_ID,
+        source: "commercial",
+        channel: "FORM",
+        name: "New Lead",
+        email: "new@example.com",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result.name).toBe("New Lead");
+      expect(result.email).toBe("new@example.com");
+      expect(result.tenantId).toBe(TENANT_ID);
+      expect(result.id).toBe("new-lead-id");
+    });
+
+    it("inserts a lead with optional fields", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        role: "ADMIN",
+      });
+      const repo = new LeadRepository(ctx);
+      const createdLead = {
+        ...baseLeadRow,
+        id: "lead-with-optional",
+        phone: "+34600123456",
+        message: "Con mensaje",
+        tipologiaId: "tipo-1",
+        source: "institutional",
+      };
+      setupMockTransaction(mockWithTx, [[createdLead]]);
+
+      const result = await repo.create({
+        promocionId: PROMOCION_ID,
+        source: "institutional",
+        name: "Lead con opcionales",
+        email: "opcionales@example.com",
+        phone: "+34600123456",
+        message: "Con mensaje",
+        tipologiaId: "tipo-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result.phone).toBe("+34600123456");
+      expect(result.message).toBe("Con mensaje");
+      expect(result.source).toBe("institutional");
+    });
+  });
+
   describe("exportCsv", () => {
     it("returns leads for ADMIN (all tenant leads)", async () => {
       const { ctx, mockWithTx } = createMockAuthCtx({
