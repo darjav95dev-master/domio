@@ -5,11 +5,13 @@ import {
   unidades,
   promocionHistory,
   promocionContentBlocks,
+  mediaAssets,
   users,
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
 import { contentBlockSchema } from "@/shared/types/content-block-schema";
 import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion-content-blocks";
+import type { MediaAsset } from "@/infrastructure/db/schema/media-assets";
 import { TipologiaRepository } from "@/infrastructure/db/repositories/tipologia.repository";
 import { UnidadRepository } from "@/infrastructure/db/repositories/unidad.repository";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
@@ -86,6 +88,15 @@ function decodeCursor(cursor: string): CursorPayload {
     sortKey: decoded.slice(0, separatorIndex),
     id: decoded.slice(separatorIndex + 1),
   };
+}
+
+/**
+ * Full detail for the public detail page.
+ * Extends PromocionWithRelations with content blocks and media assets.
+ */
+export interface PromocionDetail extends PromocionWithRelations {
+  contentBlocks: PromocionContentBlock[];
+  mediaAssets: MediaAsset[];
 }
 
 export interface PromocionWithRelations {
@@ -634,6 +645,82 @@ export class PromocionRepository extends TenantAwareRepository {
         ...promocion,
         assignedAgentName: promocion.assignedAgentName ?? null,
         tipologias: tipologiasWithUnidades,
+      };
+    });
+  }
+
+  async findDetailBySlug(slug: string): Promise<PromocionDetail | null> {
+    return this.withTransaction(async (tx) => {
+      const [promocion] = await tx
+        .select({
+          id: promociones.id,
+          tenantId: promociones.tenantId,
+          slug: promociones.slug,
+          name: promociones.name,
+          kind: promociones.kind,
+          status: promociones.status,
+          operation: promociones.operation,
+          propertyType: promociones.propertyType,
+          constructionStatus: promociones.constructionStatus,
+          island: promociones.island,
+          municipality: promociones.municipality,
+          address: promociones.address,
+          location: promociones.location,
+          locationApprox: promociones.locationApprox,
+          mapPrivacyMode: promociones.mapPrivacyMode,
+          seoTitle: promociones.seoTitle,
+          seoDescription: promociones.seoDescription,
+          assignedAgentId: promociones.assignedAgentId,
+          draftPayload: promociones.draftPayload,
+          createdAt: promociones.createdAt,
+          updatedAt: promociones.updatedAt,
+          assignedAgentName: users.name,
+        })
+        .from(promociones)
+        .leftJoin(users, eq(promociones.assignedAgentId, users.id))
+        .where(
+          and(
+            eq(promociones.slug, slug),
+            eq(promociones.tenantId, this.ctx.getTenantId()),
+          ),
+        );
+
+      if (!promocion) return null;
+
+      const tipologiasWithUnidades = await this.assembleTipologias(
+        tx,
+        promocion.id,
+      );
+
+      const contentBlocks = await tx
+        .select()
+        .from(promocionContentBlocks)
+        .where(
+          and(
+            eq(promocionContentBlocks.promocionId, promocion.id),
+            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
+          ),
+        )
+        .orderBy(promocionContentBlocks.sortOrder);
+
+      const assets = await tx
+        .select()
+        .from(mediaAssets)
+        .where(
+          and(
+            eq(mediaAssets.ownerId, promocion.id),
+            eq(mediaAssets.ownerType, "PROMOCION"),
+            eq(mediaAssets.tenantId, this.ctx.getTenantId()),
+          ),
+        )
+        .orderBy(mediaAssets.sortOrder);
+
+      return {
+        ...promocion,
+        assignedAgentName: promocion.assignedAgentName ?? null,
+        tipologias: tipologiasWithUnidades,
+        contentBlocks,
+        mediaAssets: assets,
       };
     });
   }

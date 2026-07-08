@@ -1,0 +1,158 @@
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { getPromocionBySlug } from "@/features/detail/server/get-detail-data";
+import { DetailHero } from "@/features/detail/components/DetailHero";
+import { InfoBar } from "@/features/detail/components/InfoBar";
+import { EditorialBlocks } from "@/features/detail/components/EditorialBlocks";
+import { TypologyTable } from "@/features/detail/components/TypologyTable";
+import { MapPromocion } from "@/features/detail/components/MapPromocion";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface DetailPageProps {
+  params: Promise<{ slug: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// generateMetadata — SEO title, description, OG, Twitter Cards, canonical
+// ---------------------------------------------------------------------------
+
+export async function generateMetadata({
+  params,
+}: DetailPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const result = await getPromocionBySlug(slug);
+
+  if (!result) {
+    return {};
+  }
+
+  const { promocion, seo } = result;
+
+  // Get cover image for OG/Twitter
+  const coverAsset = promocion.mediaAssets.find(
+    (a) => a.kind === "IMAGE_GALLERY" && a.isCover,
+  ) ?? promocion.mediaAssets.find((a) => a.kind === "IMAGE_GALLERY");
+
+  const canonicalUrl = `https://domio.com/inmuebles/${promocion.slug}`;
+
+  return {
+    title: seo.title,
+    description: seo.description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title: seo.title,
+      description: seo.description,
+      url: canonicalUrl,
+      type: "website",
+      locale: "es_ES",
+      siteName: "Domio",
+      ...(coverAsset ? { images: [{ url: coverAsset.r2Key, alt: coverAsset.altText }] } : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: seo.title,
+      description: seo.description,
+      ...(coverAsset ? { images: [coverAsset.r2Key] } : {}),
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default async function DetailPage({ params }: DetailPageProps) {
+  const { slug } = await params;
+  const result = await getPromocionBySlug(slug);
+
+  if (!result) {
+    notFound();
+  }
+
+  const { promocion, structuredData } = result;
+
+  return (
+    <>
+      {/* JSON-LD Structured Data */}
+      {structuredData && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(structuredData),
+          }}
+        />
+      )}
+
+      <article>
+        {/* Detail Hero — 520px fixed height */}
+        <DetailHero promocion={promocion} />
+
+        {/* InfoBar — 4-column metric grid */}
+        <InfoBar promocion={promocion} />
+
+        {/* Body: Editorial blocks + Typology table + Map */}
+        <div className="bg-bg-surface-sunken">
+          <div className="mx-auto max-w-[1280px] px-6 py-section-md md:px-10 md:py-section-lg">
+            <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1.6fr_1fr]">
+              {/* Main content column */}
+              <div className="space-y-section-md">
+                {/* Editorial blocks */}
+                <EditorialBlocks promocion={promocion} />
+
+                {/* Typology table */}
+                <section>
+                  <div className="mb-6">
+                    <p className="relative mb-3 pl-10 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-accent-default before:absolute before:left-0 before:top-1/2 before:h-px before:w-8 before:-translate-y-1/2 before:bg-[linear-gradient(90deg,var(--accent-default),transparent)]">
+                      Tipologías
+                    </p>
+                    <h2 className="font-display text-[clamp(28px,3.2vw,40px)] font-normal tracking-[-0.035em] leading-[1.05] text-fg-default">
+                      Tipos de vivienda
+                    </h2>
+                  </div>
+                  <TypologyTable promocion={promocion} />
+                </section>
+
+                {/* Map */}
+                <section>
+                  <div className="mb-6">
+                    <p className="relative mb-3 pl-10 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-accent-default before:absolute before:left-0 before:top-1/2 before:h-px before:w-8 before:-translate-y-1/2 before:bg-[linear-gradient(90deg,var(--accent-default),transparent)]">
+                      Ubicación
+                    </p>
+                    <h2 className="font-display text-[clamp(28px,3.2vw,40px)] font-normal tracking-[-0.035em] leading-[1.05] text-fg-default">
+                      Mapa
+                    </h2>
+                  </div>
+                  <MapPromocion promocion={promocion} />
+                </section>
+              </div>
+
+              {/* Sticky aside column — reserved for future aside content */}
+              <aside className="lg:sticky lg:top-24 lg:self-start">
+                <div className="rounded-surface border border-border-default bg-bg-surface p-6 md:p-8">
+                  <p className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
+                    {promocion.name}
+                  </p>
+                  {promocion.municipality && (
+                    <p className="mt-2 font-mono text-[11px] tracking-[0.04em] tabular-nums text-fg-subtle">
+                      {promocion.municipality}
+                      {promocion.island ? `, ${promocion.island}` : ""}
+                    </p>
+                  )}
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+    </>
+  );
+}
