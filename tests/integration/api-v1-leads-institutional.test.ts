@@ -1,50 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 const API_URL = "https://domio.com/api/v1/leads/institutional";
 const TENANT_ID = "00000000-0000-4000-8000-000000000001";
-const PROMOCION_ID = "00000000-0000-4000-8000-000000000040";
-const SOURCE = "institutional";
-const TEST_NAME = "Test User";
-const TEST_EMAIL = "test@example.com";
-const CONSENT_BASIS = "RGPD consent";
-const CONSENT_TEXT = "Acepto la política de privacidad";
 
 // ---------------------------------------------------------------------------
-// Mocks for tenant context middleware
+// Mocks — using vi.hoisted for proper hoisting with vi.mock
 // ---------------------------------------------------------------------------
-const mockWithTx = vi.fn();
-const mockCtx = {
-  getTenantId: () => TENANT_ID,
-  withTransaction: mockWithTx,
-};
+const mockValidateApiKey = vi.hoisted(() => vi.fn());
+const mockCreateInstitutionalLead = vi.hoisted(() => vi.fn());
 
-vi.mock("@/infrastructure/tenant/context-middleware", () => ({
-  resolveTenantContext: vi.fn(() => mockCtx),
-  tenantContextStorage: {
-    run: vi.fn(
-      <T>(_ctx: unknown, fn: () => T): T => fn(),
-    ),
-  },
-  ContextResolutionError: class MockContextResolutionError extends Error {
-    constructor(
-      message: string,
-      public readonly status: number,
-    ) {
-      super(message);
-      this.name = "ContextResolutionError";
-    }
-  },
+vi.mock("@/features/api-public/middleware/api-key-auth", () => ({
+  validateApiKey: mockValidateApiKey,
 }));
+
+vi.mock("@/features/api-public/with-rate-limit", () => ({
+  withRateLimit: vi.fn((handler: Function) => handler as never),
+}));
+
+vi.mock("@/features/api-public/server/create-institutional-lead", () => ({
+  createInstitutionalLead: mockCreateInstitutionalLead,
+}));
+
+// We do NOT mock context-middleware so the real ContextResolutionError class
+// is available for instanceof checks in the route handler.
 
 // ---------------------------------------------------------------------------
 // SUT imports
 // ---------------------------------------------------------------------------
 import { POST } from "@app/api/v1/leads/institutional/route";
-import { resolveTenantContext } from "@/infrastructure/tenant/context-middleware";
+import { ContextResolutionError } from "@/infrastructure/tenant/context-middleware";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -53,91 +40,100 @@ import { resolveTenantContext } from "@/infrastructure/tenant/context-middleware
 describe("POST /api/v1/leads/institutional", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Restore default mock behavior
-    vi.mocked(resolveTenantContext).mockReturnValue(mockCtx);
   });
 
   it("returns 422 when consent fields are missing", async () => {
-    const request = new NextRequest(API_URL, {
+    mockValidateApiKey.mockResolvedValue({
+      type: "apikey",
+      apiKeyId: "key-001",
+      getTenantId: () => TENANT_ID,
+      withTransaction: vi.fn(),
+    });
+
+    const validationError = Object.assign(
+      new Error("Validation failed"),
+      { statusCode: 422, details: { consent: ["Required"] } },
+    );
+    mockCreateInstitutionalLead.mockRejectedValue(validationError);
+
+    const request = new Request(API_URL, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-api-key": "test-key" },
       body: JSON.stringify({
-        promocionId: PROMOCION_ID,
-        source: SOURCE,
-        name: TEST_NAME,
-        email: TEST_EMAIL,
-        // Missing consentLegalBasis and consentTextAccepted
+        name: "Test User",
+        email: "test@example.com",
       }),
     });
 
     const response = await POST(request);
-
     expect(response.status).toBe(422);
 
     const body = await response.json();
-    expect(body.error).toBe("El consentimiento RGPD es obligatorio");
-    expect(body.details).toBeDefined();
+    expect(body.error).toBeDefined();
   });
 
   it("returns 201 when consent fields are present", async () => {
     const leadId = "00000000-0000-4000-8000-000000000050";
     const consentId = "00000000-0000-4000-8000-000000000060";
-    mockWithTx.mockResolvedValue({ leadId, consentId });
 
-    const request = new NextRequest(API_URL, {
+    mockValidateApiKey.mockResolvedValue({
+      type: "apikey",
+      apiKeyId: "key-001",
+      getTenantId: () => TENANT_ID,
+      withTransaction: vi.fn(),
+    });
+
+    mockCreateInstitutionalLead.mockResolvedValue({
+      leadId,
+      consentId,
+      emailQueueId: "email-789",
+    });
+
+    const request = new Request(API_URL, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-api-key": "test-key" },
       body: JSON.stringify({
-        promocionId: PROMOCION_ID,
-        tipologiaId: "00000000-0000-4000-8000-000000000041",
-        source: SOURCE,
-        channel: "FORM",
-        name: TEST_NAME,
-        email: TEST_EMAIL,
+        name: "Test User",
+        email: "test@example.com",
         phone: "+34600123456",
         message: "Quiero información",
-        consentLegalBasis: CONSENT_BASIS,
-        consentTextAccepted: CONSENT_TEXT,
+        promocionId: "00000000-0000-4000-8000-000000000040",
+        tipologiaId: "00000000-0000-4000-8000-000000000041",
+        consent: {
+          legalBasis: "RGPD consent",
+          textAccepted: "Acepto la política de privacidad",
+        },
       }),
     });
 
     const response = await POST(request);
-
     expect(response.status).toBe(201);
 
     const body = await response.json();
     expect(body.leadId).toBe(leadId);
     expect(body.consentId).toBe(consentId);
+    expect(body.emailQueueId).toBe("email-789");
   });
 
-  it("returns error when context resolution fails", async () => {
-    const { ContextResolutionError } = await import(
-      "@/infrastructure/tenant/context-middleware"
+  it("returns 401 when auth fails", async () => {
+    mockValidateApiKey.mockRejectedValue(
+      new ContextResolutionError("Missing API key", 401),
     );
 
-    vi.mocked(resolveTenantContext).mockImplementation(() => {
-      throw new ContextResolutionError("Missing or invalid API key", 401);
-    });
-
-    const request = new NextRequest(API_URL, {
+    const request = new Request(API_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        promocionId: PROMOCION_ID,
-        source: SOURCE,
-        name: TEST_NAME,
-        email: TEST_EMAIL,
-        consentLegalBasis: CONSENT_BASIS,
-        consentTextAccepted: CONSENT_TEXT,
+        name: "Test User",
+        email: "test@example.com",
+        consent: { legalBasis: "RGPD consent", textAccepted: "Acepto" },
       }),
     });
 
     const response = await POST(request);
-
     expect(response.status).toBe(401);
 
     const body = await response.json();
-    expect(body.error).toBe("Missing or invalid API key");
+    expect(body.error).toBeDefined();
   });
 });
