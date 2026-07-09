@@ -6,6 +6,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { EquipoPage } from "./pages/EquipoPage";
 import { ApiKeysPage } from "./pages/ApiKeysPage";
 import { ContenidosContactoPage } from "./pages/ContenidosContactoPage";
+import { HomePage } from "./pages/HomePage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 
@@ -29,19 +30,38 @@ const NEW_PHONE = "+34 999 888 777";
 // DB helpers
 // ---------------------------------------------------------------------------
 
+/** Tenant UUID used by the seed. */
+const TENANT_SEED_UUID = "00000000-0000-0000-0000-000000000001";
+
 /** Query a user ID by email directly from the database. */
 async function getUserIdByEmail(email: string): Promise<string> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL not set");
   const pool = new Pool({ connectionString: databaseUrl });
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query(
+    // BEGIN + SET LOCAL is mandatory under Neon + PgBouncer transaction
+    // pooling. Without it, SET without LOCAL leaks context across requests,
+    // and SET LOCAL outside a transaction is immediately lost.
+    await client.query("BEGIN");
+    await client.query(
+      `SELECT set_config('app.current_tenant_id', $1, true)`,
+      [TENANT_SEED_UUID],
+    );
+
+    const { rows } = await client.query(
       "SELECT id FROM users WHERE email = $1",
       [email],
     );
     if (rows.length === 0) throw new Error(`User not found: ${email}`);
+
+    await client.query("COMMIT");
     return rows[0].id as string;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
   } finally {
+    client.release();
     await pool.end();
   }
 }
@@ -208,6 +228,19 @@ test.describe("Administrador — recorrido completo", () => {
 
     await expect(quickBandPhone).toBeVisible();
     await expect(quickBandPhone).toContainText(NEW_PHONE);
+
+    // Navigate to home page to verify the footer reflects the new contact data.
+    // The footer reads from contact_config (dynamic, not static).
+    const home = new HomePage(page);
+    await home.goto();
+    await home.waitForLoad();
+
+    // Footer phone should now show the new number
+    await expect(home.footerPhone).toBeVisible();
+    await expect(home.footerPhone).toContainText(NEW_PHONE);
+
+    // Footer email should still be visible (unchanged)
+    await expect(home.footerEmail).toBeVisible();
   });
 
   // ── 5. Reassign lead ─────────────────────────────────────────────────
@@ -266,7 +299,9 @@ test.describe("Administrador — recorrido completo", () => {
 
   // ── 6. ARSOP deletion ────────────────────────────────────────────────
 
-  test("admin can execute ARSOP deletion", async ({ page }) => {
+  test("admin can execute ARSOP deletion and verifies cascade", async ({
+    page,
+  }) => {
     await login(page, ADMIN_EMAIL, ADMIN_PASSWORD);
 
     const LEAD_NAME = "Roberto Díaz";
@@ -288,6 +323,10 @@ test.describe("Administrador — recorrido completo", () => {
 
     expect(page.url()).toContain("/panel/leads");
 
+    // Capture the lead ID from the URL before deletion
+    const urlMatch = page.url().match(/\/panel\/leads\/([a-f0-9-]+)/);
+    const leadId = urlMatch?.[1];
+
     // Scroll to the ARSOP section (rendered by ArsopButtons component)
     const arsopSection = page.getByRole("region", {
       name: /ejercicio de derechos arsop/i,
@@ -304,28 +343,83 @@ test.describe("Administrador — recorrido completo", () => {
       .getByRole("button", { name: /confirmar borrado de datos/i })
       .click();
 
-    // After deletion, the app should redirect to /panel/leads
-    // or show an error (catch block in arsop-buttons). Handle both.
-    try {
-      await page.waitForURL(/\/panel\/leads\/?$/, { timeout: 10_000 });
-      await page.waitForLoadState("networkidle");
+    // After deletion, the app should redirect to /panel/leads.
+    await page.waitForURL(/\/panel\/leads\/?$/, { timeout: 15_000 });
+    await page.waitForLoadState("networkidle");
 
-      // Verify the lead no longer appears in the list
-      await expect(leads.heading).toBeVisible({ timeout: 10_000 });
-      const deletedLead = page.getByRole("row", {
-        name: new RegExp(LEAD_NAME, "i"),
-      });
-      await expect(deletedLead).toHaveCount(0);
-    } catch {
-      // If redirect doesn't happen, check for error message in the ARSOP section
-      const arsopSection = page.getByRole("region", {
-        name: /ejercicio de derechos arsop/i,
-      });
-      await expect(arsopSection).toBeVisible({ timeout: 5_000 });
-      const error = arsopSection.getByRole("alert");
-      // Log the error for debugging
-      const errorText = await error.textContent().catch(() => "unknown");
-      console.log("ARSOP deletion error:", errorText);
+    // Verify the lead no longer appears in the list
+    await expect(leads.heading).toBeVisible({ timeout: 10_000 });
+    const deletedLead = page.getByRole("row", {
+      name: new RegExp(LEAD_NAME, "i"),
+    });
+    await expect(deletedLead).toHaveCount(0);
+
+    // ── Verify cascade deletion in the database ─────────────────────────
+    // FR-013: After ARSOP deletion, the lead and all associated data must
+    // be removed. The operation must be registered in arsop_requests.
+    if (leadId) {
+      const databaseUrl = process.env.DATABASE_URL;
+      if (!databaseUrl) throw new Error("DATABASE_URL not set");
+
+      const pool = new Pool({ connectionString: databaseUrl });
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `SELECT set_config('app.current_tenant_id', $1, true)`,
+          [TENANT_SEED_UUID],
+        );
+
+        // Lead itself must be gone
+        const { rows: leadRows } = await client.query(
+          "SELECT COUNT(*) AS cnt FROM leads WHERE id = $1",
+          [leadId],
+        );
+        expect(Number(leadRows[0]!.cnt)).toBe(0);
+
+        // Cascade: lead_notes
+        const { rows: notesRows } = await client.query(
+          "SELECT COUNT(*) AS cnt FROM lead_notes WHERE lead_id = $1",
+          [leadId],
+        );
+        expect(Number(notesRows[0]!.cnt)).toBe(0);
+
+        // Cascade: lead_history
+        const { rows: historyRows } = await client.query(
+          "SELECT COUNT(*) AS cnt FROM lead_history WHERE lead_id = $1",
+          [leadId],
+        );
+        expect(Number(historyRows[0]!.cnt)).toBe(0);
+
+        // Cascade: consent_records
+        const { rows: consentRows } = await client.query(
+          "SELECT COUNT(*) AS cnt FROM consent_records WHERE lead_id = $1",
+          [leadId],
+        );
+        expect(Number(consentRows[0]!.cnt)).toBe(0);
+
+        // Cascade: lead_read_marks
+        const { rows: readMarkRows } = await client.query(
+          "SELECT COUNT(*) AS cnt FROM lead_read_marks WHERE lead_id = $1",
+          [leadId],
+        );
+        expect(Number(readMarkRows[0]!.cnt)).toBe(0);
+
+        // Trazability: arsop_requests must have a DELETE entry for this lead
+        const { rows: arsopRows } = await client.query(
+          "SELECT COUNT(*) AS cnt FROM arsop_requests WHERE lead_id = $1 AND request_type = 'DELETE'",
+          [leadId],
+        );
+        expect(Number(arsopRows[0]!.cnt)).toBeGreaterThanOrEqual(1);
+
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+        await pool.end();
+      }
     }
   });
 });

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getServerSession } from "@/infrastructure/auth/session";
 import { Sidebar } from "@/features/backoffice/components/sidebar";
 import PanelHeader from "@/features/backoffice/components/panel-header";
@@ -43,8 +44,21 @@ export default async function PanelLayout({
 }>) {
   const session = await getServerSession();
 
-  // Login page: render without sidebar/header if not authenticated.
+  // Defence-in-depth: if no session, redirect to login (except on the
+  // login page itself, to avoid redirect loops).
+  // The middleware at middleware.ts provides the first line of defence by
+  // checking cookie presence + format; this layout provides the authoritative
+  // check via getServerSession().
   if (!session) {
+    // Read the current pathname from the custom header set by middleware.ts.
+    const headersList = await headers();
+    const pathname = headersList.get("x-pathname") ?? "";
+
+    if (!pathname.includes("/panel/login")) {
+      redirect("/panel/login");
+    }
+
+    // On the login page, render without sidebar/header.
     return <>{children}</>;
   }
 

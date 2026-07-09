@@ -26,9 +26,17 @@ const SLUG_TO_AGENT: Record<string, string> = {
   "pisos-santa-cruz-centro": "agente2@domio.dev",
 };
 
-// Shared state between test 4 and test 5.
-// Test 4 stores the slug so test 5 can determine the assigned agent.
-let createdLeadSlug: string | undefined;
+/**
+ * Slug used for the lead creation test and backoffice verification.
+ *
+ * Uses a deterministic slug from seed ("residencial-las-americas") instead
+ * of a shared variable between tests. This avoids fragile cross-test state
+ * coupling: if tests were reordered or skipped, the shared variable approach
+ * would produce incorrect results.
+ *
+ * @see M6 - avoid shared global state between tests
+ */
+const DETERMINISTIC_SLUG = "residencial-las-americas";
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -149,17 +157,15 @@ test.describe("Visitante público — recorrido completo", () => {
   });
 
   // ── 4. Contact form creates lead with consent ───────────────────────────
+  //
+  // NOTE: navigates to "residencial-las-americas" deterministically instead
+  // of clicking the first PropertyCard. This avoids coupling with the
+  // PortafolioPage test (which may have applied filters earlier) and
+  // eliminates the shared global variable for cross-test state.
 
   test("contact form creates lead with consent", async ({ page }) => {
-    const portafolio = new PortafolioPage(page);
-    await portafolio.goto();
-    await portafolio.waitForLoad();
-    await portafolio.clickFirstProperty();
-
-    expect(page.url()).toContain("/inmuebles/");
-    createdLeadSlug = page.url().split("/").pop();
-
     const detail = new InmuebleDetailPage(page);
+    await detail.gotoSlug(DETERMINISTIC_SLUG);
     await detail.waitForLoad();
 
     // Fill and submit the contact form with consent
@@ -181,10 +187,10 @@ test.describe("Visitante público — recorrido completo", () => {
   // ── 5. Lead appears in backoffice ───────────────────────────────────────
 
   test("lead appears in backoffice", async ({ page }) => {
-    // Determine the assigned agent from the slug stored in test 4.
-    // If the slug is unknown (e.g., running this test alone), use agente1.
-    const slug = createdLeadSlug ?? "residencial-las-americas";
-    const agentEmail = SLUG_TO_AGENT[slug] ?? "agente1@domio.dev";
+    // Use the deterministic slug from seed to determine the assigned agent.
+    // This avoids coupling with test 4 (which also uses the same slug).
+    // DETERMINISTIC_SLUG is "residencial-las-americas", which is always in the map
+    const agentEmail = SLUG_TO_AGENT[DETERMINISTIC_SLUG] as string;
 
     // Login as the agent assigned to that property
     await login(page, agentEmail, "Domio2026!");

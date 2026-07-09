@@ -22,12 +22,13 @@ export async function middleware(request: NextRequest) {
 
   // ── Auth guard for /panel/* (except /panel/login itself) ──
   if (pathname.startsWith("/panel") && !pathname.startsWith("/panel/login")) {
-    // Check session cookie presence (lightweight check).
-    // next-auth v4 uses "next-auth.session-token" by default.
-    // If absent, redirect to login. The PanelLayout server component
-    // performs the authoritative session verification via getServerSession.
+    // Check session cookie presence + basic JWT format validation.
+    // A valid JWT has exactly 3 base64url-encoded segments separated by dots.
     const sessionCookie = request.cookies.get("next-auth.session-token");
-    if (!sessionCookie?.value) {
+    const cookieValue = sessionCookie?.value ?? "";
+    const isValidFormat = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(cookieValue);
+
+    if (!isValidFormat) {
       const loginUrl = new URL("/panel/login", request.url);
       return NextResponse.redirect(loginUrl);
     }
@@ -40,6 +41,8 @@ export async function middleware(request: NextRequest) {
   ) {
     const response = NextResponse.next();
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    // Expose the pathname so layouts can read it via headers()
+    response.headers.set("x-pathname", pathname);
     return response;
   }
 

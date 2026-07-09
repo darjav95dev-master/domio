@@ -110,6 +110,12 @@ test.describe("Editor de catálogo — recorrido completo", () => {
   });
 
   // ── 4. Autosave persists draft changes ──────────────────────────────────
+  //
+  // NOTE: FR-012 specifies 30 seconds as the production autosave interval.
+  // For E2E test speed, the dev server overrides this to 5 seconds via the
+  // E2E_AUTOSAVE_INTERVAL env var (set in playwright.config.ts webServer).
+  // The production 30s default is verified in unit tests
+  // (use-autosave.spec.ts).
 
   test("autosave persists draft changes", async ({ page }) => {
     test.setTimeout(90_000);
@@ -137,8 +143,8 @@ test.describe("Editor de catálogo — recorrido completo", () => {
 
     // Wait for the autosave to complete (the "Borrador guardado" indicator appears
     // only after the PATCH response is received and the DB transaction has committed).
-    // The autosave fires every 30s after mount; the assert timeout gives enough time
-    // for the interval to fire after navigation.
+    // The autosave fires every 5s (E2E override) after mount; the assert timeout
+    // of 45_000 gives ample margin for the interval to fire.
     await expect(
       page.getByRole("status").filter({ hasText: /borrador guardado/i }),
     ).toBeVisible({ timeout: 45_000 });

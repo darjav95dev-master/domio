@@ -87,10 +87,47 @@ export async function resetDatabase(): Promise<void> {
   // Phase 3: Purge Next.js server-side cache (unstable_cache) so that
   // subsequent page renders fetch fresh promocion UUIDs from the new seed.
   // The dev server may have cached stale UUIDs from before the seed reset.
+  //
+  // The /api/internal/revalidate endpoint now requires session auth, so we
+  // authenticate programmatically first via the Auth.js credentials provider.
   try {
+    // Step 1: Get a CSRF token for the credentials login
+    const csrfRes = await fetch("http://localhost:3000/api/auth/csrf");
+    const { csrfToken } = await csrfRes.json() as { csrfToken: string };
+
+    // Step 2: Login as admin to get a session cookie
+    const loginRes = await fetch(
+      "http://localhost:3000/api/auth/callback/credentials",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          csrfToken,
+          email: "admin@domio.dev",
+          // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- test credential matching seed
+          password: "Domio2026!",
+          callbackUrl: "/panel",
+          json: "true",
+        }),
+        redirect: "manual",
+      },
+    );
+
+    // Extract the session cookie from Set-Cookie headers.
+    // getSetCookie() returns an array (available in Node.js 18+).
+    const cookies = loginRes.headers.getSetCookie();
+    const sessionCookie = cookies.find((c: string) =>
+      c.trim().startsWith("next-auth.session-token="),
+    );
+    const cookieValue = sessionCookie?.split(";")[0]?.trim() ?? "";
+
+    // Step 3: Call revalidation with the session cookie
     await fetch("http://localhost:3000/api/internal/revalidate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieValue,
+      },
       body: JSON.stringify({
         tags: [
           "catalog",

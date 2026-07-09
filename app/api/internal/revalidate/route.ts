@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
+import { getServerSession } from "@/infrastructure/auth/session";
 
 /**
  * Internal cache revalidation endpoint.
@@ -13,8 +14,17 @@ import { revalidateTag } from "next/cache";
  *
  * This route is NOT part of the public API and should NOT be
  * documented or exposed externally.
+ *
+ * **Auth:** Requires a valid backoffice session (auth guard).
+ * Without it, any unauthenticated client could invalidate the cache.
  */
 export async function POST(request: NextRequest) {
+  // ── Session verification ──────────────────────────────────────────────
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = (await request.json().catch(() => null)) as {
       tags?: string[];

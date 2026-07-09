@@ -22,6 +22,9 @@ export default defineConfig({
     port: 3000,
     reuseExistingServer: !process.env.CI,
     env: {
+      // Override autosave interval from 30s (production default, FR-012)
+      // to 5s for faster E2E tests. The production 30s default is verified
+      // in unit tests (use-autosave.spec.ts).
       E2E_AUTOSAVE_INTERVAL: "5000",
     },
   },

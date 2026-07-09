@@ -19,6 +19,15 @@ const EXTERNAL_SLUGS = new Set([
   "oficina-santa-cruz-business",
 ]);
 
+/** Base path for the versioned public API. */
+const API_V1_BASE = "/api/v1";
+
+/** Relative URL to the promociones endpoint. */
+const PROMOCIONES_URL = `${API_V1_BASE}/promociones`;
+
+/** Relative URL to the institutional leads endpoint. */
+const LEADS_INSTITUTIONAL_URL = `${API_V1_BASE}/leads/institutional`;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -41,25 +50,36 @@ async function createTestApiKey(databaseUrl: string): Promise<{
   const keyHash = await bcrypt.hash(plainKey, BCRYPT_SALT_ROUNDS);
 
   const pool = new Pool({ connectionString: databaseUrl });
+  const client = await pool.connect();
   try {
-    // Set tenant context for RLS, then insert
-    await pool.query(
+    // Use explicit transaction with SET LOCAL for RLS compliance.
+    // SET LOCAL is mandatory under Neon + PgBouncer transaction pooling
+    // to prevent context leaking between connections. Without BEGIN/COMMIT,
+    // the setting is lost immediately after set_config returns.
+    await client.query("BEGIN");
+    await client.query(
       `SELECT set_config('app.current_tenant_id', $1, true)`,
       [TENANT_SEED_UUID],
     );
 
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO api_keys (tenant_id, key_hash, name, is_active, rate_limit_per_min)
        VALUES ($1, $2, 'e2e-test-key', true, 120)
        RETURNING id`,
       [TENANT_SEED_UUID, keyHash],
     );
 
+    await client.query("COMMIT");
+
     return {
       plainKey,
       keyId: result.rows[0]!.id as string,
     };
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
   } finally {
+    client.release();
     await pool.end();
   }
 }
@@ -72,13 +92,20 @@ async function deleteTestApiKey(
   keyId: string,
 ): Promise<void> {
   const pool = new Pool({ connectionString: databaseUrl });
+  const client = await pool.connect();
   try {
-    await pool.query(
+    await client.query("BEGIN");
+    await client.query(
       `SELECT set_config('app.current_tenant_id', $1, true)`,
       [TENANT_SEED_UUID],
     );
-    await pool.query(`DELETE FROM api_keys WHERE id = $1`, [keyId]);
+    await client.query(`DELETE FROM api_keys WHERE id = $1`, [keyId]);
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
   } finally {
+    client.release();
     await pool.end();
   }
 }
@@ -91,7 +118,7 @@ async function fetchPromociones(
   request: Parameters<Parameters<typeof test>[1]>[0]["request"],
   apiKey: string,
 ): Promise<{ id: string; slug: string; mapPrivacyMode: string }[]> {
-  const response = await request.get("/api/v1/promociones", {
+  const response = await request.get(PROMOCIONES_URL, {
     headers: { "X-API-Key": apiKey },
   });
   const body = await response.json();
@@ -137,7 +164,7 @@ test.describe("Consumidor API — recorrido completo", () => {
   test("GET /api/v1/promociones returns only portfolio+PUBLISHED promotions", async ({
     request,
   }) => {
-    const response = await request.get("/api/v1/promociones", {
+    const response = await request.get(PROMOCIONES_URL, {
       headers: { "X-API-Key": plainApiKey },
     });
 
@@ -163,7 +190,7 @@ test.describe("Consumidor API — recorrido completo", () => {
 
   test("cursor pagination mechanism exists", async ({ request }) => {
     // Request with limit smaller than total to trigger cursor generation
-    const page1 = await request.get("/api/v1/promociones", {
+    const page1 = await request.get(PROMOCIONES_URL, {
       headers: { "X-API-Key": plainApiKey },
       params: { limit: "2" },
     });
@@ -187,7 +214,7 @@ test.describe("Consumidor API — recorrido completo", () => {
     // seed timing. This tests the mechanism works (cursor format,
     // endpoint handles it, no crash), not precise page count.
     const page2 = await request.get(
-      `/api/v1/promociones?limit=4&cursor=${encodeURIComponent(cursor)}`,
+      `${PROMOCIONES_URL}?limit=4&cursor=${encodeURIComponent(cursor)}`,
       {
         headers: { "X-API-Key": plainApiKey },
       },
@@ -196,7 +223,7 @@ test.describe("Consumidor API — recorrido completo", () => {
     expect(page2.status()).toBe(200);
 
     // Full list (no limit) also returns cursor info
-    const fullList = await request.get("/api/v1/promociones", {
+    const fullList = await request.get(PROMOCIONES_URL, {
       headers: { "X-API-Key": plainApiKey },
     });
 
@@ -267,7 +294,7 @@ test.describe("Consumidor API — recorrido completo", () => {
       },
     };
 
-    const response = await request.post("/api/v1/leads/institutional", {
+    const response = await request.post(LEADS_INSTITUTIONAL_URL, {
       headers: { "X-API-Key": plainApiKey },
       data: payload,
     });
@@ -303,7 +330,7 @@ test.describe("Consumidor API — recorrido completo", () => {
       promocionId,
     };
 
-    const response = await request.post("/api/v1/leads/institutional", {
+    const response = await request.post(LEADS_INSTITUTIONAL_URL, {
       headers: { "X-API-Key": plainApiKey },
       data: payload,
     });
@@ -324,7 +351,7 @@ test.describe("Consumidor API — recorrido completo", () => {
   }) => {
     // Send a payload that causes a JSON parse error on the server.
     // Content-Type text/plain ensures Playwright sends the raw string as-is.
-    const response = await request.post("/api/v1/leads/institutional", {
+    const response = await request.post(LEADS_INSTITUTIONAL_URL, {
       headers: {
         "X-API-Key": plainApiKey,
         "Content-Type": "text/plain",
