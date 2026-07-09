@@ -1,29 +1,121 @@
 import type { Metadata } from "next";
-import { ContactForm } from "@/features/leads/components/contact-form";
+import { getContactPageData } from "@/features/contact/server/get-contact-data";
+import { ContactHeader } from "@/features/contact/components/ContactHeader";
+import { QuickBand } from "@/features/contact/components/QuickBand";
+import { ContactFormGeneric } from "@/features/contact/components/ContactFormGeneric";
+import { OfficeMap } from "@/features/contact/components/OfficeMap";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Contacto | Domio",
   description:
-    "Contacta con Domio para recibir informacion sobre nuestras promociones inmobiliarias.",
+    "Contacta con Domio para recibir información sobre nuestras promociones inmobiliarias en Tenerife.",
 };
 
 /**
- * ContactoPage — pagina publica de contacto con formulario
- * y consentimiento RGPD.
+ * ContactoPage — /contacto
+ *
+ * SSR page with:
+ * 1. ContactHeader (centered eyebrow + H1 + lead)
+ * 2. QuickBand (4-column contact data grid)
+ * 3. Main grid 1.4fr 1fr: ContactFormGeneric left + OfficeMap/contact data right
+ *
+ * Nav and Footer are provided by app/(public)/layout.tsx.
  */
-export default function ContactoPage() {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col px-6 py-16">
-      <h1 className="font-display text-3xl font-semibold tracking-tight text-fg-default">
-        Contacto
-      </h1>
-      <p className="mt-2 font-sans text-base text-fg-muted">
-        Rellena el formulario y te responderemos a la mayor brevedad posible.
-      </p>
+export default async function ContactoPage() {
+  const data = await getContactPageData();
 
-      <div className="mt-10">
-        <ContactForm />
-      </div>
-    </main>
+  return (
+    <>
+      <ContactHeader />
+      <QuickBand config={data.contactConfig} />
+
+      {/* Main: form + map/datos */}
+      <section className="bg-bg-canvas px-6 py-20">
+        <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-12 lg:grid-cols-[1.4fr_1fr] lg:gap-16">
+          {/* Left: form */}
+          <div className="rounded-surface bg-bg-surface p-8 md:p-10">
+            <h2 className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
+              Envíanos un mensaje
+            </h2>
+            <p className="mt-2 font-sans text-sm leading-relaxed text-fg-muted">
+              Rellena el formulario y te responderemos a la mayor brevedad
+              posible.
+            </p>
+            <div className="mt-8">
+              <ContactFormGeneric />
+            </div>
+          </div>
+
+          {/* Right: map + office contact details */}
+          <div className="flex flex-col gap-8">
+            <OfficeMap
+              coordinates={[-16.2518, 28.468]}
+              address={data.contactConfig?.address ?? undefined}
+            />
+
+            {/* Office details card */}
+            <div className="rounded-surface border border-border-default bg-bg-surface p-6">
+              <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
+                Datos de contacto
+              </h3>
+              <dl className="mt-4 space-y-4">
+                <div>
+                  <dt className="font-sans text-sm font-medium text-fg-default">
+                    Dirección
+                  </dt>
+                  <dd className="font-sans text-sm text-fg-muted">
+                    {data.contactConfig?.address ?? "Santa Cruz de Tenerife"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-sans text-sm font-medium text-fg-default">
+                    Teléfono
+                  </dt>
+                  <dd>
+                    <a
+                      href={
+                        data.contactConfig?.phone
+                          ? `tel:${data.contactConfig.phone.replace(/\s/g, "")}`
+                          : undefined
+                      }
+                      className="font-sans text-sm text-accent-default hover:text-accent-hover"
+                    >
+                      {data.contactConfig?.phone ?? "—"}
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-sans text-sm font-medium text-fg-default">
+                    Email
+                  </dt>
+                  <dd>
+                    <a
+                      href={
+                        data.contactConfig?.email
+                          ? `mailto:${data.contactConfig.email}`
+                          : undefined
+                      }
+                      className="font-sans text-sm text-accent-default hover:text-accent-hover"
+                    >
+                      {data.contactConfig?.email ?? "—"}
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-sans text-sm font-medium text-fg-default">
+                    Horario
+                  </dt>
+                  <dd className="font-sans text-sm text-fg-muted">
+                    {data.contactConfig?.hours ?? "Lun–Vie: 9:00–18:00"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
