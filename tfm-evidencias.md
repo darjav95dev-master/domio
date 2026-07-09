@@ -1223,3 +1223,112 @@ Ninguno. Las 32 tareas del plan se completaron según lo especificado. El fix po
 - `smoke.spec.ts` eliminado (absorbido en visitor.spec.ts)
 
 ---
+
+## Feature 027 · contract-tests
+*Mergeada el 2026-07-09. Rama: `feature/027-contract-tests`. Commits: `bb752e5` (spec/plan), `350d8fe` (implementación), `31caaa1` (fix post-review).*
+
+### Métricas del ciclo SDD
+- Briefing inicial (spec.md): 1.226 palabras
+- `[NEEDS CLARIFICATION]` generados por /speckit-specify: 0 (checklist sin marcadores pendientes)
+- Preguntas planteadas por /speckit-clarify: N/D
+- Tareas en tasks.md: 16 (T001–T016 en 6 fases: Setup → Foundational → US1 → US2 → US3 → Polish)
+- Tareas reescritas tras /speckit-analyze: N/D
+- Inconsistencias detectadas por /speckit-analyze: N/D
+- Decisiones de diseño documentadas en research.md: 5 (R-001 a R-005: snapshot strategy con JSON serialization vs hash/AST, @asteasolutions/zod-to-openapi, update via env var vs process.argv, consumer mirror pattern, auth en endpoint docs)
+- Escenarios de validación en quickstart.md: 7
+
+### Métricas de implementación
+- Commits en la rama: 3 commits en `main` (1 spec/plan + 1 implement + 1 fix post-review)
+- Líneas añadidas: 5.079 (excluyendo `pnpm-lock.yaml`)
+- Líneas eliminadas: 7
+- Archivos nuevos/modificados: 32
+- Archivos de código fuente nuevos (feature principal): 11
+  - `src/features/api-public/openapi/snapshot-serializer.ts` (132 líneas — serializeSchema, readSnapshot con distinción missing/corrupt/ok, writeSnapshot, isUpdateMode vía env var)
+  - `src/features/api-public/openapi/generate-openapi.ts` (332 líneas — generación OpenAPI 3.0 desde schemas zod via `@asteasolutions/zod-to-openapi` con 2 paths, 6 component schemas, security scheme)
+  - `app/api/internal/docs/route.ts` (27 líneas — GET handler con session guard + OpenAPI spec)
+  - `scripts/update-contract-snapshots.ts` (76 líneas — helper script para regenerar snapshots)
+  - `vitest.config.ts` (modificado, +13 líneas — include tests/contract en test match patterns)
+- Archivos de test nuevos: 7 test files + 2 snapshots JSON
+  - `tests/contract/v1/snapshot-divergence.contract.spec.ts` (89 líneas — detección consolidada de divergencia para ambos schemas con 3 estados: ok/missing/corrupt)
+  - `tests/contract/v1/openapi-validation.contract.spec.ts` (155 líneas — 14 tests: estructura OpenAPI 3.0, paths, component schemas, security scheme, servers, tags)
+  - `tests/contract/v1/rate-limit.contract.spec.ts` (213 líneas — 10 tests: 429 response format, X-RateLimit-* headers, comportamiento under/over limit, degraded mode)
+  - `tests/contract/v1/consumer-mirror.contract.spec.ts` (260 líneas — tests de serialización validan contra schema, handler contracts con mocks reales de auth y rate limiter)
+  - `tests/contract/v1/docs-endpoint.contract.spec.ts` (86 líneas — 4 tests: 401 sin sesión, 200 con admin/operator/agent)
+  - `tests/contract/v1/promocion-response.contract.spec.ts` (modificado, +10 líneas — tests de serialización y cursor pagination)
+  - `tests/contract/v1/lead-institutional.contract.spec.ts` (modificado, +2 líneas — tests de validación de payload y consentimiento)
+  - `tests/contract/v1/snapshots/promocion-response.schema.json` (180 líneas — snapshot versionado)
+  - `tests/contract/v1/snapshots/lead-institutional.schema.json` (56 líneas — snapshot versionado)
+- Tests contract pasando: **60 tests** en 7 test files (todos pasan)
+- Tests del endpoint de docs: 4 tests (401 sin auth, 200 admin/operator/agent)
+- Tests globales tras la feature: N/D (el reporte completo aborta por 44 pre-existing failures no relacionados con F027: imports de next-auth en auth.config, session.spec.ts, y otros)
+- Cobertura global: N/D (no se pudo ejecutar `pnpm test:coverage` por pre-existing failures)
+- Cobertura en módulos críticos de la feature: N/D (los contract tests no se ejecutan bajo coverage por config de Vitest; la suite completa de tests contract pasa 60/60)
+- Lint: clean (0 errores)
+- Typecheck: clean (0 errores)
+- `pnpm test:contract`: 60 tests pasan en ~1 segundo
+
+### Veredictos de los guardianes
+- **tdd-enforcer:** N/D (no se invocó como subagente separado; los tests de contrato SON el entregable de la feature)
+- **quality-reviewer:** BLOQUEADA → APROBADA TRAS CORRECCIONES (commit `31caaa1` — 20 archivos modificados, +3.403/−573 líneas de refactor)
+  - **Críticas (C1–C3):**
+    - C1: OpenAPI estaba hardcoded (`generate-openapi.ts` usaba schemas manuales) en vez de derivarse desde zod vía `toJSONSchema()`. Corregido: ahora usa `promocionResponseSchema.toJSONSchema()` y `leadInstitutionalSchema.toJSONSchema()` como fuente única.
+    - C2: Consumer mirror tests eran tautologías (testeaban `Headers` API, no la lógica de Domio). Corregido: ahora importan y testean el handler real (`import { GET } from "@app/api/v1/promociones/route"`) con mocks de `validateApiKey`, `applyRateLimit` y `getPromociones`.
+    - C3: Snapshot corrupto se sobrescribía silenciosamente (el código inicial detectaba corrupción pero escribía igual). Corregido: `readSnapshot()` ahora retorna triple estado `ok | missing | corrupt`; el test falla con `expect.unreachable()` SIN escribir en caso corrupto.
+  - **Mayores (M1–M4):**
+    - M1: Endpoint `/api/internal/docs` sin tests de contrato. Corregido: creado `docs-endpoint.contract.spec.ts` con 4 tests (401, 200 admin/operator/agent).
+    - M2: Lógica de snapshot duplicada en 3 archivos (cada test file tenía su propia función `writeSnapshot`). Corregido: toda la lógica de snapshot centralizada en `snapshot-serializer.ts`; los tests existentes (promocion-response, lead-institutional) ahora delegan en el test consolidado `snapshot-divergence.contract.spec.ts`.
+    - M3: Mock de `RateLimiter` ignoraba la firma real del método `consume()`. Corregido: los mocks ahora respetan la interfaz `RateLimiter` con `consume(key, opts?)` y retornan `{ allowed, remaining, resetAt, limit, windowMs }`.
+    - M4: Detección de `--update` vía `process.argv` frágil (no se propagaba en workers forkeados de Vitest). Corregido: se reemplazó por variable de entorno `CONTRACT_UPDATE_SNAPSHOTS=true`.
+  - **2ª ronda:** APROBADA (0 críticas, 0 mayores, 0 menores)
+- **contract-guardian:** NO APLICA (no hay nuevos contratos de API externa; el endpoint `/api/internal/docs` es interno del backoffice, y los contracts se definen mediante schemas Zod versionados)
+
+### Desvíos respecto al plan inicial
+- **Ninguno estructural.** Las 6 fases (Setup → Foundational → US1 → US2 → US3 → Polish) se ejecutaron según el plan. Las 16 tareas se completaron según lo especificado.
+- **Calidad del fix post-review fue significativa:** El commit de correcciones (`31caaa1`) refactorizó 20 archivos con +3.403/−573 líneas — casi tanto como la implementación inicial. La mayoría de las críticas requerían reescribir archivos completos (consumer mirror, snapshot serializer, OpenAPI generator) en lugar de cambios menores.
+- **Nuevos archivos no planificados:** El plan no listaba `docs-endpoint.contract.spec.ts` como archivo separado (M1 se corrigió creando este test file). Tampoco se planificaron los 3 nuevos agent files (`.opencode/agents/engineering-auditor.md`, `engineering-refactor.md`, `security-auditor.md`) ni `engineering-audit.md` que se añadieron en el fix commit como parte del ecosistema de auditoría del proyecto.
+- **3 commits en main sin merge explícito:** Similar a F026, los 3 commits se incorporaron directamente a `main` sin merge commit, por rebase o push directo.
+
+### Decisiones técnicas relevantes tomadas durante la feature
+1. **Snapshots JSON versionados con triple estado ok/missing/corrupt (D1):** Inspirado en Vitest snapshots pero implementado como lógica propia para distinguir tres casos: (a) snapshot existe y es válido (compara y falla si difiere), (b) no existe (lo genera automáticamente y falla con mensaje "Snapshot generated — review and commit"), (c) existe pero está corrupto (falla sin sobrescribir, obliga a reparación manual). Decisión tomada tras C3 del quality review. Documentado en research.md R-001 y R-003.
+2. **OpenAPI generado con `toJSONSchema()` de zod v4, no con `@asteasolutions/zod-to-openapi` introspection (D2):** Se descubrió que zod v4 (proyecto usa zod ≥4.0.0) tiene `schema.toJSONSchema()` nativo que produce JSON Schema draft 2020-12. El OpenAPI generator usa este output para registrar component schemas, garantizando que cualquier cambio en el schema zod se refleje automáticamente en el spec OpenAPI sin intervención manual (FR-007). El wrapper `@asteasolutions/zod-to-openapi` se usa solo para la estructura de paths, responses y security schemes. Decisión tomada tras C1 del quality review.
+3. **Consumer mirror tests con handler real y mocks de infraestructura (D3):** En lugar de tests de integración HTTP (que requieren servidor) o tests de schema puro (que no verifican el handler), los consumer mirror tests importan el handler real (`import { GET } from "…/route"`) y mockean las dependencias (api-key-auth, rate-limiter, business logic). Esto verifica que el contrato HTTP (status codes, headers, response format) se cumple sin necesidad de BD real ni servidor corriendo. Decisión tomada tras C2 del quality review. Documentado en research.md R-004.
+4. **`CONTRACT_UPDATE_SNAPSHOTS=true` como env var en lugar de `--update` flag (D4):** Vitest con fork pool no propaga `process.argv` a los workers. Se reemplazó por variable de entorno que se hereda correctamente. El script `test:contract:update` en package.json simplemente ejecuta `CONTRACT_UPDATE_SNAPSHOTS=true vitest --run tests/contract`. Decisión tomada tras M4 del quality review.
+5. **OpenAPI endpoint con session guard, no API key (D5):** El endpoint `/api/internal/docs` usa `getServerSession()` de Auth.js v5, no API key. Cualquier usuario autenticado del backoffice (admin, operator, agent) puede ver las docs. Esto es consistente con el resto de rutas internas (`/api/internal/*`) y evita exponer el contrato público sin autenticación. Documentado en research.md R-005.
+6. **Snapshot serialization con `z.toJSONSchema()` + `JSON.parse(JSON.stringify(...))` (D6):** Para obtener una representación determinista y diff-friendly, se usó el método nativo `toJSONSchema()` de zod v4 (produce JSON Schema draft 2020-12) y se estabilizó con `JSON.parse(JSON.stringify(...))` para eliminar BigInts, referencias circulares y valores no-serializables. Documentado en research.md R-001.
+
+### Observaciones útiles para el capítulo de metodología (J2)
+- **Constitution check:** plan.md verificó 7/7 principios PASS (tests de contrato en tests/contract/, schemas zod versionados, script test:contract en package.json, bloqueo CI en divergencia, Scope Rule, sin hardcoded secrets, OpenAPI como documentación interna).
+- **SDD con quality review de alto impacto:** Esta feature es el ejemplo más claro de cómo el quality review no solo atrapa errores sino que rediseña la arquitectura de la feature. Las 3 críticas (C1–C3) exigieron reescribir el enfoque completo de la generación OpenAPI (C1), los consumer mirror tests (C2) y el manejo de snapshots corruptos (C3). El fix commit (+3.403 líneas en 20 archivos) casi duplicó el tamaño de la implementación inicial. Esto demuestra que el quality review funciona como red de seguridad para desviaciones arquitectónicas — exactamente su propósito en SDD.
+- **`toJSONSchema()` como descubrimiento técnico:** Durante la corrección de C1 se descubrió que zod v4 tiene `toJSONSchema()` nativo que produce JSON Schema estándar. Inicialmente se había considerado depender exclusivamente de `@asteasolutions/zod-to-openapi` para la introspección, pero la capacidad nativa de zod permite una integración más directa y mantenible. Este hallazgo técnico se documentó en el código pero no se trasladó a research.md por ser un descubrimiento tardío.
+- **Consumer mirror tests rediseñados para evitar tautologías:** La implementación inicial de consumer mirror tests mockeaba `Headers` y `Response` de la API Web, lo que verificaba el SDK de Fetch pero no la lógica de Domio. El rediseño (C2) cambió el enfoque a importar el handler real y mockear solo la infraestructura (auth, rate limiter, DB). Esto verifica que el contrato HTTP (códigos de estado, headers, formato de respuesta) se genera correctamente desde la lógica de Domio.
+- **Missing vs corrupt snapshot como innovación de UX:** La distinción entre snapshot "missing" (se genera automáticamente y falla con instrucciones para commitear) y "corrupt" (falla sin sobrescribir, obligando a reparación manual) es una mejora respecto al comportamiento por defecto de Vitest snapshots, que sobrescriben silenciosamente archivos corruptos.
+- **`process.argv` no se propaga en forks de Vitest:** El bug M4 (detección de `--update` vía process.argv que no funcionaba en workers forkeados) es una lección sobre cómo Vitest maneja la configuración en modo fork pool. La solución fue usar variable de entorno, que se hereda correctamente en todos los workers.
+- **Cuatro roles autenticados pueden ver las docs:** El endpoint `/api/internal/docs` acepta admin, operator y agent. No hay restricción por rol porque la documentación del contrato no es sensible — solo debe estar protegida de usuarios no autenticados.
+- **Script de actualización de snapshots como utility independiente:** Además de la env var `CONTRACT_UPDATE_SNAPSHOTS=true`, se creó `scripts/update-contract-snapshots.ts` como script ejecutable con `pnpm tsx` para regenerar snapshots sin ejecutar la suite de tests completa. Es útil en CI o cuando se quiere actualizar snapshots como paso previo al commit.
+
+### Artefactos generados
+- spec.md: `specs/027-contract-tests/spec.md` (108 líneas, 10 FRs, 5 SCs, 3 US, 4 Edge Cases)
+- plan.md: `specs/027-contract-tests/plan.md` (90 líneas, constitution check 7/7 principios PASS)
+- research.md: `specs/027-contract-tests/research.md` (76 líneas, 5 decisiones técnicas R-001 a R-005)
+- data-model.md: `specs/027-contract-tests/data-model.md` (40 líneas — 2 snapshots, OpenAPI spec, 2 schemas zod referenciados)
+- quickstart.md: `specs/027-contract-tests/quickstart.md` (69 líneas, 7 escenarios de validación)
+- checklist: `specs/027-contract-tests/checklists/requirements.md` (35 líneas, 0 NEEDS CLARIFICATION)
+- Tests contract: 7 test files, 60 tests
+  - `tests/contract/v1/snapshot-divergence.contract.spec.ts` (89 líneas, 2 tests — promocionResponseSchema + leadInstitutionalSchema con triple estado)
+  - `tests/contract/v1/openapi-validation.contract.spec.ts` (155 líneas, 14 tests — estructura, paths, security scheme, servers, tags)
+  - `tests/contract/v1/rate-limit.contract.spec.ts` (213 líneas, 10 tests — 429 format, headers, under/over limit, degraded mode, configuración)
+  - `tests/contract/v1/consumer-mirror.contract.spec.ts` (260 líneas, 10 tests — serialización promociones, handler contract con auth y rate limiting, schema leads)
+  - `tests/contract/v1/docs-endpoint.contract.spec.ts` (86 líneas, 4 tests — 401, 200 admin/operator/agent)
+  - `tests/contract/v1/promocion-response.contract.spec.ts` (modificado, 10 tests — serialización, map_privacy_mode EXACT/AREA, cursor pagination)
+  - `tests/contract/v1/lead-institutional.contract.spec.ts` (modificado, 10 tests — payload válido, consentimiento obligatorio, opcionales, email inválido, UUID)
+- Snapshots versionados:
+  - `tests/contract/v1/snapshots/promocion-response.schema.json` (180 líneas — JSON Schema draft 2020-12)
+  - `tests/contract/v1/snapshots/lead-institutional.schema.json` (56 líneas — JSON Schema draft 2020-12)
+- Código fuente (4 archivos nuevos + 2 modificados):
+  - `src/features/api-public/openapi/snapshot-serializer.ts` (132 líneas — serializeSchema, readSnapshot con triple estado, writeSnapshot, isUpdateMode)
+  - `src/features/api-public/openapi/generate-openapi.ts` (332 líneas — OpenAPI 3.0 generator con 2 paths, 6 component schemas, security scheme)
+  - `app/api/internal/docs/route.ts` (27 líneas — GET handler con session guard + OpenAPI spec)
+  - `scripts/update-contract-snapshots.ts` (76 líneas — helper script para regenerar snapshots)
+  - `tests/contract/v1/promocion-response.contract.spec.ts` (modificado, +10 líneas)
+  - `tests/contract/v1/lead-institutional.contract.spec.ts` (modificado, +2 líneas)
+- Dependencias nuevas: `@asteasolutions/zod-to-openapi`
