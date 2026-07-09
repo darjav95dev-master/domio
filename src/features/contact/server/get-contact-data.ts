@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { contactConfig as contactConfigTable, contentBlocks } from "@/infrastructure/db/schema";
@@ -6,6 +7,18 @@ import type { ContactConfig } from "@/infrastructure/db/schema/contact-config";
 import type { ContentBlock } from "@/infrastructure/db/schema/content-blocks";
 import type { ContactPageData, SobrePageData } from "@/features/contact/types";
 import type { ContactConfigData } from "@/features/contact/types";
+
+// ── Zod schemas for content block payloads ──────────────────────────────────
+// architecture.md §7.6: content editorial siempre validado por Zod
+
+const aboutHeroSchema = z.object({
+  titulo: z.string(),
+  lead: z.string(),
+});
+
+const aboutCuerpoSchema = z.object({
+  parrafos: z.array(z.string()),
+});
 
 /**
  * Fetches contact configuration for the public tenant.
@@ -89,6 +102,8 @@ export async function getContactPageData(): Promise<ContactPageData> {
           hours: contactConfig.hours,
           whatsappNumber: contactConfig.whatsappNumber,
           whatsappPrefilledMessage: contactConfig.whatsappPrefilledMessage,
+          officeLat: contactConfig.officeLat ?? null,
+          officeLng: contactConfig.officeLng ?? null,
         } satisfies ContactConfigData)
       : null,
   };
@@ -104,12 +119,23 @@ export async function getSobrePageData(): Promise<SobrePageData> {
   const heroBlock = blockMap.get("hero");
   const cuerpoBlock = blockMap.get("cuerpo");
 
-  return {
-    hero: heroBlock
-      ? (heroBlock.payload as SobrePageData["hero"])
-      : null,
-    cuerpo: cuerpoBlock
-      ? (cuerpoBlock.payload as SobrePageData["cuerpo"])
-      : null,
-  };
+  // Validate payloads with Zod per architecture.md §7.6
+  // Return null for blocks with invalid payload — the page degrades gracefully
+  const hero = heroBlock
+    ? parsePayloadSafely(heroBlock.payload, aboutHeroSchema)
+    : null;
+  const cuerpo = cuerpoBlock
+    ? parsePayloadSafely(cuerpoBlock.payload, aboutCuerpoSchema)
+    : null;
+
+  return { hero, cuerpo };
+}
+
+/**
+ * Safely parses a raw payload against a Zod schema.
+ * Returns the parsed value if valid, or null if invalid.
+ */
+function parsePayloadSafely<T>(payload: unknown, schema: z.ZodSchema<T>): T | null {
+  const result = schema.safeParse(payload);
+  return result.success ? result.data : null;
 }

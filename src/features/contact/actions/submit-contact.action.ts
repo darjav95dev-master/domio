@@ -1,12 +1,18 @@
 import { headers } from "next/headers";
 import { contactFormSchema, type ContactFormResult } from "./submit-contact.schema";
 import { checkContactRateLimit } from "./contact-form-action";
+import { getContactPageData } from "@/features/contact/server/get-contact-data";
+import { EmailService } from "@/infrastructure/email/email.service";
+import { EmailRepository } from "@/infrastructure/email/email.repository";
+import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
 
 /**
  * Server action for the generic contact form.
  *
- * Validates input with Zod, checks rate limit, and queues an email
- * notification to the configured contact email.
+ * Validates input with Zod, checks rate limit, fetches the configured
+ * contact email, and enqueues a notification via email_queue.
+ * Following architecture.md §11.3: the notification is async and
+ * resilient — a Resend failure never blocks the form submission.
  */
 export async function submitContactForm(
   prevState: ContactFormResult | null,
@@ -37,8 +43,18 @@ export async function submitContactForm(
     };
   }
 
-  // 3. Validate success (in production, this would queue an email)
-  //    For now we return success as the email infrastructure is
-  //    handled by the email_queue worker pattern.
+  // 3. Enqueue email notification to the configured contact address
+  const { contactConfig } = await getContactPageData();
+  const contactEmail = contactConfig?.email;
+
+  if (contactEmail) {
+    const emailService = new EmailService(new EmailRepository());
+    await emailService.enqueue({
+      toEmail: contactEmail,
+      template: EMAIL_TEMPLATE_NAMES.CONTACT_FORM_NOTIFICATION,
+      payload: parsed.data satisfies Record<string, unknown>,
+    });
+  }
+
   return { success: true };
 }

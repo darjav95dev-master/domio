@@ -9,8 +9,10 @@ export interface ContactConfigData {
   hours: string | null;
   whatsappNumber: string | null;
   whatsappPrefilledMessage: string | null;
-  /** Office coordinates [lng, lat] — may come from a future schema addition */
-  coordinates?: [number, number] | null;
+  /** Office latitude (from contact_config.office_lat) */
+  officeLat: number | null;
+  /** Office longitude (from contact_config.office_lng) */
+  officeLng: number | null;
 }
 
 export interface AboutHeroPayload {

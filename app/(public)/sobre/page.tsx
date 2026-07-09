@@ -25,12 +25,8 @@ export default async function SobrePage() {
   const lead =
     data.hero?.lead ??
     "Conoce nuestra historia, nuestros valores y el equipo que hace posible Domio.";
-  const parrafos = data.cuerpo?.parrafos ?? [
-    "Domio nace con la misión de transformar la experiencia de comprar, vender y alquilar propiedades en Canarias. Creemos en un modelo inmobiliario transparente, donde cada cliente recibe un trato cercano y profesional desde el primer contacto.",
-    "Con más de 15 años de experiencia en el sector, nuestro equipo combina el conocimiento local del mercado canario con las mejores herramientas digitales para ofrecer un servicio integral. Desde la valoración inicial hasta la firma, acompañamos a nuestros clientes en cada paso del proceso.",
-    "Nuestra sede en Santa Cruz de Tenerife es el centro desde el que gestionamos un porfolio de inmuebles que abarca toda la isla, incluyendo viviendas, locales comerciales y terrenos. Trabajamos tanto con particulares como con inversores, adaptándonos a las necesidades específicas de cada cliente.",
-    "En Domio, la transparencia no es solo un valor: es nuestra forma de trabajar. Publicamos los precios de nuestras propiedades, compartimos toda la información disponible y no escondemos comisiones. Creemos que un cliente bien informado toma mejores decisiones.",
-  ];
+  const tieneCuerpo = data.cuerpo !== null;
+  const parrafos = data.cuerpo?.parrafos ?? [];
 
   return (
     <>
@@ -60,42 +56,52 @@ export default async function SobrePage() {
       {/* Editorial body */}
       <section className="bg-bg-canvas px-6 py-20">
         <div className="mx-auto max-w-[760px]">
-          {/* Architectural photograph */}
-          <div className="mb-16 overflow-hidden rounded-surface bg-gradient-to-br from-ink-soft to-fg-default">
-            <div
-              className="aspect-[16/9] w-full bg-cover bg-center"
-              style={{
-                backgroundImage:
-                  "linear-gradient(135deg, rgba(44,33,26,.6), rgba(26,20,16,.8))",
-                opacity: 0.85,
-              }}
-              role="img"
-              aria-label="Fachada del edificio Domio en Santa Cruz de Tenerife"
-            />
-          </div>
+          {tieneCuerpo ? (
+            <>
+              {/* Architectural photograph (decorative only) */}
+              <div className="mb-16 overflow-hidden rounded-surface bg-gradient-to-br from-ink-soft to-fg-default">
+                <div
+                  className="aspect-[16/9] w-full bg-cover bg-center"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(135deg, rgba(44,33,26,.6), rgba(26,20,16,.8))",
+                    opacity: 0.85,
+                  }}
+                  aria-hidden="true"
+                />
+              </div>
 
-          {/* Content */}
-          <div className="space-y-6">
-            {parrafos.map((texto, i) => (
-              <p
-                key={i}
-                className="font-sans text-base leading-[1.55] text-fg-muted [&:first-child]:text-[19px] [&:first-child]:leading-[1.6]"
-              >
-                {texto}
+              {/* Content */}
+              <div className="space-y-6">
+                {parrafos.map((texto, i) => (
+                  <p
+                    key={i}
+                    className="font-sans text-base leading-[1.55] text-fg-muted [&:first-child]:text-[19px] [&:first-child]:leading-[1.6]"
+                  >
+                    {texto}
+                  </p>
+                ))}
+              </div>
+
+              {/* Signature block */}
+              <div className="mt-16 border-t border-border-default pt-10">
+                <p className="font-display italic text-[21px] leading-[1.45] tracking-[-0.01em] text-fg-default">
+                  En Domio, cada propiedad cuenta una historia.
+                </p>
+                <p className="mt-4 font-mono text-[11px] tracking-[0.04em] text-fg-subtle tabular-nums">
+                  Domio · Santa Cruz de Tenerife ·{" "}
+                  {new Date().getFullYear()}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-surface border border-border-default bg-bg-surface px-6 py-16 text-center">
+              <p className="font-sans text-base text-fg-default">
+                El equipo editorial aún no ha publicado el contenido de esta
+                página
               </p>
-            ))}
-          </div>
-
-          {/* Signature block */}
-          <div className="mt-16 border-t border-border-default pt-10">
-            <p className="font-display italic text-[21px] leading-[1.45] tracking-[-0.01em] text-fg-default">
-              En Domio, cada propiedad cuenta una historia.
-            </p>
-            <p className="mt-4 font-mono text-[11px] tracking-[0.04em] text-fg-subtle tabular-nums">
-              Domio · Santa Cruz de Tenerife ·{" "}
-              {new Date().getFullYear()}
-            </p>
-          </div>
+            </div>
+          )}
         </div>
       </section>
     </>

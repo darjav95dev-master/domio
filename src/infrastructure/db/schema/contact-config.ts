@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   timestamp,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 import { users } from "./users";
@@ -20,6 +21,8 @@ export const contactConfig = pgTable(
     hours: text("hours"),
     whatsappNumber: text("whatsapp_number"),
     whatsappPrefilledMessage: text("whatsapp_prefilled_message"),
+    officeLat: doublePrecision("office_lat"),
+    officeLng: doublePrecision("office_lng"),
     updatedBy: uuid("updated_by").references(() => users.id, {
       onDelete: "set null",
     }),

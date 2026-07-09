@@ -4,6 +4,7 @@ import { ContactHeader } from "@/features/contact/components/ContactHeader";
 import { QuickBand } from "@/features/contact/components/QuickBand";
 import { ContactFormGeneric } from "@/features/contact/components/ContactFormGeneric";
 import { OfficeMap } from "@/features/contact/components/OfficeMap";
+import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
  *
  * SSR page with:
  * 1. ContactHeader (centered eyebrow + H1 + lead)
- * 2. QuickBand (4-column contact data grid)
+ * 2. QuickBand (4-column contact data grid) — or pending banner
  * 3. Main grid 1.4fr 1fr: ContactFormGeneric left + OfficeMap/contact data right
  *
  * Nav and Footer are provided by app/(public)/layout.tsx.
@@ -26,10 +27,20 @@ export const metadata: Metadata = {
 export default async function ContactoPage() {
   const data = await getContactPageData();
 
+  const hasConfig = data.contactConfig !== null;
+  const hasCoords =
+    data.contactConfig?.officeLat != null &&
+    data.contactConfig?.officeLng != null;
+
   return (
     <>
       <ContactHeader />
-      <QuickBand config={data.contactConfig} />
+
+      {hasConfig ? (
+        <QuickBand config={data.contactConfig} />
+      ) : (
+        <PendingConfigBanner />
+      )}
 
       {/* Main: form + map/datos */}
       <section className="bg-bg-canvas px-6 py-20">
@@ -50,10 +61,21 @@ export default async function ContactoPage() {
 
           {/* Right: map + office contact details */}
           <div className="flex flex-col gap-8">
-            <OfficeMap
-              coordinates={[-16.2518, 28.468]}
-              address={data.contactConfig?.address ?? undefined}
-            />
+            {hasCoords ? (
+              <OfficeMap
+                coordinates={[
+                  data.contactConfig!.officeLng!,
+                  data.contactConfig!.officeLat!,
+                ]}
+                address={data.contactConfig!.address ?? undefined}
+              />
+            ) : (
+              <div className="rounded-surface border border-border-default bg-bg-surface px-6 py-10 text-center">
+                <p className="font-sans text-sm text-fg-muted">
+                  Ubicación no disponible
+                </p>
+              </div>
+            )}
 
             {/* Office details card */}
             <div className="rounded-surface border border-border-default bg-bg-surface p-6">
@@ -117,5 +139,30 @@ export default async function ContactoPage() {
         </div>
       </section>
     </>
+  );
+}
+
+/**
+ * PendingConfigBanner — shown when contact_config has not been configured yet
+ * (instead of rendering QuickBand with empty dashes).
+ */
+function PendingConfigBanner() {
+  Sentry.captureMessage(
+    "ContactoPage: contactConfig es null — configuración pendiente",
+    "warning",
+  );
+
+  return (
+    <div className="bg-bg-surface px-6 py-12 text-center">
+      <div className="mx-auto max-w-[480px]">
+        <p className="font-sans text-sm font-medium text-fg-default">
+          Configuración de contacto pendiente
+        </p>
+        <p className="mt-1 font-sans text-sm text-fg-muted">
+          La información de contacto será visible una vez configurada por el
+          administrador.
+        </p>
+      </div>
+    </div>
   );
 }
