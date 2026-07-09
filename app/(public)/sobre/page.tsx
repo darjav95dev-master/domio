@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import { getSobrePageData } from "@/features/contact/server/get-contact-data";
+import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Sobre Domio | Domio",
-  description:
-    "Conoce Domio, nuestra historia y nuestro equipo. Más de 15 años de experiencia en el sector inmobiliario de Canarias.",
-};
+// ---------------------------------------------------------------------------
+// Metadata
+// ---------------------------------------------------------------------------
+
+export async function generateMetadata(): Promise<Metadata> {
+  return buildPageMetadata({
+    title: "Sobre Domio | Domio",
+    description:
+      "Conoce Domio, nuestra historia y nuestro equipo. Más de 15 años de experiencia en el sector inmobiliario de Canarias.",
+    path: "/sobre",
+  });
+}
 
 /**
  * SobrePage — /sobre

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPromocionBySlug } from "@/features/detail/server/get-detail-data";
+import { mediaEnv } from "@/infrastructure/media/env";
+import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 import { DetailHero } from "@/features/detail/components/DetailHero";
 import { InfoBar } from "@/features/detail/components/InfoBar";
 import { EditorialBlocks } from "@/features/detail/components/EditorialBlocks";
@@ -11,6 +13,7 @@ import { WhatsAppButton } from "@/features/engagement/components/WhatsAppButton"
 import { ShareButton } from "@/features/engagement/components/ShareButton";
 import { RelatedProperties } from "@/features/engagement/components/RelatedProperties";
 import { getContactConfig } from "@/features/engagement/server/get-contact-config";
+import { buildBreadcrumbJsonLd } from "@/features/seo/server/breadcrumb-json-ld";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,39 +39,22 @@ export async function generateMetadata({
 
   const { promocion, seo } = result;
 
-  // Get cover image for OG/Twitter
+  // Get cover image for OG/Twitter (or leave undefined so buildPageMetadata
+  // resolves the tenant default OG image)
   const coverAsset = promocion.mediaAssets.find(
     (a) => a.kind === "IMAGE_GALLERY" && a.isCover,
   ) ?? promocion.mediaAssets.find((a) => a.kind === "IMAGE_GALLERY");
 
-  const canonicalUrl = `https://domio.com/inmuebles/${promocion.slug}`;
+  const coverUrl = coverAsset
+    ? `${mediaEnv.R2_PUBLIC_URL}/${coverAsset.r2Key.replace(/^\//, "")}`
+    : undefined;
 
-  return {
+  return buildPageMetadata({
     title: seo.title,
     description: seo.description,
-    alternates: {
-      canonical: canonicalUrl,
-    },
-    openGraph: {
-      title: seo.title,
-      description: seo.description,
-      url: canonicalUrl,
-      type: "website",
-      locale: "es_ES",
-      siteName: "Domio",
-      ...(coverAsset ? { images: [{ url: coverAsset.r2Key, alt: coverAsset.altText }] } : {}),
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: seo.title,
-      description: seo.description,
-      ...(coverAsset ? { images: [coverAsset.r2Key] } : {}),
-    },
-    robots: {
-      index: true,
-      follow: true,
-    },
-  };
+    path: `/inmuebles/${promocion.slug}`,
+    ogImage: coverUrl,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +82,12 @@ export default async function DetailPage({ params }: DetailPageProps) {
   // Fetch contact config for WhatsApp
   const contactConfig = await getContactConfig();
 
+  // Build BreadcrumbList JSON-LD
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd({
+    name: promocion.name,
+    slug: promocion.slug,
+  });
+
   return (
     <>
       {/* JSON-LD Structured Data */}
@@ -107,6 +99,12 @@ export default async function DetailPage({ params }: DetailPageProps) {
           }}
         />
       )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd),
+        }}
+      />
 
       <article>
         {/* Detail Hero — 520px fixed height */}

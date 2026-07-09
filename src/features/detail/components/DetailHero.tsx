@@ -17,8 +17,9 @@ export interface DetailHeroProps {
 /** Days after which a property is no longer considered "new". */
 const FRESH_DAYS = 14;
 
-function isFresh(date: Date): boolean {
-  const diff = Date.now() - date.getTime();
+function isFresh(date: Date | string): boolean {
+  const timestamp = typeof date === "string" ? new Date(date).getTime() : date.getTime();
+  const diff = Date.now() - timestamp;
   return diff < FRESH_DAYS * 24 * 60 * 60 * 1000;
 }
 

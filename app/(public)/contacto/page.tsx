@@ -5,14 +5,22 @@ import { QuickBand } from "@/features/contact/components/QuickBand";
 import { ContactFormGeneric } from "@/features/contact/components/ContactFormGeneric";
 import { OfficeMap } from "@/features/contact/components/OfficeMap";
 import * as Sentry from "@sentry/nextjs";
+import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Contacto | Domio",
-  description:
-    "Contacta con Domio para recibir información sobre nuestras promociones inmobiliarias en Tenerife.",
-};
+// ---------------------------------------------------------------------------
+// Metadata
+// ---------------------------------------------------------------------------
+
+export async function generateMetadata(): Promise<Metadata> {
+  return buildPageMetadata({
+    title: "Contacto | Domio",
+    description:
+      "Contacta con Domio para recibir información sobre nuestras promociones inmobiliarias en Tenerife.",
+    path: "/contacto",
+  });
+}
 
 /**
  * ContactoPage — /contacto

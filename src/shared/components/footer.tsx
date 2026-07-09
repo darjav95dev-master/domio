@@ -85,7 +85,7 @@ export function Footer() {
         {/* Legal row */}
         <div className="mt-[48px] border-t border-white/10 pt-[32px]">
           <div className="flex flex-col gap-[8px] md:flex-row md:items-center md:justify-between">
-            <p className="font-sans text-sm text-fg-on-inverted/45">
+            <p className="font-sans text-sm text-fg-on-inverted/60">
               &copy; {new Date().getFullYear()} Domio. Todos los derechos
               reservados.
             </p>
@@ -94,7 +94,7 @@ export function Footer() {
                 <li>
                   <a
                     href="/legal/aviso-legal"
-                    className="text-sm text-fg-on-inverted/45 transition-colors duration-150 hover:text-white"
+                    className="text-sm text-fg-on-inverted/60 transition-colors duration-150 hover:text-white"
                   >
                     Aviso Legal
                   </a>
@@ -102,7 +102,7 @@ export function Footer() {
                 <li>
                   <a
                     href="/legal/privacidad"
-                    className="text-sm text-fg-on-inverted/45 transition-colors duration-150 hover:text-white"
+                    className="text-sm text-fg-on-inverted/60 transition-colors duration-150 hover:text-white"
                   >
                     Privacidad
                   </a>
@@ -110,7 +110,7 @@ export function Footer() {
                 <li>
                   <a
                     href="/legal/cookies"
-                    className="text-sm text-fg-on-inverted/45 transition-colors duration-150 hover:text-white"
+                    className="text-sm text-fg-on-inverted/60 transition-colors duration-150 hover:text-white"
                   >
                     Cookies
                   </a>
@@ -135,9 +135,9 @@ function FooterColumn({
 }) {
   return (
     <div>
-      <h4 className="font-mono text-[10px] font-medium tracking-[0.16em] uppercase text-white">
+      <h3 className="font-mono text-[10px] font-medium tracking-[0.16em] uppercase text-white">
         {title}
-      </h4>
+      </h3>
       <nav aria-label={title}>
         <ul className="mt-[12px] space-y-[8px]">{children}</ul>
       </nav>

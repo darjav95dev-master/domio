@@ -41,9 +41,9 @@ export function BlockCalidades({ block }: BlockCalidadesProps) {
               aria-hidden="true"
             >
               {item.icon ? (
-                <span className="text-lg text-accent-default">{item.icon}</span>
+                <span className="text-lg text-fg-muted">{item.icon}</span>
               ) : (
-                <span className="text-lg text-accent-default">
+                <span className="text-lg text-fg-muted">
                   <svg
                     width="20"
                     height="20"
@@ -72,9 +72,9 @@ export function BlockCalidades({ block }: BlockCalidadesProps) {
 
             {/* Content */}
             <div>
-              <h4 className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
+              <h3 className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
                 {item.title}
-              </h4>
+              </h3>
               <p className="mt-1 text-base leading-relaxed text-fg-muted">
                 {item.description}
               </p>

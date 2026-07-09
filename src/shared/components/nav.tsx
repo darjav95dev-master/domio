@@ -31,8 +31,20 @@ export function Nav() {
   }, []);
 
   useEffect(() => {
-    // On mount, read actual scroll position
-    handleScroll();
+    // Only use transparent (over-hero) mode if the page has a dark hero
+    // section as first child of <main>. On light-background pages like
+    // portafolio, stay in scrolled (solid) mode to avoid white-on-light
+    // contrast failures.
+    const main = document.getElementById("main-content");
+    const hasDarkHero = main?.firstElementChild?.matches(
+      '[class*="bg-bg-band-ink"], [class*="h-[520px]"], [class*="h-\\[520"]',
+    );
+
+    if (hasDarkHero) {
+      handleScroll();
+    } else {
+      setIsScrolled(true);
+    }
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);

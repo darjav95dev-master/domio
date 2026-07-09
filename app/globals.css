@@ -210,8 +210,8 @@
   --border-on-ink: rgba(255, 255, 255, 0.08);
 
   /* Semantic colors: accent */
-  --accent-default: #c75d3f;
-  --accent-hover: #a84a2e;
+  --accent-default: #a84a2e;
+  --accent-hover: #8f3c22;
   --accent-subtle: rgba(199, 93, 63, 0.1);
   --accent-glow: rgba(199, 93, 63, 0.2);
 

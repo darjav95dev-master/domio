@@ -7,17 +7,21 @@ import { EmptyState } from "@/features/catalog/components/EmptyState";
 import { FilterBar } from "@/features/catalog/components/FilterBar";
 import { Skeleton } from "@/shared/components/skeleton";
 import { cn } from "@/shared/utils/cn";
+import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 
 
 // ---------------------------------------------------------------------------
 // Metadata
 // ---------------------------------------------------------------------------
 
-export const metadata: Metadata = {
-  title: "Portafolio | Domio",
-  description:
-    "Explora nuestro portafolio de inmuebles en Canarias. Venta y alquiler de pisos, casas, locales y más.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildPageMetadata({
+    title: "Portafolio | Domio",
+    description:
+      "Explora nuestro portafolio de inmuebles en Canarias. Venta y alquiler de pisos, casas, locales y más.",
+    path: "/portafolio",
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Data transformation helper

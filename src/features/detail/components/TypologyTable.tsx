@@ -87,7 +87,7 @@ export function TypologyTable({ promocion }: TypologyTableProps) {
         <table className="w-full border-collapse">
           {/* Head */}
           <thead>
-            <tr className="border-b border-border-default font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
+            <tr className="border-b border-border-default font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-muted">
               <th scope="col" className="px-4 py-3 text-left">Nombre</th>
               <th scope="col" className="px-4 py-3 text-right">Superficie</th>
               <th scope="col" className="px-4 py-3 text-right">Dorm.</th>

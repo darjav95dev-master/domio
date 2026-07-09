@@ -40,7 +40,7 @@ export function WhatsAppButton({
     <button
       type="button"
       onClick={handleClick}
-      className="flex w-full items-center justify-center gap-3 rounded-pill border border-[#25D366] px-[26.5px] py-[13.5px] font-sans text-base font-medium leading-[1.5] text-[#25D366] transition-all duration-350 ease-[cubic-bezier(.2,.8,.2,1)] hover:bg-[#25D366] hover:text-white focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3 focus-visible:rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex w-full items-center justify-center gap-3 rounded-pill border border-[#075E54] bg-[#075E54] px-[26.5px] py-[13.5px] font-sans text-base font-medium leading-[1.5] text-white transition-all duration-350 ease-[cubic-bezier(.2,.8,.2,1)] hover:bg-[#064a41] hover:border-[#064a41] focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3 focus-visible:rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed"
       aria-label={
         "Contactar por WhatsApp" +
         (promocionName ? " sobre " + promocionName : "")

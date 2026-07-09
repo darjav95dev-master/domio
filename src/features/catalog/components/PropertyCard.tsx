@@ -111,17 +111,25 @@ export function PropertyCard({ item }: PropertyCardProps) {
         aria-label={undefined}
         tabIndex={-1}
       >
-        <MediaImage
-          alt={`${name}, ${item.propertyType ?? "inmueble"}, ${locationText}`}
-          src={imageUrl ?? ""}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-          className={cn(
-            "object-cover object-[center_35%]",
-            "contrast-[0.96] saturate-[0.92] brightness-[1.02]",
-            "transition-transform duration-image ease-standard group-hover:scale-105",
-          )}
-        />
+        {imageUrl ? (
+          <MediaImage
+            alt={`${name}, ${item.propertyType ?? "inmueble"}, ${locationText}`}
+            src={imageUrl}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            className={cn(
+              "object-cover object-[center_35%]",
+              "contrast-[0.96] saturate-[0.92] brightness-[1.02]",
+              "transition-transform duration-image ease-standard group-hover:scale-105",
+            )}
+          />
+        ) : (
+          <div
+            className="h-full w-full bg-[linear-gradient(135deg,var(--color-ink-2),var(--color-ink))]"
+            role="img"
+            aria-label={`${name}, ${item.propertyType ?? "inmueble"}, ${locationText}`}
+          />
+        )}
 
         {/* Badges */}
         {isNew && (
@@ -149,14 +157,14 @@ export function PropertyCard({ item }: PropertyCardProps) {
         </p>
 
         {/* Name */}
-        <h3 className="mb-2 font-display text-2xl font-medium tracking-[-0.015em] text-fg-default line-clamp-2">
+        <h2 className="mb-2 font-display text-2xl font-medium tracking-[-0.015em] text-fg-default line-clamp-2">
           <Link
             href={`/inmuebles/${slug}`}
             className="after:absolute after:inset-0 after:z-10 focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3 focus-visible:rounded-[4px]"
           >
             {name}
           </Link>
-        </h3>
+        </h2>
 
         {/* Price */}
         {price !== null && (

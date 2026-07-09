@@ -596,7 +596,13 @@ async function stepTenant(
       id: TENANT_SEED_UUID,
       slug: TENANT_SLUG,
       name: "Domio Inmobiliaria",
-      config: {},
+      config: {
+        logo: "https://domio.test/logo.png",
+        phone: "+34 912 345 678",
+        email: "info@domio.test",
+        address: "Calle de Ejemplo 123, 28001 Madrid",
+        defaultOgImage: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/og-default.jpg`,
+      },
     })
     .onConflictDoNothing({ target: schema.tenants.slug });
 
@@ -856,7 +862,7 @@ async function stepMediaAssets(
         ownerType: "PROMOCION",
         ownerId: promId,
         kind: "IMAGE_GALLERY",
-        r2Key: "placeholder/image-1.jpg",
+        r2Key: "/placeholder/image-1.jpg",
         mimeType: "image/jpeg",
         altText: `${p.name} — imagen principal`,
         sortOrder: 0,
@@ -871,7 +877,7 @@ async function stepMediaAssets(
         ownerType: "PROMOCION",
         ownerId: promId,
         kind: "IMAGE_GALLERY",
-        r2Key: "placeholder/image-2.jpg",
+        r2Key: "/placeholder/image-2.jpg",
         mimeType: "image/jpeg",
         altText: `${p.name} — vista general`,
         sortOrder: 1,

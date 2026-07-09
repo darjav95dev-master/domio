@@ -34,9 +34,9 @@ export function BlockZonasComunes({ block }: BlockZonasComunesProps) {
             key={index}
             className="rounded-card border border-border-default bg-bg-surface p-5"
           >
-            <h4 className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
+            <h3 className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
               {item.name}
-            </h4>
+            </h3>
             {item.description && (
               <p className="mt-2 text-base leading-relaxed text-fg-muted">
                 {item.description}
