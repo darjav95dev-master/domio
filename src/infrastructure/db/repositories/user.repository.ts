@@ -56,7 +56,18 @@ export class UserRepository extends TenantAwareRepository {
       const whereClause = and(...conditions);
 
       const items = await tx
-        .select()
+        .select({
+          id: users.id,
+          tenantId: users.tenantId,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+          isActive: users.isActive,
+          invitationTokenHash: users.invitationTokenHash,
+          invitationTokenExpires: users.invitationTokenExpires,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        })
         .from(users)
         .where(whereClause)
         .orderBy(desc(users.createdAt));
@@ -78,7 +89,18 @@ export class UserRepository extends TenantAwareRepository {
   async findById(id: string): Promise<UserRow | null> {
     return this.withTransaction(async (tx) => {
       const [row] = await tx
-        .select()
+        .select({
+          id: users.id,
+          tenantId: users.tenantId,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+          isActive: users.isActive,
+          invitationTokenHash: users.invitationTokenHash,
+          invitationTokenExpires: users.invitationTokenExpires,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        })
         .from(users)
         .where(
           and(
@@ -186,7 +208,18 @@ export class UserRepository extends TenantAwareRepository {
     return this.withTransaction(async (tx) => {
       // Verify the user exists within the tenant
       const [current] = await tx
-        .select()
+        .select({
+          id: users.id,
+          tenantId: users.tenantId,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+          isActive: users.isActive,
+          invitationTokenHash: users.invitationTokenHash,
+          invitationTokenExpires: users.invitationTokenExpires,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        })
         .from(users)
         .where(
           and(

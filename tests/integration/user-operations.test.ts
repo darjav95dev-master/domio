@@ -124,6 +124,34 @@ describe("UserRepository", () => {
       expect(result.items).toHaveLength(0);
       expect(result.total).toBe(0);
     });
+
+    it("does not include passwordHash in the Drizzle select columns", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        role: "ADMIN",
+      });
+      const repo = new UserRepository(ctx);
+      // Use createMockTx directly to capture actual Drizzle calls
+      const { tx, calls } = createMockTx([
+        [{ ...baseUserRow, passwordHash: "$2b$12$shouldnotbeexposed" }],
+        [{ count: "1" }],
+      ]);
+      mockWithTx.mockImplementation(
+        <T>(fn: (tx: Transaction) => Promise<T>): Promise<T> => fn(tx),
+      );
+
+      await repo.findAll({});
+
+      // The first select call should specify explicit columns (no passwordHash)
+      const selectCalls = calls.filter((c) => c.method === "select");
+      expect(selectCalls.length).toBeGreaterThanOrEqual(1);
+
+      const selectArg = selectCalls[0]?.args[0] as Record<string, unknown> | undefined;
+      // With explicit column selection, the select has an argument (columns object)
+      expect(selectArg).toBeDefined();
+      // passwordHash should never be in the select columns
+      expect(selectArg!).not.toHaveProperty("passwordHash");
+    });
   });
 
   describe("findById", () => {

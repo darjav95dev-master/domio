@@ -18,3 +18,32 @@ export const tipologiaSchema = z.object({
 });
 
 export type TipologiaPayload = z.infer<typeof tipologiaSchema>;
+
+// ---------------------------------------------------------------------------
+// Payload types for CRUD operations (tipología + nested unidades)
+// ---------------------------------------------------------------------------
+
+export interface UnidadPayload {
+  id?: string;
+  identifier?: string | null;
+  status: string;
+}
+
+export interface TipologiaPayloadFull {
+  id?: string;
+  name: string;
+  usefulArea?: number | null;
+  builtArea?: number | null;
+  floors?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  yearBuilt?: number | null;
+  energyCert?: string | null;
+  referencePriceSale?: number | null;
+  referencePriceRent?: number | null;
+  communityFee?: number | null;
+  deposit?: number | null;
+  amenities?: string[];
+  planAssetId?: string | null;
+  unidades?: UnidadPayload[];
+}

@@ -4,35 +4,7 @@ import type { TenantContext, Transaction } from "@/infrastructure/tenant/TenantC
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import { TipologiaRepository } from "@/infrastructure/db/repositories/tipologia.repository";
 import { UnidadRepository } from "@/infrastructure/db/repositories/unidad.repository";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface UnidadPayload {
-  id?: string;
-  identifier?: string | null;
-  status: string;
-}
-
-export interface TipologiaPayload {
-  id?: string;
-  name: string;
-  usefulArea?: number | null;
-  builtArea?: number | null;
-  floors?: number | null;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  yearBuilt?: number | null;
-  energyCert?: string | null;
-  referencePriceSale?: number | null;
-  referencePriceRent?: number | null;
-  communityFee?: number | null;
-  deposit?: number | null;
-  amenities?: string[];
-  planAssetId?: string | null;
-  unidades?: UnidadPayload[];
-}
+import type { TipologiaPayloadFull as TipologiaPayload, UnidadPayload } from "@/shared/types/tipologia-schema";
 
 // ---------------------------------------------------------------------------
 // Service

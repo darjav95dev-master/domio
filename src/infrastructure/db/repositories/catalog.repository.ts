@@ -12,38 +12,9 @@ import type {
   ConstructionStatus,
   Amenity,
 } from "@/shared/constants/db-enums";
-import { PaginatedResult } from "@/shared/types/pagination";
 import { encodeCursor, decodeCursor } from "./cursor-encoder";
 import type { PromocionListRow } from "./promocion.repository";
-
-// ---------------------------------------------------------------------------
-// Shared select columns (same as in PromocionRepository)
-// ---------------------------------------------------------------------------
-
-const CATALOG_SELECT_COLUMNS = {
-  id: promociones.id,
-  tenantId: promociones.tenantId,
-  slug: promociones.slug,
-  name: promociones.name,
-  kind: promociones.kind,
-  status: promociones.status,
-  operation: promociones.operation,
-  propertyType: promociones.propertyType,
-  constructionStatus: promociones.constructionStatus,
-  island: promociones.island,
-  municipality: promociones.municipality,
-  address: promociones.address,
-  location: promociones.location,
-  locationApprox: promociones.locationApprox,
-  mapPrivacyMode: promociones.mapPrivacyMode,
-  seoTitle: promociones.seoTitle,
-  seoDescription: promociones.seoDescription,
-  assignedAgentId: promociones.assignedAgentId,
-  assignedAgentName: users.name,
-  draftPayload: promociones.draftPayload,
-  createdAt: promociones.createdAt,
-  updatedAt: promociones.updatedAt,
-} as const;
+import { PROMOCION_SELECT_COLUMNS } from "./promocion.repository";
 
 // ---------------------------------------------------------------------------
 // Public Catalog Types
@@ -152,7 +123,7 @@ export class CatalogRepository extends TenantAwareRepository {
       }
 
       const items = await tx
-        .select(CATALOG_SELECT_COLUMNS)
+        .select(PROMOCION_SELECT_COLUMNS)
         .from(promociones)
         .leftJoin(users, eq(promociones.assignedAgentId, users.id))
         .where(whereClause)
@@ -286,7 +257,7 @@ export class CatalogRepository extends TenantAwareRepository {
     }
 
     const items = await tx
-      .select(CATALOG_SELECT_COLUMNS)
+      .select(PROMOCION_SELECT_COLUMNS)
       .from(promociones)
       .leftJoin(users, eq(promociones.assignedAgentId, users.id))
       .where(and(whereClause, ...conditions))
@@ -362,7 +333,7 @@ export class CatalogRepository extends TenantAwareRepository {
       : whereClause;
 
     const rows = await tx
-      .select(CATALOG_SELECT_COLUMNS)
+      .select(PROMOCION_SELECT_COLUMNS)
       .from(promociones)
       .leftJoin(users, eq(promociones.assignedAgentId, users.id))
       .leftJoin(priceAgg, eq(priceAgg.promocionId, promociones.id))

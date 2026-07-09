@@ -26,7 +26,7 @@ import type {
 // Shared select columns
 // ---------------------------------------------------------------------------
 
-const PROMOCION_SELECT_COLUMNS = {
+export const PROMOCION_SELECT_COLUMNS = {
   id: promociones.id,
   tenantId: promociones.tenantId,
   slug: promociones.slug,
@@ -65,6 +65,7 @@ export interface PromocionFilters {
 }
 
 import { PaginatedResult } from "@/shared/types/pagination";
+import type { TipologiaPayloadFull as TipologiaPayload, UnidadPayload } from "@/shared/types/tipologia-schema";
 
 /**
  * Full detail for the public detail page.
@@ -132,31 +133,6 @@ interface UnidadRow {
   status: string;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface TipologiaPayload {
-  id?: string;
-  name: string;
-  usefulArea?: number | null;
-  builtArea?: number | null;
-  floors?: number | null;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  yearBuilt?: number | null;
-  energyCert?: string | null;
-  referencePriceSale?: number | null;
-  referencePriceRent?: number | null;
-  communityFee?: number | null;
-  deposit?: number | null;
-  amenities?: string[];
-  planAssetId?: string | null;
-  unidades?: UnidadPayload[];
-}
-
-export interface UnidadPayload {
-  id?: string;
-  identifier?: string | null;
-  status: string;
 }
 
 export interface PromocionUpdateData {
