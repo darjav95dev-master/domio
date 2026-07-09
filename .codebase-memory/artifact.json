@@ -1,11 +1,11 @@
 {
     "schema_version": 1,
-    "commit": "125f330d5b5484543e7a17a6984342619a1c1836",
-    "indexed_at": "2026-07-08T23:39:28Z",
+    "commit": "751e4e6f3094d6f62571a406af9292c24e817b04",
+    "indexed_at": "2026-07-09T09:06:41Z",
     "project": "Users-dariojavierdiazcaballero-Desktop-Domio",
-    "nodes": 4802,
-    "edges": 8439,
-    "original_size": 12189696,
-    "compressed_size": 1931518,
+    "nodes": 4908,
+    "edges": 8696,
+    "original_size": 12517376,
+    "compressed_size": 1981364,
     "compression_level": 3
 }

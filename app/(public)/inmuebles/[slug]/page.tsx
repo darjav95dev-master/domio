@@ -6,6 +6,11 @@ import { InfoBar } from "@/features/detail/components/InfoBar";
 import { EditorialBlocks } from "@/features/detail/components/EditorialBlocks";
 import { TypologyTable } from "@/features/detail/components/TypologyTable";
 import { MapPromocion } from "@/features/detail/components/MapPromocion";
+import { ContactForm } from "@/features/engagement/components/ContactForm";
+import { WhatsAppButton } from "@/features/engagement/components/WhatsAppButton";
+import { ShareButton } from "@/features/engagement/components/ShareButton";
+import { RelatedProperties } from "@/features/engagement/components/RelatedProperties";
+import { getContactConfig } from "@/features/engagement/server/get-contact-config";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,6 +93,9 @@ export default async function DetailPage({ params }: DetailPageProps) {
       ? promocion.location
       : promocion.locationApprox;
 
+  // Fetch contact config for WhatsApp
+  const contactConfig = await getContactConfig();
+
   return (
     <>
       {/* JSON-LD Structured Data */}
@@ -147,23 +155,57 @@ export default async function DetailPage({ params }: DetailPageProps) {
                 </section>
               </div>
 
-              {/* Sticky aside column — reserved for future aside content */}
+              {/* Sticky aside column — ContactForm + action buttons */}
               <aside className="lg:sticky lg:top-24 lg:self-start">
-                <div className="rounded-surface border border-border-default bg-bg-surface p-6 md:p-8">
-                  <p className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
-                    {promocion.name}
-                  </p>
-                  {promocion.municipality && (
-                    <p className="mt-2 font-mono text-[11px] tracking-[0.04em] tabular-nums text-fg-subtle">
-                      {promocion.municipality}
-                      {promocion.island ? `, ${promocion.island}` : ""}
+                <div className="space-y-6">
+                  {/* Property info summary */}
+                  <div className="rounded-surface border border-border-default bg-bg-surface p-6 md:p-8">
+                    <p className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
+                      {promocion.name}
                     </p>
-                  )}
+                    {promocion.municipality && (
+                      <p className="mt-2 font-mono text-[11px] tracking-[0.04em] tabular-nums text-fg-subtle">
+                        {promocion.municipality}
+                        {promocion.island ? `, ${promocion.island}` : ""}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Contact form */}
+                  <div className="rounded-surface border border-border-default bg-bg-surface p-6 md:p-8">
+                    <h3 className="mb-5 font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
+                      Solicitar información
+                    </h3>
+                    <ContactForm
+                      promocionId={promocion.id}
+                      tipologias={promocion.tipologias}
+                    />
+                  </div>
+
+                  {/* WhatsApp + Share buttons */}
+                  <div className="flex flex-col gap-3">
+                    <WhatsAppButton
+                      phoneNumber={contactConfig.whatsappNumber}
+                      prefilledMessage={contactConfig.whatsappPrefilledMessage}
+                      promocionId={promocion.id}
+                      promocionName={promocion.name}
+                    />
+                    <div className="flex justify-start">
+                      <ShareButton />
+                    </div>
+                  </div>
                 </div>
               </aside>
             </div>
           </div>
         </div>
+
+        {/* Related Properties — at the bottom */}
+        <RelatedProperties
+          promocionId={promocion.id}
+          location={mapCoordinates}
+          municipality={promocion.municipality}
+        />
       </article>
     </>
   );
