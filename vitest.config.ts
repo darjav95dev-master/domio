@@ -2,16 +2,15 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 /**
- * Propagate the --update / -u flag to forked workers via env var.
- * The config file runs in the main process (before forking), so it can
- * read process.argv and set an environment variable visible to workers.
+ * Snapshot update mode is controlled exclusively via the environment variable
+ * CONTRACT_UPDATE_SNAPSHOTS, set by the script `test:contract:update` in
+ * package.json. The `isUpdateMode()` function in snapshot-serializer.ts reads
+ * this env var directly.
+ *
+ * Using process.argv is fragile under Vitest's fork pool because arguments
+ * are not guaranteed to propagate to worker processes. Using an env var set
+ * before the vitest command is the reliable approach (M4 fix).
  */
-const isUpdateMode = process.argv.some(
-  (arg) => arg === "--update" || arg === "-u",
-);
-if (isUpdateMode) {
-  process.env.CONTRACT_UPDATE_SNAPSHOTS = "true";
-}
 
 export default defineConfig({
   resolve: {

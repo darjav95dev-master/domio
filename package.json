@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:contract": "vitest run tests/contract --passWithNoTests",
+    "test:contract:update": "CONTRACT_UPDATE_SNAPSHOTS=true vitest run tests/contract --passWithNoTests",
     "worker:emails": "tsx scripts/worker-emails.ts",
     "db:generate": "drizzle-kit generate --config=src/infrastructure/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=src/infrastructure/db/drizzle.config.ts",

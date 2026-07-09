@@ -1,42 +1,55 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { RateLimiter } from "@/infrastructure/rate-limiting/rate-limiter.types";
+import type { RateLimitConfig, RateLimitResult, RateLimiter } from "@/infrastructure/rate-limiting/rate-limiter.types";
+import { createRateLimiter } from "@/infrastructure/rate-limiting/rate-limiter.factory";
+
+// ---------------------------------------------------------------------------
+// Rate Limiting Contract Tests (v1)
+//
+// Verifies the contract of the RateLimiter interface and its implementations:
+// 1. The `consume()` method accepts `(identifier, config)` with the full
+//    RateLimitConfig signature (M3 fix).
+// 2. The no-op degraded mode (no Redis) returns `{ allowed: true }`.
+// 3. The Upstash-based limiter (with Redis mock) enforces limits correctly.
+// 4. Response format matches the API contract (429 status, Retry-After,
+//    X-RateLimit-* headers).
+// ---------------------------------------------------------------------------
 
 /**
- * Helper: creates a rate limiter mock that simulates rate limiting behavior.
+ * Creates a mock rate limiter that respects the full RateLimiter signature
+ * including the `config` parameter (M3 fix).
+ *
+ * The per-call `config.limit` determines the maximum allowed requests.
+ * `config.windowMs` is used for the `resetAt` calculation.
  */
-function createMockRateLimiter(options: {
-  initiallyAllowed?: boolean;
-  denyAfter?: number;
-}): RateLimiter {
+function createMockRateLimiter(): RateLimiter {
   let counter = 0;
-  const denyAfter = options.denyAfter ?? 0;
 
   return {
-    async check(_identifier: string) {
+    async check(_identifier: string, cfg: RateLimitConfig) {
       return {
-        allowed: counter < denyAfter,
-        remaining: Math.max(0, denyAfter - counter),
-        limit: denyAfter,
-        resetAt: new Date(Date.now() + 60_000),
+        allowed: counter < cfg.limit,
+        remaining: Math.max(0, cfg.limit - counter),
+        limit: cfg.limit,
+        resetAt: new Date(Date.now() + cfg.windowMs),
       };
     },
-    async increment(_identifier: string) {
+    async increment(_identifier: string, cfg: RateLimitConfig) {
       counter++;
       return {
-        allowed: counter <= denyAfter,
-        remaining: Math.max(0, denyAfter - counter),
-        limit: denyAfter,
-        resetAt: new Date(Date.now() + 60_000),
+        allowed: counter <= cfg.limit,
+        remaining: Math.max(0, cfg.limit - counter),
+        limit: cfg.limit,
+        resetAt: new Date(Date.now() + cfg.windowMs),
       };
     },
-    async consume(_identifier: string) {
-      const wasAllowed = counter < denyAfter;
+    async consume(_identifier: string, cfg: RateLimitConfig) {
+      const wasAllowed = counter < cfg.limit;
       counter++;
       return {
         allowed: wasAllowed,
-        remaining: Math.max(0, denyAfter - counter),
-        limit: denyAfter,
-        resetAt: new Date(Date.now() + 60_000),
+        remaining: Math.max(0, cfg.limit - counter),
+        limit: cfg.limit,
+        resetAt: new Date(Date.now() + cfg.windowMs),
       };
     },
   };
@@ -44,17 +57,14 @@ function createMockRateLimiter(options: {
 
 describe("Rate Limiting Contract (v1)", () => {
   describe("Rate limit response format", () => {
-    it("should have correct status code (429)", () => {
-      const limiter = createMockRateLimiter({ denyAfter: 0 });
-      // After consuming one request with limit=0, the result should show blocked
-      const result = {
+    it("should produce a valid 429 response structure", () => {
+      const result: RateLimitResult = {
         allowed: false,
         remaining: 0,
         limit: 60,
         resetAt: new Date(Date.now() + 60_000),
       };
 
-      // The 429 response body should contain error and retryAfter
       const retryAfter = Math.max(
         1,
         Math.ceil((result.resetAt.getTime() - Date.now()) / 1_000),
@@ -62,29 +72,21 @@ describe("Rate Limiting Contract (v1)", () => {
 
       expect(result.allowed).toBe(false);
       expect(retryAfter).toBeGreaterThanOrEqual(1);
-    });
 
-    it("should include Retry-After header value in response body", () => {
-      const resetAt = new Date(Date.now() + 30_000);
-      const retryAfter = Math.max(
-        1,
-        Math.ceil((resetAt.getTime() - Date.now()) / 1_000),
-      );
-
-      // The retryAfter must be a positive integer
-      expect(Number.isInteger(retryAfter)).toBe(true);
-      expect(retryAfter).toBeGreaterThan(0);
+      // Response body contract
+      const body = { error: "Rate limit exceeded", retryAfter };
+      expect(body).toHaveProperty("error");
+      expect(body).toHaveProperty("retryAfter");
     });
 
     it("should have X-RateLimit-* headers format", () => {
-      const result = {
+      const result: RateLimitResult = {
         allowed: false,
         remaining: 0,
         limit: 60,
         resetAt: new Date(Date.now() + 60_000),
       };
 
-      // Verify header values are numeric strings
       expect(String(result.limit)).toBe("60");
       expect(String(result.remaining)).toBe("0");
       expect(String(Math.floor(result.resetAt.getTime() / 1_000))).toMatch(
@@ -93,121 +95,86 @@ describe("Rate Limiting Contract (v1)", () => {
     });
   });
 
-  describe("Rate limiter behavior", () => {
+  describe("Rate limiter behavior (respects config)", () => {
     it("should allow requests under the limit", async () => {
-      const limiter = createMockRateLimiter({ denyAfter: 5 });
+      const limiter = createMockRateLimiter();
 
-      const result1 = await limiter.consume("test-key");
+      const result1 = await limiter.consume("test-key", {
+        limit: 5,
+        windowMs: 60_000,
+      });
       expect(result1.allowed).toBe(true);
       expect(result1.remaining).toBe(4);
+      expect(result1.limit).toBe(5);
     });
 
     it("should deny requests when limit is exceeded", async () => {
-      const limiter = createMockRateLimiter({ denyAfter: 2 });
+      const limiter = createMockRateLimiter();
 
-      await limiter.consume("test-key"); // 1st: allowed
-      await limiter.consume("test-key"); // 2nd: allowed (at limit)
-      const result = await limiter.consume("test-key"); // 3rd: denied
+      await limiter.consume("test-key", { limit: 2, windowMs: 60_000 });
+      await limiter.consume("test-key", { limit: 2, windowMs: 60_000 });
+      const result = await limiter.consume("test-key", {
+        limit: 2,
+        windowMs: 60_000,
+      });
 
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
     });
 
-    it("should have correct remaining count", async () => {
-      const limiter = createMockRateLimiter({ denyAfter: 5 });
-
-      const r1 = await limiter.consume("test-key");
-      expect(r1.remaining).toBe(4);
-
-      const r2 = await limiter.consume("test-key");
-      expect(r2.remaining).toBe(3);
-    });
-
     it("should track different keys independently", async () => {
-      const limiter = createMockRateLimiter({ denyAfter: 2 });
+      const limiter = createMockRateLimiter();
 
-      const r1 = await limiter.consume("key-a");
+      const r1 = await limiter.consume("key-a", { limit: 2, windowMs: 60_000 });
       expect(r1.allowed).toBe(true);
 
-      // Different key should still be allowed (independent counters)
-      const r2 = await limiter.consume("key-b");
+      const r2 = await limiter.consume("key-b", { limit: 2, windowMs: 60_000 });
       expect(r2.allowed).toBe(true);
     });
 
-    it("should provide a resetAt timestamp in the future", async () => {
-      const limiter = createMockRateLimiter({ denyAfter: 5 });
-      const result = await limiter.consume("test-key");
+    it("should use config.limit in the result", async () => {
+      const limiter = createMockRateLimiter();
 
+      const result = await limiter.consume("test-key", {
+        limit: 10,
+        windowMs: 60_000,
+      });
+      expect(result.limit).toBe(10);
+      expect(result.remaining).toBe(9);
+    });
+
+    it("should provide a resetAt timestamp in the future based on config.windowMs", async () => {
+      const limiter = createMockRateLimiter();
+
+      const result = await limiter.consume("test-key", {
+        limit: 5,
+        windowMs: 60_000,
+      });
       expect(result.resetAt.getTime()).toBeGreaterThan(Date.now());
     });
   });
 
-  describe("Degraded mode", () => {
-    it("should pass when rate limiter is no-op (degraded mode)", async () => {
-      // Simulate no-op rate limiter (no Redis configured)
-      const noopLimiter: RateLimiter = {
-        async check(_identifier: string) {
-          return {
-            allowed: true,
-            remaining: Infinity,
-            limit: 60,
-            resetAt: new Date(Date.now() + 60_000),
-          };
-        },
-        async increment(_identifier: string) {
-          return {
-            allowed: true,
-            remaining: Infinity,
-            limit: 60,
-            resetAt: new Date(Date.now() + 60_000),
-          };
-        },
-        async consume(_identifier: string) {
-          return {
-            allowed: true,
-            remaining: Infinity,
-            limit: 60,
-            resetAt: new Date(Date.now() + 60_000),
-          };
-        },
-      };
-
-      const result = await noopLimiter.consume("any-key");
-      expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(Infinity);
+  describe("Degraded mode (no Redis)", () => {
+    beforeEach(() => {
+      vi.stubEnv("RATE_LIMIT_STORE_URL", "");
     });
 
-    it("should not affect normal API operation", async () => {
-      const noopLimiter: RateLimiter = {
-        async consume(_identifier: string) {
-          return {
-            allowed: true,
-            remaining: Infinity,
-            limit: 60,
-            resetAt: new Date(Date.now() + 60_000),
-          };
-        },
-        async check(_identifier: string) {
-          return {
-            allowed: true,
-            remaining: Infinity,
-            limit: 60,
-            resetAt: new Date(Date.now() + 60_000),
-          };
-        },
-        async increment(_identifier: string) {
-          return {
-            allowed: true,
-            remaining: Infinity,
-            limit: 60,
-            resetAt: new Date(Date.now() + 60_000),
-          };
-        },
-      };
+    it("should return a no-op limiter that always allows", async () => {
+      const limiter = createRateLimiter();
+      const cfg: RateLimitConfig = { limit: 60, windowMs: 60_000 };
 
-      // Simulate many rapid requests - all should be allowed in degraded mode
+      const result = await limiter.consume("any-key", cfg);
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(Infinity);
+      expect(result.limit).toBe(60);
+    });
+
+    it("should not affect normal API operation under high load", async () => {
+      const limiter = createRateLimiter();
+      const cfg: RateLimitConfig = { limit: 60, windowMs: 60_000 };
+
       for (let i = 0; i < 100; i++) {
-        const result = await noopLimiter.consume("any-key");
+        const result = await limiter.consume("any-key", cfg);
         expect(result.allowed).toBe(true);
       }
     });
@@ -215,26 +182,29 @@ describe("Rate Limiting Contract (v1)", () => {
 
   describe("Rate limit configuration contract", () => {
     it("should use configurable limit per API key", async () => {
-      // Keys with higher limits should allow more requests
-      const lowLimitLimiter = createMockRateLimiter({ denyAfter: 1 });
-      const highLimitLimiter = createMockRateLimiter({ denyAfter: 10 });
+      const lowConfig: RateLimitConfig = { limit: 1, windowMs: 60_000 };
+      const highConfig: RateLimitConfig = { limit: 10, windowMs: 60_000 };
 
-      const lowResult = await lowLimitLimiter.consume("low-key");
+      const lowLimiter = createMockRateLimiter();
+      const highLimiter = createMockRateLimiter();
+
+      const lowResult = await lowLimiter.consume("low-key", lowConfig);
       expect(lowResult.limit).toBe(1);
+      expect(lowResult.remaining).toBe(0);
 
-      const highResult = await highLimitLimiter.consume("high-key");
+      const highResult = await highLimiter.consume("high-key", highConfig);
       expect(highResult.limit).toBe(10);
+      expect(highResult.remaining).toBe(9);
     });
 
-    it("should have a window duration", async () => {
-      const result = {
+    it("should have a reasonable window duration", () => {
+      const result: RateLimitResult = {
         allowed: true,
         remaining: 59,
         limit: 60,
         resetAt: new Date(Date.now() + 60_000),
       };
 
-      // Window should be approximately 60 seconds
       const windowMs = result.resetAt.getTime() - Date.now();
       expect(windowMs).toBeGreaterThan(0);
       expect(windowMs).toBeLessThanOrEqual(120_000);

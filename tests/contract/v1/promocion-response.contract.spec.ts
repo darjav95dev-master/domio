@@ -1,16 +1,10 @@
-/* eslint-disable sonarjs/no-duplicate-string */
 import { describe, it, expect } from "vitest";
 import { promocionResponseSchema } from "@/features/api-public/schemas/promocion-response.schema";
 import { serializePromocion } from "@/features/api-public/serializers/promocion-serializer";
-import {
-  serializeSchema,
-  isUpdateMode,
-} from "@/features/api-public/openapi/snapshot-serializer";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 describe("Promocion Response Contract (v1)", () => {
-  const NOW = new Date("2026-07-08T12:00:00.000Z");
+  const NOW_DATE = "2026-07-08T12:00:00.000Z";
+  const NOW = new Date(NOW_DATE);
 
   const VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
   const VALID_SLUG = "piso-en-venta-en-santa-cruz-3hab-a4c9";
@@ -59,7 +53,7 @@ describe("Promocion Response Contract (v1)", () => {
       superficieMax: 100,
       dormitorios: 3,
       banios: 2,
-      updatedAt: "2026-07-08T12:00:00.000Z",
+      updatedAt: NOW_DATE,
       ...overrides,
     });
 
@@ -152,46 +146,9 @@ describe("Promocion Response Contract (v1)", () => {
         updatedAt: new Date("2026-07-08T12:00:00.000Z"),
       });
 
-      expect(serialized.updatedAt).toBe("2026-07-08T12:00:00.000Z");
+      expect(serialized.updatedAt).toBe(NOW_DATE);
     });
   });
 
-  describe("Snapshot comparison", () => {
-    const SNAPSHOT_FILE = "promocion-response.schema.json";
-    const SNAPSHOTS_DIR = path.resolve(
-      __dirname,
-      "..",
-      "..",
-      "..",
-      "tests/contract/v1/snapshots",
-    );
-
-    it("should match the stored schema snapshot", () => {
-      const current = serializeSchema(promocionResponseSchema);
-      const filePath = path.join(SNAPSHOTS_DIR, SNAPSHOT_FILE);
-
-      let stored: Record<string, unknown> | null = null;
-      try {
-        const raw = fs.readFileSync(filePath, "utf-8");
-        stored = JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        // Snapshot does not exist — will fail comparison
-      }
-
-      if (stored === null) {
-        fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
-        fs.writeFileSync(filePath, JSON.stringify(current, null, 2) + "\n");
-        // Fail — snapshot was missing, now written
-        expect(stored).not.toBeNull();
-        return;
-      }
-
-      if (isUpdateMode()) {
-        fs.writeFileSync(filePath, JSON.stringify(current, null, 2) + "\n");
-        return;
-      }
-
-      expect(current).toEqual(stored);
-    });
-  });
+  // NOTE: Snapshot comparison moved to snapshot-divergence.contract.spec.ts (M2)
 });

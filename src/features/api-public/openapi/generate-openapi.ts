@@ -1,114 +1,31 @@
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from "@asteasolutions/zod-to-openapi";
+import { promocionResponseSchema } from "@/features/api-public/schemas/promocion-response.schema";
+import { leadInstitutionalSchema } from "@/features/api-public/schemas/lead-institutional.schema";
 
 /**
  * Builds and returns the OpenAPI 3.0 document for the Domio API v1.
  *
- * Uses raw OpenAPI component registration to avoid the need for
- * `extendZodWithOpenApi` (which would require modifying zod's prototype
- * before schema creation). The schema details are defined manually in
- * OpenAPI format, which is more explicit and avoids coupling to zod v4's
- * prototype extension mechanism.
+ * Component schemas for PromocionResponse, PromocionListResponse and
+ * LeadInstitutionalInput are auto-generated from the zod versioned schemas
+ * via `z.toJSONSchema()` (zod v4 built-in). This guarantees that any change
+ * to the zod schema is reflected in the OpenAPI spec without manual
+ * intervention (FR-007).
+ *
+ * Auxiliary schemas (ErrorResponse, RateLimitErrorResponse, etc.) are
+ * defined inline as they have no corresponding zod schema -- they are
+ * generic error envelopes unlikely to diverge.
  */
 export function generateOpenAPISpec(): Record<string, unknown> {
   const registry = new OpenAPIRegistry();
 
   // ── Register component schemas ──────────────────────────────────
+  // Auto-generated from zod versioned schemas (FR-007)
+  // Cast to Record because zod's JSONSchema type (draft 2020-12) is structurally
+  // compatible but not assignable to @asteasolutions/zod-to-openapi's SchemaObject.
+  const promocionJsonSchema = promocionResponseSchema.toJSONSchema() as unknown as Record<string, unknown>;
   registry.registerComponent("schemas", "PromocionResponse", {
-    type: "object",
-    description: "A published portfolio promocion response",
-    properties: {
-      id: { type: "string", format: "uuid", description: "Promocion UUID" },
-      slug: { type: "string", description: "URL-friendly slug" },
-      nombre: { type: "string", description: "Promocion name" },
-      tipo: { type: "string", nullable: true, description: "Property type" },
-      operacion: {
-        type: "string",
-        nullable: true,
-        description: "Operation type (SALE/RENT)",
-      },
-      isla: { type: "string", nullable: true, description: "Island" },
-      municipio: {
-        type: "string",
-        nullable: true,
-        description: "Municipality",
-      },
-      mapPrivacyMode: {
-        type: "string",
-        enum: ["EXACT", "AREA"],
-        description: "Map privacy mode",
-      },
-      location: {
-        type: "object",
-        description: "Exact location (omitted when mapPrivacyMode=AREA)",
-        properties: {
-          lat: { type: "number" },
-          lng: { type: "number" },
-        },
-        required: ["lat", "lng"],
-      },
-      locationApprox: {
-        type: "object",
-        description: "Approximate location (centroid of municipality)",
-        properties: {
-          lat: { type: "number" },
-          lng: { type: "number" },
-        },
-        required: ["lat", "lng"],
-      },
-      precioMin: {
-        type: "number",
-        nullable: true,
-        description: "Minimum price (EUR)",
-      },
-      precioMax: {
-        type: "number",
-        nullable: true,
-        description: "Maximum price (EUR)",
-      },
-      superficieMin: {
-        type: "number",
-        nullable: true,
-        description: "Minimum surface area (m2)",
-      },
-      superficieMax: {
-        type: "number",
-        nullable: true,
-        description: "Maximum surface area (m2)",
-      },
-      dormitorios: {
-        type: "number",
-        nullable: true,
-        description: "Number of bedrooms",
-      },
-      banios: {
-        type: "number",
-        nullable: true,
-        description: "Number of bathrooms",
-      },
-      updatedAt: {
-        type: "string",
-        format: "date-time",
-        description: "Last update timestamp",
-      },
-    },
-    required: [
-      "id",
-      "slug",
-      "nombre",
-      "tipo",
-      "operacion",
-      "isla",
-      "municipio",
-      "mapPrivacyMode",
-      "locationApprox",
-      "precioMin",
-      "precioMax",
-      "superficieMin",
-      "superficieMax",
-      "dormitorios",
-      "banios",
-      "updatedAt",
-    ],
+    ...promocionJsonSchema,
+    description: "A published portfolio promocion response derived from promocionResponseSchema",
   });
 
   registry.registerComponent("schemas", "PromocionListResponse", {
@@ -132,53 +49,10 @@ export function generateOpenAPISpec(): Record<string, unknown> {
     required: ["items", "nextCursor", "total"],
   });
 
+  const leadJsonSchema = leadInstitutionalSchema.toJSONSchema() as unknown as Record<string, unknown>;
   registry.registerComponent("schemas", "LeadInstitutionalInput", {
-    type: "object",
-    description: "Institutional lead creation payload",
-    properties: {
-      name: { type: "string", minLength: 1, description: "Contact name" },
-      email: {
-        type: "string",
-        format: "email",
-        description: "Contact email",
-      },
-      phone: {
-        type: "string",
-        description: "Contact phone (optional)",
-      },
-      message: {
-        type: "string",
-        description: "Message (optional)",
-      },
-      promocionId: {
-        type: "string",
-        format: "uuid",
-        description: "Promocion UUID",
-      },
-      tipologiaId: {
-        type: "string",
-        format: "uuid",
-        description: "Tipologia UUID (optional)",
-      },
-      consent: {
-        type: "object",
-        description: "RGPD consent record",
-        properties: {
-          legalBasis: {
-            type: "string",
-            minLength: 1,
-            description: "Legal basis for processing",
-          },
-          textAccepted: {
-            type: "string",
-            minLength: 1,
-            description: "Accepted privacy policy text",
-          },
-        },
-        required: ["legalBasis", "textAccepted"],
-      },
-    },
-    required: ["name", "email", "promocionId", "consent"],
+    ...leadJsonSchema,
+    description: "Institutional lead creation payload derived from leadInstitutionalSchema",
   });
 
   registry.registerComponent("schemas", "LeadInstitutionalResponse", {
@@ -191,11 +65,15 @@ export function generateOpenAPISpec(): Record<string, unknown> {
     required: ["id", "status"],
   });
 
+  // Constants to avoid sonarjs/no-duplicate-string in structural OpenAPI boilerplate
+  const ERR_MSG_DESC = "Error message";
+  const ERR_RESPONSE_REF = { $ref: "#/components/schemas/ErrorResponse" } as const;
+
   registry.registerComponent("schemas", "ErrorResponse", {
     type: "object",
     description: "Generic error response",
     properties: {
-      error: { type: "string", description: "Error message" },
+      error: { type: "string", description: ERR_MSG_DESC },
     },
     required: ["error"],
   });
@@ -204,7 +82,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
     type: "object",
     description: "Rate limit exceeded response",
     properties: {
-      error: { type: "string", description: "Error message" },
+      error: { type: "string", description: ERR_MSG_DESC },
       retryAfter: {
         type: "integer",
         description: "Seconds to wait before retrying",
@@ -217,7 +95,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
     type: "object",
     description: "Validation error response",
     properties: {
-      error: { type: "string", description: "Error message" },
+      error: { type: "string", description: ERR_MSG_DESC },
       details: {
         type: "object",
         description: "Field-level validation errors",
@@ -286,7 +164,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
         description: "Missing API key",
         content: {
           "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
+            schema: ERR_RESPONSE_REF,
           },
         },
       },
@@ -294,7 +172,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
         description: "Invalid or revoked API key",
         content: {
           "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
+            schema: ERR_RESPONSE_REF,
           },
         },
       },
@@ -363,7 +241,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
         description: "Invalid JSON body",
         content: {
           "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
+            schema: ERR_RESPONSE_REF,
           },
         },
       },
@@ -371,7 +249,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
         description: "Missing API key",
         content: {
           "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
+            schema: ERR_RESPONSE_REF,
           },
         },
       },
@@ -379,7 +257,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
         description: "Invalid or revoked API key",
         content: {
           "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
+            schema: ERR_RESPONSE_REF,
           },
         },
       },

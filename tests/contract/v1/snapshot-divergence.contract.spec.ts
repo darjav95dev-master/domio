@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { promocionResponseSchema } from "@/features/api-public/schemas/promocion-response.schema";
 import { leadInstitutionalSchema } from "@/features/api-public/schemas/lead-institutional.schema";
 import {
   serializeSchema,
+  readSnapshot,
+  writeSnapshot,
   isUpdateMode,
 } from "@/features/api-public/openapi/snapshot-serializer";
-import * as fs from "node:fs";
 import * as path from "node:path";
 
 const SNAPSHOTS_DIR = path.resolve(
@@ -16,82 +17,73 @@ const SNAPSHOTS_DIR = path.resolve(
   "tests/contract/v1/snapshots",
 );
 
-/**
- * Helper: read a snapshot JSON file, returning null if it doesn't exist or is invalid.
- */
-function readSnapshot(filename: string): Record<string, unknown> | null {
-  const filePath = path.join(SNAPSHOTS_DIR, filename);
-  try {
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+// ---------------------------------------------------------------------------
+// Consolidated Snapshot Divergence Detection
+//
+// For each versioned schema, the test:
+// 1. Serialises the current zod schema to a JSON Schema snapshot.
+// 2. Reads the stored snapshot from disk.
+//    - If MISSING: writes it and FAILS with "Snapshot generated" message.
+//    - If CORRUPT: FAILS with "Snapshot corrupt" message WITHOUT writing.
+//    - If update mode: writes current snapshot and PASSES.
+//    - Otherwise: deep-compares current vs stored.
+//
+// This consolidation eliminates the duplication of the snapshot comparison
+// logic across three test files (M2), and properly distinguishes missing
+// vs corrupt snapshots (C3).
+// ---------------------------------------------------------------------------
+
+const SCHEMAS = [
+  {
+    name: "promocionResponseSchema",
+    file: "promocion-response.schema.json",
+    schema: promocionResponseSchema,
+  },
+  {
+    name: "leadInstitutionalSchema",
+    file: "lead-institutional.schema.json",
+    schema: leadInstitutionalSchema,
+  },
+] as const;
 
 describe("Snapshot Divergence Detection (v1)", () => {
-  describe("promocionResponseSchema snapshot", () => {
-    const SNAPSHOT_FILE = "promocion-response.schema.json";
+  describe.each(SCHEMAS)("$name snapshot", ({ file, schema }) => {
+    it("should match the stored snapshot — run with CONTRACT_UPDATE_SNAPSHOTS=true to update", () => {
+      const current = serializeSchema(schema);
+      const result = readSnapshot(SNAPSHOTS_DIR, file);
 
-    it("should match the stored snapshot", () => {
-      const current = serializeSchema(promocionResponseSchema);
-      const stored = readSnapshot(SNAPSHOT_FILE);
+      switch (result.status) {
+        case "ok": {
+          if (isUpdateMode()) {
+            writeSnapshot(SNAPSHOTS_DIR, file, current);
+            return; // Updated, pass
+          }
+          // Deep equality comparison
+          expect(current).toEqual(result.data);
+          return;
+        }
 
-      // If snapshot doesn't exist, write it and fail with a meaningful message
-      if (stored === null) {
-        writeSnapshot(SNAPSHOT_FILE, current);
-        expect(stored).not.toBeNull();
-        return;
+        case "missing": {
+          // Snapshot does not exist → write it and fail with clear message
+          writeSnapshot(SNAPSHOTS_DIR, file, current);
+          expect.unreachable(
+            `Snapshot generated: ${result.filePath}. ` +
+              `Review the diff and commit the snapshot if the change is intentional. ` +
+              `To auto-update: CONTRACT_UPDATE_SNAPSHOTS=true pnpm test:contract`,
+          );
+          return;
+        }
+
+        case "corrupt": {
+          // Snapshot exists but is invalid → fail WITHOUT writing
+          expect.unreachable(
+            `Snapshot corrupt: ${result.filePath}. ` +
+              `Parse error: ${result.parseError}. ` +
+              `Fix or delete the snapshot file manually before re-running.`,
+          );
+          return;
+        }
       }
-
-      // If --update flag is passed, write current snapshot and pass
-      if (isUpdateMode()) {
-        writeSnapshot(SNAPSHOT_FILE, current);
-        return;
-      }
-
-      // Deep equality comparison
-      expect(current).toEqual(stored);
-    });
-  });
-
-  describe("leadInstitutionalSchema snapshot", () => {
-    const SNAPSHOT_FILE = "lead-institutional.schema.json";
-
-    it("should match the stored snapshot", () => {
-      const current = serializeSchema(leadInstitutionalSchema);
-      const stored = readSnapshot(SNAPSHOT_FILE);
-
-      if (stored === null) {
-        writeSnapshot(SNAPSHOT_FILE, current);
-        expect(stored).not.toBeNull();
-        return;
-      }
-
-      if (isUpdateMode()) {
-        writeSnapshot(SNAPSHOT_FILE, current);
-        return;
-      }
-
-      expect(current).toEqual(stored);
     });
   });
 });
-
-/**
- * Write a snapshot to disk, creating the directory if needed.
- */
-function writeSnapshot(
-  filename: string,
-  data: Record<string, unknown>,
-): void {
-  fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
-  fs.writeFileSync(
-    path.join(SNAPSHOTS_DIR, filename),
-    JSON.stringify(data, null, 2) + "\n",
-  );
-}

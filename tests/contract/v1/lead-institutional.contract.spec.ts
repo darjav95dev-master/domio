@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { leadInstitutionalSchema } from "@/features/api-public/schemas/lead-institutional.schema";
-import {
-  serializeSchema,
-  isUpdateMode,
-} from "@/features/api-public/openapi/snapshot-serializer";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 describe("Lead Institutional Contract (v1)", () => {
   const VALID_CONSENT = { legalBasis: "RGPD consent", textAccepted: "Acepto la política de privacidad" };
@@ -96,41 +90,5 @@ describe("Lead Institutional Contract (v1)", () => {
     });
   });
 
-  describe("Snapshot comparison", () => {
-    const SNAPSHOT_FILE = "lead-institutional.schema.json";
-    const SNAPSHOTS_DIR = path.resolve(
-      __dirname,
-      "..",
-      "..",
-      "..",
-      "tests/contract/v1/snapshots",
-    );
-
-    it("should match the stored schema snapshot", () => {
-      const current = serializeSchema(leadInstitutionalSchema);
-      const filePath = path.join(SNAPSHOTS_DIR, SNAPSHOT_FILE);
-
-      let stored: Record<string, unknown> | null = null;
-      try {
-        const raw = fs.readFileSync(filePath, "utf-8");
-        stored = JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        // Snapshot does not exist — will fail comparison
-      }
-
-      if (stored === null) {
-        fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
-        fs.writeFileSync(filePath, JSON.stringify(current, null, 2) + "\n");
-        expect(stored).not.toBeNull();
-        return;
-      }
-
-      if (isUpdateMode()) {
-        fs.writeFileSync(filePath, JSON.stringify(current, null, 2) + "\n");
-        return;
-      }
-
-      expect(current).toEqual(stored);
-    });
-  });
+  // NOTE: Snapshot comparison moved to snapshot-divergence.contract.spec.ts (M2)
 });
