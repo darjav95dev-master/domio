@@ -1,3 +1,5 @@
+"use server";
+
 import { headers } from "next/headers";
 import { contactFormSchema, type ContactFormResult } from "./submit-contact.schema";
 import { checkContactRateLimit } from "./contact-form-action";

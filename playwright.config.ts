@@ -21,5 +21,8 @@ export default defineConfig({
     command: "pnpm dev",
     port: 3000,
     reuseExistingServer: !process.env.CI,
+    env: {
+      E2E_AUTOSAVE_INTERVAL: "5000",
+    },
   },
 });

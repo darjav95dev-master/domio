@@ -1,11 +1,11 @@
 import { getServerSession } from "@/infrastructure/auth/session";
-import { signOut } from "@/infrastructure/auth/auth.config";
 
 /**
  * PanelHeader — top bar of the backoffice panel.
  *
  * Server component that reads the current session, displays the user's name
- * (or email fallback), and provides a logout button via a server action.
+ * (or email fallback), and provides a logout button via redirect to the
+ * NextAuth signout endpoint.
  *
  * Styling: border-bottom subtle divider, compact padding, flex space-between.
  */
@@ -20,16 +20,11 @@ export default async function PanelHeader() {
 
   const displayName = session.name ?? "Usuario";
 
-  async function handleSignOut() {
-    "use server";
-    await signOut();
-  }
-
   return (
     <header className="flex items-center justify-between border-b border-border-default px-6 py-3">
       <span className="text-base font-medium text-fg-default">{displayName}</span>
 
-      <form action={handleSignOut}>
+      <form action="/api/auth/signout" method="POST">
         <button
           type="submit"
           aria-label="Cerrar sesión"

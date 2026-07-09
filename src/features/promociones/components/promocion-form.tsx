@@ -78,6 +78,11 @@ export interface PromocionFormProps {
    * Comes from server-side validation (T030-T031).
    */
   publishBlocked?: PublishBlockedInfo | null;
+  /**
+   * Override the autosave interval in milliseconds.
+   * Defaults to 30000 (30s). Set to a smaller value for E2E tests (e.g. 5000).
+   */
+  autosaveIntervalMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +150,7 @@ export function PromocionForm({
   currentStatus,
   initialTipologias = [],
   publishBlocked = null,
+  autosaveIntervalMs = 30000,
 }: PromocionFormProps) {
   // ── Track whether draft was restored on mount ─────────────────────────
   const draftRestoredRef = useRef(false);
@@ -184,7 +190,7 @@ export function PromocionForm({
     lastSavedAt,
     isSaving: isAutoSaving,
     error: autosaveError,
-  } = useAutosave(formState as unknown as Record<string, unknown>, promocionId);
+  } = useAutosave(formState as unknown as Record<string, unknown>, promocionId, autosaveIntervalMs);
 
   // ── Field-to-section mapping ──────────────────────────────────────────
 

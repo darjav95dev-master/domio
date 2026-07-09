@@ -12,15 +12,7 @@
 
 ## Validation Scenarios
 
-### Scenario 1: Smoke Test (existing)
-
-```bash
-pnpm test:e2e -- tests/e2e/smoke.spec.ts
-```
-
-**Expected**: Test pasa. Homepage loads with Domio title.
-
-### Scenario 2: Visitor Journey (Journey 1)
+### Scenario 1: Visitor Journey (Journey 1)
 
 ```bash
 pnpm test:e2e -- tests/e2e/visitor.spec.ts
@@ -32,7 +24,7 @@ pnpm test:e2e -- tests/e2e/visitor.spec.ts
 - Ficha de detalle muestra galería, infobar, bloques, tipologías, mapa
 - Formulario de contacto con consentimiento crea lead y muestra confirmación
 
-### Scenario 3: Catalog Editor Journey (Journey 2)
+### Scenario 2: Catalog Editor Journey (Journey 2)
 
 ```bash
 pnpm test:e2e -- tests/e2e/catalog-editor.spec.ts
@@ -44,7 +36,7 @@ pnpm test:e2e -- tests/e2e/catalog-editor.spec.ts
 - Edición de promoción con autoguardado funciona
 - Publicación refleja cambios en ficha pública
 
-### Scenario 4: Sales Agent Journey (Journey 3)
+### Scenario 3: Sales Agent Journey (Journey 3)
 
 ```bash
 pnpm test:e2e -- tests/e2e/sales-agent.spec.ts
@@ -58,7 +50,7 @@ pnpm test:e2e -- tests/e2e/sales-agent.spec.ts
 - Nota interna se guarda correctamente
 - RLS: agente1 no ve leads de agente2
 
-### Scenario 5: API Consumer Journey (Journey 4)
+### Scenario 4: API Consumer Journey (Journey 4)
 
 ```bash
 pnpm test:e2e -- tests/e2e/api-consumer.spec.ts
@@ -70,7 +62,7 @@ pnpm test:e2e -- tests/e2e/api-consumer.spec.ts
 - POST /api/v1/leads/institutional con consentimiento devuelve 201
 - POST sin consentimiento devuelve 422
 
-### Scenario 6: Admin Journey (Journey 5)
+### Scenario 5: Admin Journey (Journey 5)
 
 ```bash
 pnpm test:e2e -- tests/e2e/admin.spec.ts
@@ -83,7 +75,7 @@ pnpm test:e2e -- tests/e2e/admin.spec.ts
 - Edición de configuración de contacto se refleja en footer público
 - Ejercicio ARSOP de borrado elimina lead en cascada
 
-### Scenario 7: Full Suite
+### Scenario 6: Full Suite
 
 ```bash
 pnpm test:e2e

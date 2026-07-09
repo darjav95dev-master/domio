@@ -4,9 +4,11 @@ import { useState, useCallback } from "react";
 import { Plus } from "@phosphor-icons/react";
 import { ApiKeysTable } from "@/features/api-keys/components/api-keys-table";
 import { CreateApiKeyDialog } from "@/features/api-keys/components/create-api-key-dialog";
+import { revokeApiKeyAction } from "@/features/api-keys/actions/api-keys.actions";
 import { Button } from "@/shared/components/button";
 import { ICON_SIZES } from "@/shared/constants/iconography";
 import { Toast } from "@/shared/components/toast";
+import type { ApiKeyResponse } from "@/shared/types/api-key-schema";
 
 /**
  * ApiKeysPageClient — client component that composes the API keys management page.
@@ -30,13 +32,21 @@ export function ApiKeysPageClient() {
     });
   }, []);
 
-  const handleRevoked = useCallback(() => {
+  const handleRevoked = useCallback(async (key: ApiKeyResponse) => {
+    const result = await revokeApiKeyAction(key.id);
     setRefreshKey((k) => k + 1);
-    setToast({
-      variant: "success",
-      title: "API key revocada",
-      message: "La clave ya no es válida para autenticación.",
-    });
+    if (result.success) {
+      setToast({
+        variant: "success",
+        title: "API key revocada",
+        message: "La clave ya no es válida para autenticación.",
+      });
+    } else {
+      setToast({
+        variant: "error",
+        title: result.error ?? "Error al revocar la API key",
+      });
+    }
   }, []);
 
   return (

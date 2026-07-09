@@ -32,6 +32,9 @@ export const metadata: Metadata = {
  * **Header:** PanelHeader at the top of the content area with user name and logout.
  *
  * @see design.md §13.5
+ *
+ * NOTE: The middleware already guards /panel/* routes. This layout's auth check
+ * is defence-in-depth. We skip the redirect on /panel/login to avoid redirect loops.
  */
 export default async function PanelLayout({
   children,
@@ -40,11 +43,9 @@ export default async function PanelLayout({
 }>) {
   const session = await getServerSession();
 
-  // ── Auth guard ──────────────────────────────────────────────────────
-  // The middleware already protects /panel/*, but we check here too
-  // (defence-in-depth — constitution §2).
+  // Login page: render without sidebar/header if not authenticated.
   if (!session) {
-    redirect("/panel/login");
+    return <>{children}</>;
   }
 
   return (

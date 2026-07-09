@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/infrastructure/auth/auth.config";
 
 /**
  * Middleware for the backoffice panel.
@@ -23,8 +22,12 @@ export async function middleware(request: NextRequest) {
 
   // ── Auth guard for /panel/* (except /panel/login itself) ──
   if (pathname.startsWith("/panel") && !pathname.startsWith("/panel/login")) {
-    const session = await auth();
-    if (!session) {
+    // Check session cookie presence (lightweight check).
+    // next-auth v4 uses "next-auth.session-token" by default.
+    // If absent, redirect to login. The PanelLayout server component
+    // performs the authoritative session verification via getServerSession.
+    const sessionCookie = request.cookies.get("next-auth.session-token");
+    if (!sessionCookie?.value) {
       const loginUrl = new URL("/panel/login", request.url);
       return NextResponse.redirect(loginUrl);
     }

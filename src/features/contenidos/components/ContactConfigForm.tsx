@@ -228,7 +228,7 @@ export function ContactConfigForm({ initialData }: ContactConfigFormProps) {
       </div>
 
       {toast && (
-        <div role="alert" aria-live="polite">
+        <div aria-live="polite">
           <Toast
             variant={toast.variant}
             title={toast.title}

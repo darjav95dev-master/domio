@@ -357,6 +357,11 @@ export default async function EditPromocionPage({
         initialDraftPayload={raw.draftPayload as Record<string, unknown> | null}
         currentStatus={raw.status}
         publishBlocked={publishBlocked}
+        autosaveIntervalMs={
+          process.env.E2E_AUTOSAVE_INTERVAL
+            ? Number(process.env.E2E_AUTOSAVE_INTERVAL)
+            : undefined
+        }
       />
 
       {/* Editorial blocks section */}

@@ -61,7 +61,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T020 [US1] Create `tests/e2e/visitor.spec.ts` — full visitor journey spec:
+- [x] T020 [US1] Create `tests/e2e/visitor.spec.ts` — full visitor journey spec:
   1. Navigate to `/` — verify hero, trust card, featured portfolio, FAQ, footer render with real data
   2. Navigate to `/portafolio` — apply filters (isla=Tenerife, operación=SALE), verify URL updates, verify grid shows matching results, verify result count
   3. Click first PropertyCard — verify detail page loads with gallery, infobar, editorial blocks, tipologías table, map

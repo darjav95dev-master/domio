@@ -776,6 +776,11 @@ const GLOBAL_CONTENT_BLOCKS_SEED = [
       ctaPrimary: "Ver propiedades",
       ctaSecondary: "Contactar",
       backgroundImageId: null,
+      trustStats: [
+        { value: "15", unit: "años", label: "de experiencia" },
+        { value: "500", unit: "inmuebles", label: "gestionados" },
+        { value: "10", unit: "ciudades", label: "en Tenerife" },
+      ],
     },
   },
   {

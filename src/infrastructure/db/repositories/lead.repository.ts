@@ -206,15 +206,13 @@ export class LeadRepository extends TenantAwareRepository {
 
   async findById(id: string): Promise<LeadRow | null> {
     return this.withTransaction(async (tx) => {
+      const conditions = this.buildBaseConditions({});
+      conditions.push(eq(leads.id, id));
+
       const [lead] = await tx
         .select()
         .from(leads)
-        .where(
-          and(
-            eq(leads.id, id),
-            eq(leads.tenantId, this.ctx.getTenantId()),
-          ),
-        );
+        .where(and(...conditions));
 
       return lead ?? null;
     });
@@ -230,40 +228,44 @@ export class LeadRepository extends TenantAwareRepository {
     userId: string,
   ): Promise<LeadRow> {
     return this.withTransaction(async (tx) => {
-      // 1. Fetch current lead
+      // 1. Build base conditions (includes AGENT scoping by assignedAgentId)
+      const conditions = this.buildBaseConditions({});
+      conditions.push(eq(leads.id, id));
+
+      // 2. Fetch current lead
       const [current] = await tx
         .select()
         .from(leads)
-        .where(
-          and(
-            eq(leads.id, id),
-            eq(leads.tenantId, this.ctx.getTenantId()),
-          ),
-        );
+        .where(and(...conditions));
 
       if (!current) {
         throw new Error(`Lead with id ${id} not found`);
       }
 
-      // 2. Validate state transition (T006)
+      // 3. Validate state transition (T006)
       validateStatusTransition(
         current.status as LeadStatus,
         newStatus,
       );
 
-      // 3. Update lead status
+      // 4. Update lead status (re-build where without the JOIN-friendly conditions)
+      const updateConditions: ReturnType<typeof eq>[] = [
+        eq(leads.id, id),
+        eq(leads.tenantId, this.ctx.getTenantId()),
+      ];
+
+      // AGENT role: scope update by assignedAgentId
+      if (this.authCtx?.role === "AGENT") {
+        updateConditions.push(eq(leads.assignedAgentId, this.authCtx.userId));
+      }
+
       const [updated] = await tx
         .update(leads)
         .set({
           status: newStatus,
           updatedAt: sql`now()`,
         })
-        .where(
-          and(
-            eq(leads.id, id),
-            eq(leads.tenantId, this.ctx.getTenantId()),
-          ),
-        )
+        .where(and(...updateConditions))
         .returning();
 
       if (!updated) {
@@ -280,15 +282,13 @@ export class LeadRepository extends TenantAwareRepository {
       });
 
       // 5. Re-fetch to return fresh data
+      const fetchConditions = this.buildBaseConditions({});
+      fetchConditions.push(eq(leads.id, id));
+
       const [result] = await tx
         .select()
         .from(leads)
-        .where(
-          and(
-            eq(leads.id, id),
-            eq(leads.tenantId, this.ctx.getTenantId()),
-          ),
-        );
+        .where(and(...fetchConditions));
 
       if (!result) {
         throw new Error(`Failed to fetch lead ${id} after status update`);
