@@ -4,12 +4,14 @@ import { leadAssignedAgent } from "@/infrastructure/email/templates/lead-assigne
 import { leadConfirmation } from "@/infrastructure/email/templates/lead-confirmation";
 import { teamInvitation } from "@/infrastructure/email/templates/team-invitation";
 import { passwordRecovery } from "@/infrastructure/email/templates/password-recovery";
+import { contactFormNotification } from "@/infrastructure/email/templates/contact-form-notification";
 
 const templateRegistry: Record<string, EmailTemplate> = {
   [leadAssignedAgent.name]: leadAssignedAgent,
   [leadConfirmation.name]: leadConfirmation,
   [teamInvitation.name]: teamInvitation,
   [passwordRecovery.name]: passwordRecovery,
+  [contactFormNotification.name]: contactFormNotification,
 };
 
 /**
