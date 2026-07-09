@@ -1,8 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { hasConsentCookie } from "../server/consent-actions";
-import { createLeadAction } from "../server/create-lead-action";
+import { useCallback } from "react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -11,7 +9,6 @@ import { createLeadAction } from "../server/create-lead-action";
 export interface WhatsAppButtonProps {
   phoneNumber: string | null;
   prefilledMessage: string | null;
-  promocionId: string;
   promocionName: string;
 }
 
@@ -22,15 +19,11 @@ export interface WhatsAppButtonProps {
 export function WhatsAppButton({
   phoneNumber,
   prefilledMessage,
-  promocionId,
   promocionName,
 }: WhatsAppButtonProps) {
-  const [isCreating, setIsCreating] = useState(false);
-
-  const handleClick = useCallback(async () => {
+  const handleClick = useCallback(() => {
     if (!phoneNumber) return;
 
-    // Build wa.me URL
     const text = prefilledMessage
       ? encodeURIComponent(prefilledMessage)
       : encodeURIComponent(
@@ -38,28 +31,8 @@ export function WhatsAppButton({
         );
     const waUrl = `https://wa.me/${phoneNumber}?text=${text}`;
 
-    // Check consent for automatic lead creation
-    const hasConsent = await hasConsentCookie();
-    if (hasConsent && !isCreating) {
-      setIsCreating(true);
-      try {
-        await createLeadAction({
-          name: "Contacto WhatsApp",
-          email: "whatsapp@lead.domio.com",
-          message: `Contacto vía WhatsApp desde la ficha de ${promocionName}`,
-          consent: true,
-          promocionId,
-        });
-      } catch {
-        // Silently fail — WhatsApp link still opens
-      } finally {
-        setIsCreating(false);
-      }
-    }
-
-    // Open WhatsApp
     window.open(waUrl, "_blank", "noopener,noreferrer");
-  }, [phoneNumber, prefilledMessage, promocionId, promocionName, isCreating]);
+  }, [phoneNumber, prefilledMessage, promocionName]);
 
   if (!phoneNumber) return null;
 
@@ -67,7 +40,6 @@ export function WhatsAppButton({
     <button
       type="button"
       onClick={handleClick}
-      disabled={isCreating}
       className="flex w-full items-center justify-center gap-3 rounded-pill border border-[#25D366] px-[26.5px] py-[13.5px] font-sans text-base font-medium leading-[1.5] text-[#25D366] transition-all duration-350 ease-[cubic-bezier(.2,.8,.2,1)] hover:bg-[#25D366] hover:text-white focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3 focus-visible:rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed"
       aria-label={
         "Contactar por WhatsApp" +

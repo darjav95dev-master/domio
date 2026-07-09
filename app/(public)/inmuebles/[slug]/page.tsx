@@ -187,7 +187,6 @@ export default async function DetailPage({ params }: DetailPageProps) {
                     <WhatsAppButton
                       phoneNumber={contactConfig.whatsappNumber}
                       prefilledMessage={contactConfig.whatsappPrefilledMessage}
-                      promocionId={promocion.id}
                       promocionName={promocion.name}
                     />
                     <div className="flex justify-start">
