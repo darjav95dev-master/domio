@@ -11,14 +11,21 @@ const TENANT_ID = "00000000-0000-4000-8000-000000000001";
 // ---------------------------------------------------------------------------
 const mockValidateApiKey = vi.hoisted(() => vi.fn());
 const mockCreateInstitutionalLead = vi.hoisted(() => vi.fn());
+const mockApplyRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/api-public/middleware/api-key-auth", () => ({
   validateApiKey: mockValidateApiKey,
 }));
 
-vi.mock("@/features/api-public/with-rate-limit", () => ({
-  withRateLimit: vi.fn((handler: Function) => handler as never),
-}));
+// Mock applyRateLimit to allow the request by default (rate limit integration
+// is tested separately in api-v1-rate-limit-auth-order.test.ts)
+vi.mock("@/features/api-public/with-rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/api-public/with-rate-limit")>();
+  return {
+    ...actual,
+    applyRateLimit: mockApplyRateLimit,
+  };
+});
 
 vi.mock("@/features/api-public/server/create-institutional-lead", () => ({
   createInstitutionalLead: mockCreateInstitutionalLead,
@@ -40,12 +47,23 @@ import { ContextResolutionError } from "@/infrastructure/tenant/context-middlewa
 describe("POST /api/v1/leads/institutional", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // By default, rate limiter allows the request
+    mockApplyRateLimit.mockResolvedValue({
+      allowed: true,
+      result: {
+        allowed: true,
+        remaining: 59,
+        limit: 60,
+        resetAt: new Date(Date.now() + 60_000),
+      },
+    });
   });
 
   it("returns 422 when consent fields are missing", async () => {
     mockValidateApiKey.mockResolvedValue({
       type: "apikey",
       apiKeyId: "key-001",
+      rateLimitPerMin: 60,
       getTenantId: () => TENANT_ID,
       withTransaction: vi.fn(),
     });
@@ -79,6 +97,7 @@ describe("POST /api/v1/leads/institutional", () => {
     mockValidateApiKey.mockResolvedValue({
       type: "apikey",
       apiKeyId: "key-001",
+      rateLimitPerMin: 60,
       getTenantId: () => TENANT_ID,
       withTransaction: vi.fn(),
     });
@@ -135,5 +154,42 @@ describe("POST /api/v1/leads/institutional", () => {
 
     const body = await response.json();
     expect(body.error).toBeDefined();
+  });
+
+  it("returns 429 when rate limit is exceeded", async () => {
+    mockValidateApiKey.mockResolvedValue({
+      type: "apikey",
+      apiKeyId: "key-001",
+      rateLimitPerMin: 60,
+      getTenantId: () => TENANT_ID,
+      withTransaction: vi.fn(),
+    });
+
+    // Simulate rate limit exceeded
+    mockApplyRateLimit.mockResolvedValue({
+      allowed: false,
+      result: {
+        allowed: false,
+        remaining: 0,
+        limit: 60,
+        resetAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    const request = new Request(API_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": "test-key" },
+      body: JSON.stringify({
+        name: "Test User",
+        email: "test@example.com",
+        consent: { legalBasis: "RGPD consent", textAccepted: "Acepto" },
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(429);
+
+    const body = await response.json();
+    expect(body.error).toBe("Rate limit exceeded");
   });
 });

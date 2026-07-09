@@ -144,5 +144,5 @@ export async function validateApiKey(
   // Fire-and-forget: update last_used_at (non-critical)
   void touchFn(matched.id);
 
-  return new ApiKeyContext(matched.tenantId, matched.id);
+  return new ApiKeyContext(matched.tenantId, matched.id, matched.rateLimitPerMin);
 }

@@ -1,4 +1,5 @@
 import { TenantContext } from "./TenantContext";
+import { DEFAULT_API_LIMIT_PER_MIN } from "@/shared/constants/rate-limits";
 
 const API_KEY_CATALOG_FILTERS = {
   kind: "portfolio",
@@ -13,6 +14,7 @@ export class ApiKeyContext extends TenantContext {
   constructor(
     tenantId: string,
     public readonly apiKeyId: string,
+    public readonly rateLimitPerMin: number = DEFAULT_API_LIMIT_PER_MIN,
   ) {
     super(tenantId);
   }

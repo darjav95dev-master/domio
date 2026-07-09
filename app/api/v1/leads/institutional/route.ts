@@ -1,6 +1,10 @@
 import { validateApiKey } from "@/features/api-public/middleware/api-key-auth";
 import { createInstitutionalLead } from "@/features/api-public/server/create-institutional-lead";
-import { withRateLimit } from "@/features/api-public/with-rate-limit";
+import {
+  createRateLimitResponse,
+  addRateLimitHeaders,
+} from "@/infrastructure/rate-limiting/api-key-middleware";
+import { applyRateLimit } from "@/features/api-public/with-rate-limit";
 import { ContextResolutionError } from "@/infrastructure/tenant/context-middleware";
 import { logger } from "@/shared/utils/logger";
 
@@ -20,17 +24,23 @@ async function handler(request: Request): Promise<Response> {
     // 1. Authenticate via API key
     const ctx = await validateApiKey(request);
 
-    // 2. Parse and validate request body
+    // 2. Rate limit check (runs after auth — auth provides the API key ID)
+    const rateCheck = await applyRateLimit(ctx.apiKeyId, ctx.rateLimitPerMin);
+    if (!rateCheck.allowed) {
+      return createRateLimitResponse(rateCheck.result);
+    }
+
+    // 3. Parse and validate request body
     const body = await request.json();
 
-    // 3. Get IP and user-agent for consent record
+    // 4. Get IP and user-agent for consent record
     const ip =
       request.headers.get("x-forwarded-for") ??
       request.headers.get("x-real-ip") ??
       undefined;
     const userAgent = request.headers.get("user-agent") ?? undefined;
 
-    // 4. Create lead + consent + enqueue email atomically
+    // 5. Create lead + consent + enqueue email atomically
     const result = await createInstitutionalLead({
       ctx,
       payload: body,
@@ -38,7 +48,7 @@ async function handler(request: Request): Promise<Response> {
       userAgent,
     });
 
-    return Response.json(result, { status: 201 });
+    return addRateLimitHeaders(Response.json(result, { status: 201 }), rateCheck.result);
   } catch (error) {
     if (error instanceof ContextResolutionError) {
       return Response.json(
@@ -85,5 +95,4 @@ async function handler(request: Request): Promise<Response> {
   }
 }
 
-// Wrap with rate limiting
-export const POST = withRateLimit(handler);
+export const POST = handler;
