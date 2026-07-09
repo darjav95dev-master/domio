@@ -88,10 +88,13 @@ describe("Nav (T006)", () => {
     }
   });
 
-  it("initially renders in over-hero mode (transparent bg, white text)", () => {
+  it("initially renders in glass mode (scrolled state) — default safe for SSR", () => {
     const { container } = render(<Nav />);
     const nav = container.querySelector("nav");
-    expect(nav?.className).toMatch(/bg-transparent/);
+    // Nav defaults to glass/scrolled mode (isScrolled=true) for SSR safety.
+    // Over-hero transparent mode only activates client-side when a dark hero is detected.
+    expect(nav?.className).not.toMatch(/bg-transparent/);
+    expect(nav?.className).toMatch(/backdrop-blur/);
   });
 
   it("renders links with proper href attributes", () => {

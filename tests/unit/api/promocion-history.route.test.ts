@@ -33,6 +33,13 @@ vi.mock(
   }),
 );
 
+vi.mock(
+  "@/infrastructure/db/repositories/promocion-history.repository",
+  () => ({
+    PromocionHistoryRepository: mockRepository.PromocionRepository,
+  }),
+);
+
 const { GET } = await import(
   "@/../app/api/internal/promociones/[id]/history/route"
 );

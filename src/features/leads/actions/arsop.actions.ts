@@ -26,7 +26,7 @@ export async function exportLeadAction(leadId: string) {
     session.role,
   );
 
-  const mediaService = new MediaService(session.tenantId);
+  const mediaService = new MediaService(new AuthenticatedContext(session.tenantId, session.userId, session.role));
   const repo = new ArsopRepository(ctx, mediaService);
 
   return repo.exportLead(leadId, session.userId);
@@ -53,7 +53,7 @@ export async function deleteLeadAction(leadId: string) {
     session.role,
   );
 
-  const mediaService = new MediaService(session.tenantId);
+  const mediaService = new MediaService(new AuthenticatedContext(session.tenantId, session.userId, session.role));
   const repo = new ArsopRepository(ctx, mediaService);
 
   return repo.deleteLead(leadId, session.userId);

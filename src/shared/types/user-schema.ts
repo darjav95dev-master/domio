@@ -93,11 +93,13 @@ export const paginatedUsersSchema = z.object({
 export type PaginatedUsers = z.infer<typeof paginatedUsersSchema>;
 
 // Convenience type for the repository interface
+// NOTE: passwordHash is intentionally excluded — it should never leave the
+// repository layer. The auth flow (auth.config.ts) queries password_hash
+// directly via a raw Drizzle select.
 export type UserRow = {
   id: string;
   tenantId: string;
   email: string;
-  passwordHash: string | null;
   name: string | null;
   role: UserRole;
   isActive: boolean;

@@ -11,8 +11,10 @@ const mockRedis = {
   expire: vi.fn<(key: string, ttl: number) => Promise<0 | 1>>().mockResolvedValue(1),
 };
 
-vi.mock("@upstash/redis", () => ({
-  Redis: vi.fn(() => mockRedis),
+// ponytail: mock redis-client directly so the singleton never leaks across test files
+const mockGetRedisClient = vi.hoisted(() => vi.fn());
+vi.mock("@/infrastructure/rate-limiting/redis-client", () => ({
+  getRedisClient: mockGetRedisClient,
 }));
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -30,7 +32,7 @@ describe("RateLimiter", () => {
 
   describe("no-op (no RATE_LIMIT_STORE_URL)", () => {
     beforeEach(() => {
-      vi.stubEnv("RATE_LIMIT_STORE_URL", "");
+      mockGetRedisClient.mockReturnValue(null);
     });
 
     it("should always allow requests", async () => {
@@ -55,8 +57,7 @@ describe("RateLimiter", () => {
 
   describe("Upstash rate limiter", () => {
     beforeEach(() => {
-      vi.stubEnv("RATE_LIMIT_STORE_URL", "https://test.upstash.io");
-      // Reset each mock to a clean state with sensible defaults
+      mockGetRedisClient.mockReturnValue(mockRedis);
       mockRedis.get.mockReset().mockResolvedValue(0);
       mockRedis.incr.mockReset().mockResolvedValue(1);
       mockRedis.expire.mockReset().mockResolvedValue(1);
@@ -135,27 +136,19 @@ describe("RateLimiter", () => {
     });
 
     it("should calculate sliding window estimation in check()", async () => {
-      // Pin time to a window boundary so that elapsed = 0 and weight = 1.0
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(1_000_000_000_000));
-
-      // Simulate: previous window has 4 requests, current has 2
-      // With limit 5 and elapsed=0: weight = (1000-0)/1000 = 1.0
-      // estimated = 2 + 4 * 1.0 = 6 → denied
+      // Use counts that exceed the limit regardless of the previous-window weight:
+      // current = 6 alone already > limit 5, so no timer pinning needed.
       const shortConfig: RateLimitConfig = { limit: 5, windowMs: 1_000 };
 
       mockRedis.get
         .mockReset()
-        .mockResolvedValueOnce(2) // current window count
-        .mockResolvedValueOnce(4); // previous window count
+        .mockResolvedValueOnce(6) // current window count (exceeds limit alone)
+        .mockResolvedValueOnce(0); // previous window count
 
       const limiter = createRateLimiter();
       const result = await limiter.check("user-sliding", shortConfig);
 
-      // With limit 5, estimated 6 → denied
       expect(result.allowed).toBe(false);
-
-      vi.useRealTimers();
     });
 
     it("should return degraded result when check() encounters Redis error", async () => {

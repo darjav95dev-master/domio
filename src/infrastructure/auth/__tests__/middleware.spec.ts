@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 
-// ─── We mock @/infrastructure/auth/auth.config (which exports `auth`) ──
-// instead of the next-auth module, avoiding hoisting issues with variable
-// references. The middleware imports `auth` from auth.config.ts.
-const mockAuth = vi.fn();
+// ─── We mock next-auth/jwt (Edge-safe) which is what middleware uses ──────────
+const mockGetToken = vi.fn();
 
-vi.mock("@/infrastructure/auth/auth.config", () => ({
-  auth: mockAuth,
+vi.mock("next-auth/jwt", () => ({
+  getToken: mockGetToken,
 }));
 
 // ─── NextResponse helpers ─────────────────────────────────────────────────────
-// We use simple arrays to track calls, avoiding closure capture issues.
 
 let nextCalls: string[] = [];
 let redirectCalls: Array<{ url: string; headers: Map<string, string> }> = [];
@@ -43,7 +40,7 @@ function createRequest(path: string): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockAuth.mockReset();
+  mockGetToken.mockReset();
   nextCalls = [];
   redirectCalls = [];
 });
@@ -58,18 +55,19 @@ describe("middleware config", () => {
     expect(Array.isArray(mod.config.matcher)).toBe(true);
   });
 
-  it("should match /panel/:path* and /api/internal/:path* patterns", async () => {
+  it("should match /panel/:path*, /api/internal/:path*, and /api/auth/callback/credentials", async () => {
     const mod = await import("../../../../middleware");
     expect(mod.config.matcher).toEqual([
       "/panel/:path*",
       "/api/internal/:path*",
+      "/api/auth/callback/credentials",
     ]);
   });
 });
 
 describe("middleware auth guard", () => {
   it("should redirect to /panel/login when accessing /panel without session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetToken.mockResolvedValue(null);
 
     const { middleware } = await import("../../../../middleware");
     await middleware(createRequest(PANEL_DASHBOARD_PATH));
@@ -80,7 +78,7 @@ describe("middleware auth guard", () => {
   });
 
   it("should NOT redirect when accessing /panel/login without session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetToken.mockResolvedValue(null);
 
     const { middleware } = await import("../../../../middleware");
     await middleware(createRequest(PANEL_LOGIN_PATH));
@@ -90,9 +88,7 @@ describe("middleware auth guard", () => {
   });
 
   it("should allow access to /panel when session exists", async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: "1", name: "Admin", role: "ADMIN" },
-    });
+    mockGetToken.mockResolvedValue({ sub: "1", role: "ADMIN" });
 
     const { middleware } = await import("../../../../middleware");
     await middleware(createRequest(PANEL_DASHBOARD_PATH));
@@ -102,24 +98,19 @@ describe("middleware auth guard", () => {
   });
 
   it("should inject X-Robots-Tag header for /panel routes", async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: "1", name: "Admin", role: "ADMIN" },
-    });
+    mockGetToken.mockResolvedValue({ sub: "1", role: "ADMIN" });
 
     const { middleware } = await import("../../../../middleware");
     const req = createRequest(PANEL_DASHBOARD_PATH);
 
     await middleware(req);
 
-    // The last `next` call should have set X-Robots-Tag
-    // We look at the response from the middleware by re-mocking
-    // next to capture the headers
     expect(redirectCalls).toHaveLength(0);
     expect(nextCalls.length).toBeGreaterThanOrEqual(1);
   });
 
   it("should pass through for routes outside /panel and /api/internal", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetToken.mockResolvedValue(null);
 
     const { middleware } = await import("../../../../middleware");
     await middleware(createRequest("/"));

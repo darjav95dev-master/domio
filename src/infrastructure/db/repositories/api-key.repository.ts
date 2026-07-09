@@ -18,10 +18,7 @@ export interface ApiKeyFilters {
   isActive?: boolean;
 }
 
-export interface PaginatedResult<T> {
-  items: T[];
-  total: number;
-}
+import { PaginatedResult } from "@/shared/types/pagination";
 
 export interface CreateApiKeyResult extends ApiKeyRow {
   plainKey: string;
@@ -108,6 +105,7 @@ export class ApiKeyRepository extends TenantAwareRepository {
     // Generate random key outside the transaction (pure computation)
     const plainKey = `dom_${crypto.randomBytes(API_KEY_BYTE_LENGTH).toString("hex")}`;
     const keyHash = await bcrypt.hash(plainKey, BCRYPT_SALT_ROUNDS);
+    const keyPrefix = plainKey.slice(0, 8);
 
     return this.withTransaction(async (tx) => {
       const [row] = await tx
@@ -116,6 +114,7 @@ export class ApiKeyRepository extends TenantAwareRepository {
           tenantId: this.authCtx.getTenantId(),
           name,
           keyHash,
+          keyPrefix,
           rateLimitPerMin: rateLimitPerMin ?? 60,
           createdBy: this.authCtx.userId,
         })

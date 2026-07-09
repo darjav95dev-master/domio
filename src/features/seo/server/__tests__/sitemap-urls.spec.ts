@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import type { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
 import { SITEMAP_LIMITS } from "@/shared/utils/seo/constants";
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ function createMockPromocionRepository(
       nextCursor: null,
       total: items.length,
     }),
-  } as unknown as PromocionRepository;
+  } as unknown as CatalogRepository;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ describe("buildSitemapUrls", () => {
     });
     const mockRepo = {
       findPublicWithCursor,
-    } as unknown as PromocionRepository;
+    } as unknown as CatalogRepository;
     const { buildSitemapUrls } = await import("../sitemap-urls");
 
     await buildSitemapUrls(mockRepo);

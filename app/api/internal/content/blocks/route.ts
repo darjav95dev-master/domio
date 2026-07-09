@@ -1,6 +1,5 @@
 import { type NextRequest } from "next/server";
-import { getServerSession } from "@/infrastructure/auth/session";
-import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { ContentBlockRepository } from "@/features/contenidos/server/content-block.repository";
 import { saveContentBlock } from "@/features/contenidos/actions/content-block.actions";
 import type { PageKey } from "@/shared/types/content.types";
@@ -11,12 +10,10 @@ import type { PageKey } from "@/shared/types/content.types";
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
-  if (session.role !== "ADMIN" && session.role !== "OPERATOR") {
+  if (auth.ctx.role !== "ADMIN" && auth.ctx.role !== "OPERATOR") {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -31,15 +28,9 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   try {
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
-
-    const repo = new ContentBlockRepository(authCtx);
+    const repo = new ContentBlockRepository(auth.ctx);
     const blocks = await repo.findByTenantAndPage(
-      session.tenantId,
+      auth.ctx.getTenantId(),
       pageKey as PageKey,
     );
 
@@ -58,12 +49,10 @@ export async function GET(request: NextRequest): Promise<Response> {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
-  if (session.role !== "ADMIN" && session.role !== "OPERATOR") {
+  if (auth.ctx.role !== "ADMIN" && auth.ctx.role !== "OPERATOR") {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 

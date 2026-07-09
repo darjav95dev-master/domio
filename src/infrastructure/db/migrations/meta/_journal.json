@@ -36,6 +36,27 @@
       "when": 1783600124463,
       "tag": "0004_cheerful_archangel",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783620000000,
+      "tag": "0005_api_key_prefix",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783630000000,
+      "tag": "0006_arsop_lead_fk_set_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783627824333,
+      "tag": "0007_early_deadpool",
+      "breakpoints": true
     }
   ]
 }

@@ -30,10 +30,7 @@ export interface LeadPagination {
   limit: number;
 }
 
-export interface PaginatedResult<T> {
-  items: T[];
-  total: number;
-}
+import { PaginatedResult } from "@/shared/types/pagination";
 
 export interface LeadRow {
   id: string;

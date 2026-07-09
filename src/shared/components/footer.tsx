@@ -1,3 +1,5 @@
+import { getContactPageData } from "@/features/contact/server/get-contact-data";
+
 /**
  * Footer — slate 4-column institutional footer.
  *
@@ -8,7 +10,11 @@
  * - 4 columns: Domio, Portafolio, Legal, Contacto
  * - Legal row with border-top and copyright
  */
-export function Footer() {
+export async function Footer() {
+  const { contactConfig } = await getContactPageData();
+  const phone = contactConfig?.phone ?? "+34 922 000 000";
+  const email = contactConfig?.email ?? "info@domio.es";
+
   return (
     <footer
       role="contentinfo"
@@ -58,18 +64,18 @@ export function Footer() {
             <ul className="mt-[8px] space-y-[8px]">
               <li>
                 <a
-                  href="tel:+34922000000"
+                  href={`tel:${phone.replace(/\s/g, "")}`}
                   className="text-sm text-fg-on-inverted/55 transition-colors duration-150 hover:text-white"
                 >
-                  +34 922 000 000
+                  {phone}
                 </a>
               </li>
               <li>
                 <a
-                  href="mailto:info@domio.es"
+                  href={`mailto:${email}`}
                   className="text-sm text-fg-on-inverted/55 transition-colors duration-150 hover:text-white"
                 >
-                  info@domio.es
+                  {email}
                 </a>
               </li>
               <li className="text-sm text-fg-on-inverted/55">

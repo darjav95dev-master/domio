@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { PromocionRepository } from "./promocion.repository";
+import { PromocionHistoryRepository } from "./promocion-history.repository";
 import {
   createMockAuthCtx,
   setupMockTransaction,
@@ -20,7 +21,7 @@ const NOW = new Date("2026-07-08T12:00:00Z");
 const basePromocionRow = {
   id: PROMOCION_ID,
   tenantId: TENANT_ID,
-  slug: "",
+  slug: null,
   name: "Residencial Las Américas",
   kind: "portfolio",
   status: "DRAFT",
@@ -601,7 +602,7 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const repo = new PromocionHistoryRepository(ctx);
 
       const historyRows = [
         {
@@ -639,7 +640,7 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const repo = new PromocionHistoryRepository(ctx);
 
       setupMockTransaction(mockWithTx, [[]]);
 

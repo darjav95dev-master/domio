@@ -6,6 +6,7 @@ import { getUsersAction } from "@/features/team/actions/team.actions";
 import { Button } from "@/shared/components/button";
 import { Skeleton } from "@/shared/components/skeleton";
 import { USER_ROLES, type UserRole } from "@/shared/constants/db-enums";
+import { USER_ROLE_LABELS } from "@/shared/constants/domain-labels";
 import { ICON_SIZES } from "@/shared/constants/iconography";
 import { cn } from "@/shared/utils/cn";
 import type { UserResponse, PaginatedUsers } from "@/shared/types/user-schema";
@@ -15,12 +16,6 @@ import type { UserResponse, PaginatedUsers } from "@/shared/types/user-schema";
 // ---------------------------------------------------------------------------
 
 const PAGE_SIZE = 20;
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  ADMIN: "Administrador",
-  OPERATOR: "Operador",
-  AGENT: "Agente",
-};
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos" },
@@ -106,7 +101,7 @@ export function UsersTable({ onEditUser }: UsersTableProps) {
           roleStyles[role],
         )}
       >
-        {ROLE_LABELS[role]}
+        {USER_ROLE_LABELS[role]}
       </span>
     );
   }
@@ -259,7 +254,7 @@ export function UsersTable({ onEditUser }: UsersTableProps) {
             <option value="all">Todos</option>
             {USER_ROLES.map((role) => (
               <option key={role} value={role}>
-                {ROLE_LABELS[role]}
+                {USER_ROLE_LABELS[role]}
               </option>
             ))}
           </select>

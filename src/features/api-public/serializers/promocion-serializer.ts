@@ -23,7 +23,7 @@ export function serializePromocion(row: PromocionListRow): PromocionResponse {
 
   const response: PromocionResponse = {
     id: row.id,
-    slug: row.slug,
+    slug: row.slug ?? "",
     nombre: row.name,
     tipo: row.propertyType,
     operacion: row.operation,

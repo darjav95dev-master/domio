@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { getServerSession } from "@/infrastructure/auth/session";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 
 /**
  * Internal cache revalidation endpoint.
@@ -20,10 +20,8 @@ import { getServerSession } from "@/infrastructure/auth/session";
  */
 export async function POST(request: NextRequest) {
   // ── Session verification ──────────────────────────────────────────────
-  const session = await getServerSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
     const body = (await request.json().catch(() => null)) as {

@@ -1,6 +1,5 @@
 import { type NextRequest } from "next/server";
-import { getServerSession } from "@/infrastructure/auth/session";
-import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
 import { PromocionCreateSchema } from "@/shared/schemas/promocion.schema";
 import {
@@ -15,19 +14,11 @@ import type { PromocionFilters } from "@/infrastructure/db/repositories/promocio
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
-
-    const repository = new PromocionRepository(authCtx);
+    const repository = new PromocionRepository(auth.ctx);
 
     // Parse query params using standard URL (works with plain Request in tests)
     const url = new URL(request.url);
@@ -88,18 +79,10 @@ export async function GET(request: NextRequest): Promise<Response> {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
-
     // Parse and validate body
     const body = await request.json();
     const parsed = PromocionCreateSchema.safeParse(body);
@@ -117,7 +100,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    const repository = new PromocionRepository(authCtx);
+    const repository = new PromocionRepository(auth.ctx);
     const created = await repository.create({
       name: parsed.data.name,
       kind: parsed.data.kind,

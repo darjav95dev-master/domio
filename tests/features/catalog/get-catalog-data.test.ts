@@ -4,8 +4,8 @@ import { describe, it, expect, vi } from "vitest";
 // Must be before imports — vi.mock hoists to top
 const mockFindPublicWithCursor = vi.fn();
 
-vi.mock("@/infrastructure/db/repositories/promocion.repository", () => ({
-  PromocionRepository: vi.fn().mockImplementation(() => ({
+vi.mock("@/infrastructure/db/repositories/catalog.repository", () => ({
+  CatalogRepository: vi.fn().mockImplementation(() => ({
     findPublicWithCursor: mockFindPublicWithCursor,
   })),
 }));

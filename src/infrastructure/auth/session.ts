@@ -1,6 +1,6 @@
 import type { UserRole } from "@/shared/constants/db-enums";
-import { getServerSession as nextAuthGetSession } from "next-auth";
-import { authConfig } from "./auth.config";
+import { auth } from "./auth.config";
+import { logger } from "@/shared/utils/logger";
 
 export interface ServerSession {
   userId: string;
@@ -16,10 +16,11 @@ export interface ServerSession {
  * Returns `null` if no session exists or the session has no user data.
  */
 export async function getServerSession(): Promise<ServerSession | null> {
-  let session: Awaited<ReturnType<typeof nextAuthGetSession>>;
+  let session: Awaited<ReturnType<typeof auth>>;
   try {
-    session = await nextAuthGetSession(authConfig);
-  } catch {
+    session = await auth();
+  } catch (err) {
+    logger.warn("getServerSession failed:", err instanceof Error ? err.message : String(err));
     return null;
   }
 

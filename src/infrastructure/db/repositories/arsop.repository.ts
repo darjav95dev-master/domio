@@ -289,6 +289,25 @@ export class ArsopRepository extends TenantAwareRepository {
         throw new Error("Lead not found");
       }
 
+      // ponytail: insert audit record BEFORE deleting the lead so the FK check passes.
+      // lead_id becomes NULL after lead deletion (ON DELETE SET NULL).
+      const [request] = await tx
+        .insert(arsopRequests)
+        .values({
+          tenantId: this.authCtx.getTenantId(),
+          leadId,
+          requestType: "DELETE",
+          requestedAt: sql`now()`,
+          processedBy: userId,
+          processedAt: sql`now()`,
+          resultAssetId: null,
+        })
+        .returning();
+
+      if (!request) {
+        throw new Error("Failed to insert arsop_request for delete");
+      }
+
       // 2. Cascade delete in order
       await tx
         .delete(leadReadMarks)
@@ -334,24 +353,6 @@ export class ArsopRepository extends TenantAwareRepository {
             eq(leads.tenantId, this.authCtx.getTenantId()),
           ),
         );
-
-      // 3. Insert arsop_request
-      const [request] = await tx
-        .insert(arsopRequests)
-        .values({
-          tenantId: this.authCtx.getTenantId(),
-          leadId,
-          requestType: "DELETE",
-          requestedAt: sql`now()`,
-          processedBy: userId,
-          processedAt: sql`now()`,
-          resultAssetId: null,
-        })
-        .returning();
-
-      if (!request) {
-        throw new Error("Failed to insert arsop_request for delete");
-      }
 
       return request;
     });

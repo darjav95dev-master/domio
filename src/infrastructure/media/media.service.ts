@@ -1,11 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { MediaAsset } from "../db/schema/media-assets";
 import { mediaAssets } from "../db/schema/media-assets";
-import { db } from "../db/client";
+import type { TenantContext } from "../tenant/TenantContext";
 import {
   ALLOWED_MEDIA_KINDS,
   ALLOWED_UPLOAD_MIME_TYPES,
@@ -20,9 +19,8 @@ import { UploadValidationError } from "./types";
 
 export class MediaService {
   private readonly s3Client = r2Client;
-  private readonly database = db;
 
-  constructor(private readonly tenantId: string) {}
+  constructor(private readonly ctx: TenantContext) {}
 
   async uploadImage(input: UploadInput): Promise<MediaAsset> {
     const trimmedAltText = input.altText.trim();
@@ -64,6 +62,7 @@ export class MediaService {
 
     const extension = input.fileName.split(".").pop()?.toLowerCase() || "bin";
     const r2Key = `${randomUUID()}.${extension}`;
+    const tenantId = this.ctx.getTenantId();
 
     await this.s3Client.send(
       new PutObjectCommand({
@@ -74,12 +73,9 @@ export class MediaService {
       }),
     );
 
-    return this.database.transaction(async (tx) => {
-      await tx.execute(
-        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
-      );
+    return this.ctx.withTransaction(async (tx) => {
       const rows = await tx.insert(mediaAssets).values({
-        tenantId: this.tenantId,
+        tenantId,
         ownerType: DEFAULT_MEDIA_OWNER_TYPE,
         ownerId: input.ownerId,
         kind: input.kind,
@@ -97,12 +93,11 @@ export class MediaService {
     ttlSeconds: number = 3600,
     opts?: TransformOptions,
   ): Promise<string> {
-    const asset = await this.database.transaction(async (tx) => {
-      await tx.execute(
-        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
-      );
+    const tenantId = this.ctx.getTenantId();
+
+    const asset = await this.ctx.withTransaction(async (tx) => {
       const [found] = await tx.select().from(mediaAssets).where(
-        and(eq(mediaAssets.id, assetId), eq(mediaAssets.tenantId, this.tenantId)),
+        and(eq(mediaAssets.id, assetId), eq(mediaAssets.tenantId, tenantId)),
       );
       return found;
     });
@@ -135,11 +130,9 @@ export class MediaService {
       return;
     }
 
-    await this.database.transaction(async (tx) => {
-      await tx.execute(
-        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
-      );
+    const tenantId = this.ctx.getTenantId();
 
+    await this.ctx.withTransaction(async (tx) => {
       const existing = await tx
         .select({ id: mediaAssets.id })
         .from(mediaAssets)
@@ -147,7 +140,7 @@ export class MediaService {
           and(
             inArray(mediaAssets.id, orderedAssetIds),
             eq(mediaAssets.ownerId, ownerId),
-            eq(mediaAssets.tenantId, this.tenantId),
+            eq(mediaAssets.tenantId, tenantId),
           ),
         );
 
@@ -165,7 +158,7 @@ export class MediaService {
             and(
               eq(mediaAssets.id, assetId),
               eq(mediaAssets.ownerId, ownerId),
-              eq(mediaAssets.tenantId, this.tenantId),
+              eq(mediaAssets.tenantId, tenantId),
             ),
           );
       }
@@ -173,11 +166,9 @@ export class MediaService {
   }
 
   async setCover(ownerId: string, assetId: string): Promise<void> {
-    await this.database.transaction(async (tx) => {
-      await tx.execute(
-        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
-      );
+    const tenantId = this.ctx.getTenantId();
 
+    await this.ctx.withTransaction(async (tx) => {
       const [asset] = await tx
         .select({ id: mediaAssets.id })
         .from(mediaAssets)
@@ -185,7 +176,7 @@ export class MediaService {
           and(
             eq(mediaAssets.id, assetId),
             eq(mediaAssets.ownerId, ownerId),
-            eq(mediaAssets.tenantId, this.tenantId),
+            eq(mediaAssets.tenantId, tenantId),
           ),
         );
 
@@ -199,7 +190,7 @@ export class MediaService {
         .where(
           and(
             eq(mediaAssets.ownerId, ownerId),
-            eq(mediaAssets.tenantId, this.tenantId),
+            eq(mediaAssets.tenantId, tenantId),
           ),
         );
 
@@ -210,20 +201,18 @@ export class MediaService {
           and(
             eq(mediaAssets.id, assetId),
             eq(mediaAssets.ownerId, ownerId),
-            eq(mediaAssets.tenantId, this.tenantId),
+            eq(mediaAssets.tenantId, tenantId),
           ),
         );
     });
   }
 
   async delete(assetId: string): Promise<void> {
-    await this.database.transaction(async (tx) => {
-      await tx.execute(
-        sql`SELECT set_config('app.current_tenant_id', ${this.tenantId}, true)`,
-      );
+    const tenantId = this.ctx.getTenantId();
 
+    await this.ctx.withTransaction(async (tx) => {
       const [asset] = await tx.select().from(mediaAssets).where(
-        and(eq(mediaAssets.id, assetId), eq(mediaAssets.tenantId, this.tenantId)),
+        and(eq(mediaAssets.id, assetId), eq(mediaAssets.tenantId, tenantId)),
       );
 
       if (!asset) {

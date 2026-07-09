@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { describe, it, expect } from "vitest";
 import { ApiKeyRepository } from "@/infrastructure/db/repositories/api-key.repository";
-import { verifyKey } from "@/infrastructure/api-keys/api-key-verifier";
+
 import {
   createMockAuthCtx,
   setupMockTransaction,
@@ -181,9 +181,9 @@ describe("ApiKeyRepository", () => {
       // Verify bcrypt hash format: $2[aby]$<rounds>$<base64-hash>
       expect(hash).toMatch(/^\$2[aby]\$\d{2}\$.+$/);
       // Verify bcrypt.compare returns true for the matching key
-      await expect(verifyKey(plainKey, hash)).resolves.toBe(true);
+      await expect(bcrypt.compare(plainKey, hash)).resolves.toBe(true);
       // Verify bcrypt.compare returns false for a wrong key
-      await expect(verifyKey("wrong-key", hash)).resolves.toBe(false);
+      await expect(bcrypt.compare("wrong-key", hash)).resolves.toBe(false);
     });
 
     it("uses default rate limit (60/min) when not specified", async () => {
@@ -286,23 +286,5 @@ describe("ApiKeyRepository", () => {
     });
   });
 
-  describe("verifyKey", () => {
-    it("returns true for matching plain key and hash", async () => {
-      const plainKey = "test-api-key-12345";
-      const hash = await bcrypt.hash(plainKey, BCRYPT_SALT_ROUNDS);
 
-      const result = await verifyKey(plainKey, hash);
-
-      expect(result).toBe(true);
-    });
-
-    it("returns false for non-matching key and hash", async () => {
-      // Hash of a different key
-      const hash = await bcrypt.hash("other-key-value", BCRYPT_SALT_ROUNDS);
-
-      const result = await verifyKey("wrong-key", hash);
-
-      expect(result).toBe(false);
-    });
-  });
 });

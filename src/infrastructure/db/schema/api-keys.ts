@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   text,
+  varchar,
   integer,
   boolean,
   timestamp,
@@ -19,6 +20,7 @@ export const apiKeys = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     keyHash: text("key_hash").notNull(),
+    keyPrefix: varchar("key_prefix", { length: 8 }),
     name: text("name").notNull(),
     isActive: boolean("is_active").notNull().default(true),
     rateLimitPerMin: integer("rate_limit_per_min").notNull().default(60),

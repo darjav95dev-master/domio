@@ -1,3 +1,4 @@
+import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
 
@@ -115,3 +116,47 @@ export const authConfig: NextAuthConfig = {
 
   trustHost: true,
 };
+
+// ─── v5-compatible interface wrapping v4 NextAuth ───────────────────────────
+//
+// ponytail: NextAuth v4 returns a handler fn; mocked/v5 returns {handlers, auth, signIn, signOut}.
+// We detect which shape we got and provide fallbacks so both test mocks and
+// v4 production behave correctly.
+
+const _na = NextAuth(authConfig) as unknown as {
+  handlers?: { GET: (...args: unknown[]) => unknown; POST: (...args: unknown[]) => unknown };
+  auth?: (...args: unknown[]) => Promise<unknown>;
+  signIn?: (...args: unknown[]) => unknown;
+  signOut?: (...args: unknown[]) => unknown;
+};
+
+export const handlers = _na.handlers ?? {
+  GET: _na as unknown as (...args: unknown[]) => unknown,
+  POST: _na as unknown as (...args: unknown[]) => unknown,
+};
+
+// auth() works in both Edge (with req → getToken) and Node.js (without req → getServerSession)
+export const auth = _na.auth ?? async function auth(req?: unknown) {
+  if (req) {
+    const { getToken } = await import("next-auth/jwt");
+    const token = await getToken({
+      req: req as Parameters<typeof getToken>[0]["req"],
+      secret: process.env.AUTH_SECRET,
+    });
+    if (!token) return null;
+    return {
+      user: {
+        id: token.user_id,
+        tenant_id: token.tenant_id,
+        role: token.role,
+        name: (token.name as string | null) ?? null,
+      },
+      expires: new Date(((token.exp as number) ?? 0) * 1000).toISOString(),
+    };
+  }
+  const { getServerSession } = await import("next-auth");
+  return getServerSession(authConfig);
+};
+
+export const signIn = _na.signIn ?? null;
+export const signOut = _na.signOut ?? null;

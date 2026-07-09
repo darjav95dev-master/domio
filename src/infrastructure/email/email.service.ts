@@ -8,7 +8,6 @@ import {
 } from "@/infrastructure/email/types";
 import { emailTemplatePayloadSchemas } from "@/shared/constants/email-templates";
 import type { EmailTemplateName } from "@/shared/constants/email-templates";
-import { EMAIL_STATUS } from "@/shared/constants/db-enums";
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -70,7 +69,7 @@ export class EmailService {
         toEmail: input.toEmail,
         template: input.template,
         payload: payloadResult.data as Record<string, unknown>,
-        status: EMAIL_STATUS.PENDING,
+        status: "PENDING",
         attempts: 0,
         nextAttemptAt: new Date(),
       },

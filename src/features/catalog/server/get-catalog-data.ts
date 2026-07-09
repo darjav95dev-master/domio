@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { PublicContext } from "@/infrastructure/tenant/PublicContext";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
 import type {
   PublicCatalogFilters,
   CatalogSortOption,
-} from "@/infrastructure/db/repositories/promocion.repository";
+} from "@/infrastructure/db/repositories/catalog.repository";
 import { PROPERTY_TYPES, OPERATION_TYPES, CONSTRUCTION_STATUSES, AMENITIES } from "@/shared/constants/db-enums";
 
 // ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ export type CatalogInput = z.infer<typeof catalogInputSchema>;
 export interface CatalogDataResult {
   items: Array<{
     id: string;
-    slug: string;
+    slug: string | null;
     name: string;
     kind: string;
     status: string;
@@ -67,7 +67,7 @@ export async function getCatalogData(
   const parsed = catalogInputSchema.parse(input);
 
   const ctx = new PublicContext();
-  const repo = new PromocionRepository(ctx);
+  const repo = new CatalogRepository(ctx);
 
   const filters: PublicCatalogFilters = {
     island: parsed.island,

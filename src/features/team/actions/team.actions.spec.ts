@@ -53,15 +53,14 @@ const operatorSession = {
 };
 
 const mockUserRow: UserRow = {
-  id: "user-1",
+  id: "user-123",
   tenantId: "tenant-1",
-  email: "user@example.com",
-  passwordHash: null,
-  name: "Test User",
+  email: "agent@domio.com",
+  name: "Test Agent",
   role: "AGENT",
   isActive: true,
-  createdAt: new Date("2026-01-01"),
-  updatedAt: new Date("2026-01-01"),
+  createdAt: new Date("2025-01-01"),
+  updatedAt: new Date("2025-01-01"),
 };
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -145,8 +144,9 @@ describe("createUserAction", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toMatchObject({
-        email: "user@example.com",
-        name: "Test User",
+        email: mockUserRow.email,
+        name: mockUserRow.name,
+        role: mockUserRow.role,
       });
     }
     expect(mockCreate).toHaveBeenCalledWith({

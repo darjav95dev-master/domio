@@ -1,29 +1,28 @@
 import { setTenantContext } from "@/infrastructure/observability/sentry.wrapper";
-import { getTenantContext } from "./context-middleware";
-import { AuthenticatedContext } from "./AuthenticatedContext";
+import type { TenantContext } from "./TenantContext";
 
 /**
- * Sincroniza el contexto de tenant activo con Sentry.
+ * Sincroniza el contexto de tenant activo con Sentry, extrayendo
+ * tenant_id, user_id y role del TenantContext proporcionado (o del
+ * AsyncLocalStorage almacenado en la request).
  *
- * Extrae el TenantContext del AsyncLocalStorage actual y llama a
- * `setTenantContext()` para que los errores posteriores lleven los tags
- * de tenant_id, user_id y role.
+ * Puede invocarse manualmente tras resolver el contexto si se desea
+ * que los errores posteriores lleven los tags de tenant en Sentry.
  *
- * Se invoca tras resolver el TenantContext (en middleware, server action
- * o layout) antes de ejecutar lógica de negocio.
+ * @param ctx — TenantContext opcional. Si se omite, se intenta leer
+ *   del almacenamiento de ámbito de request (AsyncLocalStorage).
  */
-export function syncSentryWithTenant(): void {
-  const ctx = getTenantContext();
-
+export function syncSentryWithTenant(ctx?: TenantContext): void {
   if (!ctx) return;
 
   const context: { tenantId: string; userId?: string; role?: string } = {
     tenantId: ctx.getTenantId(),
   };
 
-  if (ctx instanceof AuthenticatedContext) {
-    context.userId = ctx.userId;
-    context.role = ctx.role;
+  if ("userId" in ctx && typeof (ctx as Record<string, unknown>).userId === "string") {
+    const authed = ctx as unknown as { userId: string; role: string };
+    context.userId = authed.userId;
+    context.role = authed.role;
   }
 
   setTenantContext(context);

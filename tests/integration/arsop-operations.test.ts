@@ -175,8 +175,8 @@ describe("ArsopRepository", () => {
       const mediaService = createMockMediaService();
       const repo = new ArsopRepository(ctx, mediaService as never);
 
-      // Sequence: find lead, delete read_marks, delete notes, delete history,
-      // delete consent_records, delete lead, insert arsop_request
+      // Sequence: find lead, insert arsop_request, delete read_marks, delete notes,
+      // delete history, delete consent_records, delete lead
       const arsopRequestRow = {
         id: "arsop-2",
         tenantId: TENANT_ID,
@@ -188,13 +188,13 @@ describe("ArsopRepository", () => {
         resultAssetId: null,
       };
       setupMockTransaction(mockWithTx, [
-        [baseLeadRow], // find lead
-        [], // delete read marks
-        [], // delete notes
-        [], // delete history
-        [], // delete consent_records
-        [], // delete lead
-        [arsopRequestRow], // insert arsop_request
+        [baseLeadRow],    // find lead
+        [arsopRequestRow], // insert arsop_request (before deletion)
+        [],               // delete read marks
+        [],               // delete notes
+        [],               // delete history
+        [],               // delete consent_records
+        [],               // delete lead
       ]);
 
       const result = await repo.deleteLead(LEAD_ID, ADMIN_ID);

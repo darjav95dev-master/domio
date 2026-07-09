@@ -17,10 +17,7 @@ export interface UserFilters {
   isActive?: boolean;
 }
 
-export interface PaginatedResult<T> {
-  items: T[];
-  total: number;
-}
+import { PaginatedResult } from "@/shared/types/pagination";
 
 export interface CreateUserData {
   email: string;

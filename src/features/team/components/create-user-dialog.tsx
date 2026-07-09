@@ -6,17 +6,8 @@ import { createUserAction } from "@/features/team/actions/team.actions";
 import { Button } from "@/shared/components/button";
 import { Input } from "@/shared/components/input";
 import { USER_ROLES, type UserRole } from "@/shared/constants/db-enums";
+import { USER_ROLE_LABELS } from "@/shared/constants/domain-labels";
 import { ICON_SIZES } from "@/shared/constants/iconography";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  ADMIN: "Administrador",
-  OPERATOR: "Operador",
-  AGENT: "Agente",
-};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -206,7 +197,7 @@ export function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogP
                 >
                   {USER_ROLES.map((r) => (
                     <option key={r} value={r}>
-                      {ROLE_LABELS[r]}
+                      {USER_ROLE_LABELS[r]}
                     </option>
                   ))}
                 </select>

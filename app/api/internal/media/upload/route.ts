@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  resolveTenantContext,
-  tenantContextStorage,
-  ContextResolutionError,
-} from "@/infrastructure/tenant/context-middleware";
+import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import { MediaService } from "@/infrastructure/media/media.service";
 import { UploadValidationError } from "@/infrastructure/media/types";
@@ -31,24 +27,6 @@ interface UploadFormData {
   altText: string | null;
   kind: string | null;
   ownerId: string | null;
-}
-
-function resolveAuthContext(
-  request: NextRequest,
-): AuthenticatedContext {
-  const url = new URL(request.url);
-
-  const resolved = resolveTenantContext({
-    host: url.host,
-    pathname: url.pathname,
-    headers: request.headers,
-  });
-
-  if (!(resolved instanceof AuthenticatedContext)) {
-    throw new ContextResolutionError("Not authenticated", 401);
-  }
-
-  return resolved;
 }
 
 function fileTooLargeResponse(): NextResponse {
@@ -218,18 +196,18 @@ function uploadValidationErrorToResponse(
 }
 
 export async function POST(request: NextRequest) {
-  // 1. Resolve tenant context
-  let context: AuthenticatedContext;
+  // 1. Authenticate session
+  const session = await getServerSession();
 
-  try {
-    context = resolveAuthContext(request);
-  } catch (error) {
-    if (error instanceof ContextResolutionError) {
-      return authRequiredResponse();
-    }
-
-    return internalErrorResponse();
+  if (!session) {
+    return authRequiredResponse();
   }
+
+  const context = new AuthenticatedContext(
+    session.tenantId,
+    session.userId,
+    session.role,
+  );
 
   // 2. Parse FormData
   let formData: FormData;
@@ -257,20 +235,18 @@ export async function POST(request: NextRequest) {
     await new Response(fields.file!).arrayBuffer(),
   );
 
-  // 5. Create service and upload within tenant context
-  const service = new MediaService(context.getTenantId());
+  // 5. Create service and upload
+  const service = new MediaService(context);
 
   try {
-    const asset = await tenantContextStorage.run(context, () =>
-      service.uploadImage({
-        file: fileBuffer,
-        fileName: fields.file!.name,
-        mimeType: fields.file!.type,
-        altText: fields.altText!.trim(),
-        kind: fields.kind as "IMAGE_GALLERY" | "PLAN" | "DOCUMENT",
-        ownerId: fields.ownerId!,
-      }),
-    );
+    const asset = await service.uploadImage({
+      file: fileBuffer,
+      fileName: fields.file!.name,
+      mimeType: fields.file!.type,
+      altText: fields.altText!.trim(),
+      kind: fields.kind as "IMAGE_GALLERY" | "PLAN" | "DOCUMENT",
+      ownerId: fields.ownerId!,
+    });
 
     return NextResponse.json({ asset }, { status: 201 });
   } catch (error) {

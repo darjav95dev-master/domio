@@ -91,16 +91,24 @@ export async function resetDatabase(): Promise<void> {
   // The /api/internal/revalidate endpoint now requires session auth, so we
   // authenticate programmatically first via the Auth.js credentials provider.
   try {
-    // Step 1: Get a CSRF token for the credentials login
+    // Step 1: Get a CSRF token + cookie for the credentials login.
+    // NextAuth validates both the body csrfToken AND the csrfToken cookie.
     const csrfRes = await fetch("http://localhost:3000/api/auth/csrf");
     const { csrfToken } = await csrfRes.json() as { csrfToken: string };
+    const csrfCookie = csrfRes.headers.getSetCookie()
+      .find((c: string) => c.startsWith("next-auth.csrf-token="))
+      ?.split(";")[0] ?? "";
 
-    // Step 2: Login as admin to get a session cookie
+    // Step 2: Login as admin to get a session cookie.
+    // Must send the CSRF cookie back so NextAuth can validate the CSRF token.
     const loginRes = await fetch(
       "http://localhost:3000/api/auth/callback/credentials",
       {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: csrfCookie,
+        },
         body: new URLSearchParams({
           csrfToken,
           email: "admin@domio.dev",
@@ -114,14 +122,13 @@ export async function resetDatabase(): Promise<void> {
     );
 
     // Extract the session cookie from Set-Cookie headers.
-    // getSetCookie() returns an array (available in Node.js 18+).
     const cookies = loginRes.headers.getSetCookie();
     const sessionCookie = cookies.find((c: string) =>
       c.trim().startsWith("next-auth.session-token="),
     );
     const cookieValue = sessionCookie?.split(";")[0]?.trim() ?? "";
 
-    // Step 3: Call revalidation with the session cookie
+    // Step 3: Call revalidation with the session cookie.
     await fetch("http://localhost:3000/api/internal/revalidate", {
       method: "POST",
       headers: {

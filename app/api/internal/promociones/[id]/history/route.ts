@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
-import { getServerSession } from "@/infrastructure/auth/session";
-import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionHistoryRepository } from "@/infrastructure/db/repositories/promocion-history.repository";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -25,24 +25,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
     const { id } = await params;
 
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
-
-    const repository = new PromocionRepository(authCtx);
+    const promocionRepo = new PromocionRepository(auth.ctx);
+    const historyRepo = new PromocionHistoryRepository(auth.ctx);
 
     // Verify promoción exists and check AGENT scope
-    const current = await repository.findById(id);
+    const current = await promocionRepo.findById(id);
 
     if (!current) {
       return Response.json({ error: ERR_NOT_FOUND }, { status: 404 });
@@ -50,8 +43,8 @@ export async function GET(
 
     // AGENT role scope: only assigned promociones
     if (
-      authCtx.role === "AGENT" &&
-      current.assignedAgentId !== authCtx.userId
+      auth.ctx.role === "AGENT" &&
+      current.assignedAgentId !== auth.ctx.userId
     ) {
       return Response.json(
         { error: ERR_FORBIDDEN },
@@ -60,7 +53,7 @@ export async function GET(
     }
 
     // Fetch history with author names (joined in repository)
-    const historyItems = await repository.getHistory(id);
+    const historyItems = await historyRepo.getHistory(id);
 
     return Response.json(
       {

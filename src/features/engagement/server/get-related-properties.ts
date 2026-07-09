@@ -10,7 +10,7 @@ import type { GeometryPoint } from "@/infrastructure/db/schema/geo";
 
 export interface RelatedProperty {
   id: string;
-  slug: string;
+  slug: string | null;
   name: string;
   propertyType: string | null;
   operation: string | null;

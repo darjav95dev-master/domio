@@ -18,8 +18,7 @@ export const arsopRequests = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     leadId: uuid("lead_id")
-      .notNull()
-      .references(() => leads.id, { onDelete: "cascade" }),
+      .references(() => leads.id, { onDelete: "set null" }),
     requestType: arsopRequestTypeEnum("request_type").notNull(),
     requestedAt: timestamp("requested_at", { withTimezone: true })
       .notNull()

@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server";
-import { getServerSession } from "@/infrastructure/auth/session";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { getContentHistory } from "@/features/contenidos/actions/content-history.actions";
 import type { ContentType } from "@/shared/types/content.types";
 
@@ -9,12 +9,10 @@ import type { ContentType } from "@/shared/types/content.types";
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
-  if (session.role !== "ADMIN" && session.role !== "OPERATOR") {
+  if (auth.ctx.role !== "ADMIN" && auth.ctx.role !== "OPERATOR") {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 

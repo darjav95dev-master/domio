@@ -1,8 +1,8 @@
 import { type NextRequest } from "next/server";
 import { revalidateTag } from "next/cache";
-import { getServerSession } from "@/infrastructure/auth/session";
-import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionContentBlockRepository } from "@/infrastructure/db/repositories/promocion-content-block.repository";
 import { PromocionWithTipologiasUpdateSchema } from "@/shared/schemas/promocion.schema";
 import { generateSlug } from "@/infrastructure/slug/generate-slug";
 import { validateMediaForPublish } from "@/features/promociones/actions/media.actions";
@@ -114,6 +114,7 @@ interface PrepareUpdateParams {
   parsedData: PromocionUpdatePayload;
   current: PromocionWithRelations;
   id: string;
+  isPublishing: boolean;
 }
 
 interface PreparedUpdate {
@@ -122,14 +123,11 @@ interface PreparedUpdate {
 }
 
 function prepareUpdateData(params: PrepareUpdateParams): PreparedUpdate {
-  const { parsedData, current, id } = params;
+  const { parsedData, current, id, isPublishing } = params;
 
   const updateData: Record<string, unknown> = {
     ...parsedData,
   };
-
-  const isPublishing =
-    parsedData.status === "PUBLISHED" && current.status !== "PUBLISHED";
 
   // If publishing from draft, merge draftPayload fields
   if (isPublishing && current.draftPayload) {
@@ -180,12 +178,10 @@ function prepareUpdateData(params: PrepareUpdateParams): PreparedUpdate {
  */
 async function validateMediaOnPublish(
   promocionId: string,
-  parsedData: PromocionUpdatePayload,
-  current: PromocionWithRelations,
+  _parsedData: PromocionUpdatePayload,
+  _current: PromocionWithRelations,
+  isPublishing: boolean,
 ): Promise<Response | null> {
-  const isPublishing =
-    parsedData.status === "PUBLISHED" && current.status !== "PUBLISHED";
-
   if (!isPublishing) return null;
 
   const mediaValidation = await validateMediaForPublish(promocionId);
@@ -229,17 +225,15 @@ function validationErrorResponse(
  * Extracted to reduce cognitive complexity of the PATCH handler (FR-008).
  */
 async function validateBlocksOnPublish(
-  repository: PromocionRepository,
+  contentBlockRepo: PromocionContentBlockRepository,
   promocionId: string,
-  parsedData: PromocionUpdatePayload,
-  current: PromocionWithRelations,
+  _parsedData: PromocionUpdatePayload,
+  _current: PromocionWithRelations,
+  isPublishing: boolean,
 ): Promise<Response | null> {
-  const isPublishing =
-    parsedData.status === "PUBLISHED" && current.status !== "PUBLISHED";
-
   if (!isPublishing) return null;
 
-  const blockValidation = await repository.validateBlocksForPublish(promocionId);
+  const blockValidation = await contentBlockRepo.validateBlocksForPublish(promocionId);
 
   if (blockValidation.valid) return null;
 
@@ -271,21 +265,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
     const { id } = await params;
 
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
+    const repository = new PromocionRepository(auth.ctx);
+    const contentBlockRepo = new PromocionContentBlockRepository(auth.ctx);
 
-    const repository = new PromocionRepository(authCtx);
     const promocion = await repository.findById(id);
 
     if (!promocion) {
@@ -294,8 +282,8 @@ export async function GET(
 
     // AGENT role scope: only assigned promociones
     if (
-      authCtx.role === "AGENT" &&
-      promocion.assignedAgentId !== authCtx.userId
+      auth.ctx.role === "AGENT" &&
+      promocion.assignedAgentId !== auth.ctx.userId
     ) {
       return Response.json(
         { error: ERR_FORBIDDEN },
@@ -304,7 +292,7 @@ export async function GET(
     }
 
     // Compute constructionWarning from PLAZOS_GARANTIAS block
-    const blockPayload = await repository.findContentBlock(
+    const blockPayload = await contentBlockRepo.findContentBlock(
       id,
       "PLAZOS_GARANTIAS",
     );
@@ -337,19 +325,13 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
     const { id } = await params;
 
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
+    const repository = new PromocionRepository(auth.ctx);
 
     // Parse and validate body
     // Uses PromocionWithTipologiasUpdateSchema so that optional tipologias
@@ -362,7 +344,6 @@ export async function PATCH(
       return validationErrorResponse(parsed.error.issues);
     }
 
-    const repository = new PromocionRepository(authCtx);
     const current = await repository.findById(id);
 
     if (!current) {
@@ -371,8 +352,8 @@ export async function PATCH(
 
     // AGENT role scope: only assigned promociones
     if (
-      authCtx.role === "AGENT" &&
-      current.assignedAgentId !== authCtx.userId
+      auth.ctx.role === "AGENT" &&
+      current.assignedAgentId !== auth.ctx.userId
     ) {
       return Response.json(
         { error: ERR_FORBIDDEN },
@@ -392,23 +373,28 @@ export async function PATCH(
         loc === null ? null : ([loc.lng, loc.lat] as [number, number]);
     }
 
+    const isPublishing =
+      parsed.data.status === "PUBLISHED" && current.status !== "PUBLISHED";
+
     const { data: updateData, resultingSlug } = prepareUpdateData({
       parsedData: parsed.data,
       current,
       id,
+      isPublishing,
     });
 
     // FR-008: Re-check block validation on publish — the server component
     // computes publishBlocked on page-load, but the operator may have edited
     // blocks client-side since then, making the initial check stale.
+    const contentBlockRepo = new PromocionContentBlockRepository(auth.ctx);
     const blockResponse = await validateBlocksOnPublish(
-      repository, id, parsed.data, current,
+      contentBlockRepo, id, parsed.data, current, isPublishing,
     );
     if (blockResponse) return blockResponse;
 
     // FR-009 / FR-010: Reject publish if media assets are invalid
     const mediaResponse = await validateMediaOnPublish(
-      id, parsed.data, current,
+      id, parsed.data, current, isPublishing,
     );
     if (mediaResponse) return mediaResponse;
 
@@ -441,29 +427,21 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
     const { id } = await params;
 
     // Only ADMIN and OPERATOR can delete
-    if (session.role === "AGENT") {
+    if (auth.ctx.role === "AGENT") {
       return Response.json(
         { error: ERR_FORBIDDEN },
         { status: 403 },
       );
     }
 
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
-
-    const repository = new PromocionRepository(authCtx);
+    const repository = new PromocionRepository(auth.ctx);
 
     // Fetch the promoción first to get the slug for revalidation
     const current = await repository.findById(id);

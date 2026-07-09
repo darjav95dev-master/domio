@@ -3,7 +3,7 @@ import {
   SITEMAP_CHANGE_FREQ,
   SITEMAP_LIMITS,
 } from "@/shared/utils/seo/constants";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,11 +28,11 @@ export interface SitemapEntry {
  * - `lastmod`: promotion's `updated_at` in YYYY-MM-DD format
  * - `changefreq`: weekly (per spec, detail pages use weekly frequency)
  *
- * @param repo - A `PromocionRepository` instance (allows DI for testing).
- *               In production, pass `new PromocionRepository(new PublicContext())`.
+ * @param repo - A `CatalogRepository` instance (allows DI for testing).
+ *               In production, pass `new CatalogRepository(new PublicContext())`.
  */
 export async function buildSitemapUrls(
-  repo: PromocionRepository,
+  repo: CatalogRepository,
 ): Promise<SitemapEntry[]> {
   const result = await repo.findPublicWithCursor(
     {},
@@ -42,7 +42,7 @@ export async function buildSitemapUrls(
   const siteUrl = getSiteUrl();
 
   return result.items.map((promo) => ({
-    loc: `${siteUrl}/inmuebles/${promo.slug}`,
+    loc: `${siteUrl}/inmuebles/${promo.slug ?? ""}`,
     lastmod: formatDate(promo.updatedAt),
     changefreq: SITEMAP_CHANGE_FREQ.DETAIL,
   }));

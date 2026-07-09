@@ -53,7 +53,7 @@ export async function uploadMediaAction(
       };
     }
 
-    const mediaService = new MediaService(session.tenantId);
+    const mediaService = new MediaService(new AuthenticatedContext(session.tenantId, session.userId, session.role));
     // jsdom no implementa File.arrayBuffer — usamos new Response como workaround
     const buffer = Buffer.from(await new Response(file).arrayBuffer());
 
@@ -123,7 +123,7 @@ export async function deleteMediaAction(
       }
     });
 
-    const mediaService = new MediaService(session.tenantId);
+    const mediaService = new MediaService(new AuthenticatedContext(session.tenantId, session.userId, session.role));
     await mediaService.delete(assetId);
 
     return { success: true };
@@ -163,7 +163,7 @@ export async function reorderMediaAction(
       };
     }
 
-    const mediaService = new MediaService(session.tenantId);
+    const mediaService = new MediaService(new AuthenticatedContext(session.tenantId, session.userId, session.role));
     await mediaService.reorderGallery(promocionId, orderedAssetIds);
 
     return { success: true };
@@ -198,7 +198,7 @@ export async function setCoverAction(
       };
     }
 
-    const mediaService = new MediaService(session.tenantId);
+    const mediaService = new MediaService(new AuthenticatedContext(session.tenantId, session.userId, session.role));
     await mediaService.setCover(promocionId, assetId);
 
     return { success: true };

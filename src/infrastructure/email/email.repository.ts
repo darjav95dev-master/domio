@@ -4,7 +4,7 @@ import { db as defaultDb } from "@/infrastructure/db/client";
 import { emailQueue } from "@/infrastructure/db/schema/email-queue";
 import * as schema from "@/infrastructure/db/schema";
 import type { EmailQueue, NewEmailQueue } from "@/infrastructure/db/schema/email-queue";
-import { EMAIL_STATUS } from "@/shared/constants/db-enums";
+
 
 export class EmailRepository {
   constructor(private readonly db: NodePgDatabase<typeof schema> = defaultDb) {}
@@ -34,7 +34,7 @@ export class EmailRepository {
     const result = await db.execute<EmailQueue>(
       sql`
         SELECT * FROM email_queue
-        WHERE status = ${EMAIL_STATUS.PENDING}
+        WHERE status = ${"PENDING"}
           AND (next_attempt_at IS NULL OR next_attempt_at <= now())
         ORDER BY next_attempt_at ASC NULLS FIRST
         LIMIT ${limit}
@@ -57,7 +57,7 @@ export class EmailRepository {
     await db
       .update(emailQueue)
       .set({
-        status: EMAIL_STATUS.SENT,
+        status: "SENT",
         sentAt: sql`now()`,
         attempts: sql`attempts + 1`,
       })
@@ -77,7 +77,7 @@ export class EmailRepository {
     await db
       .update(emailQueue)
       .set({
-        status: EMAIL_STATUS.FAILED,
+        status: "FAILED",
         lastError: error,
         attempts: sql`attempts + 1`,
       })

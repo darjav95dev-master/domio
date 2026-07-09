@@ -1,10 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { apiKeys } from "@/infrastructure/db/schema";
 import { db } from "@/infrastructure/db/client";
 import { ApiKeyContext } from "@/infrastructure/tenant/ApiKeyContext";
-import { ContextResolutionError } from "@/infrastructure/tenant/context-middleware";
-import { API_KEY_HEADER } from "@/shared/constants/tenant-hosts";
+import { ContextResolutionError, extractApiKey } from "@/infrastructure/tenant/context-middleware";
 import { logger } from "@/shared/utils/logger";
 
 /**
@@ -20,7 +19,7 @@ export interface MatchedApiKey {
  * Type for the key lookup dependency.
  * Default implementation queries the DB; tests can inject mocks.
  */
-export type FindActiveKeysFn = () => Promise<
+export type FindActiveKeysFn = (keyPrefix?: string) => Promise<
   Array<{ id: string; tenantId: string; keyHash: string; rateLimitPerMin: number }>
 >;
 
@@ -31,7 +30,14 @@ export type TouchLastUsedAtFn = (apiKeyId: string) => Promise<void>;
 
 // ─── Default implementations (production) ────────────────────────────────────
 
-const defaultFindActiveKeys: FindActiveKeysFn = async () => {
+const defaultFindActiveKeys: FindActiveKeysFn = async (keyPrefix?: string) => {
+  const conditions = [eq(apiKeys.isActive, true)];
+
+  if (keyPrefix) {
+    // Filter by prefix for O(1) lookup; also include legacy keys without prefix
+    conditions.push(or(eq(apiKeys.keyPrefix, keyPrefix), isNull(apiKeys.keyPrefix)) as never);
+  }
+
   return db
     .select({
       id: apiKeys.id,
@@ -40,7 +46,7 @@ const defaultFindActiveKeys: FindActiveKeysFn = async () => {
       rateLimitPerMin: apiKeys.rateLimitPerMin,
     })
     .from(apiKeys)
-    .where(eq(apiKeys.isActive, true));
+    .where(and(...conditions));
 };
 
 const defaultTouchLastUsedAt: TouchLastUsedAtFn = async (apiKeyId: string) => {
@@ -59,31 +65,26 @@ const defaultTouchLastUsedAt: TouchLastUsedAtFn = async (apiKeyId: string) => {
 };
 
 /**
- * Extract the API key from a request's headers.
+ * Extracts the API key from a request.
  *
- * Checks, in order:
+ * Delegates to `extractApiKey` from `@/infrastructure/tenant/context-middleware`,
+ * which checks:
  * 1. `Authorization: Bearer <key>`
  * 2. `X-API-Key` header (defined in tenant-hosts.ts as `x-api-key`)
  *
  * Returns the key string, or null if absent.
  */
-export function extractApiKeyFromRequest(request: Request): string | null {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const BEARER_PREFIX = "Bearer ";
-
-  if (authHeader.startsWith(BEARER_PREFIX)) {
-    const token = authHeader.slice(BEARER_PREFIX.length).trim();
-    if (token.length > 0) {
-      return token;
-    }
-  }
-
-  return request.headers.get(API_KEY_HEADER);
-}
+export const extractApiKeyFromRequest = (request: Request): string | null =>
+  extractApiKey(request.headers);
 
 /**
  * Locate a matching active API key from the DB by bcrypt-comparing the
- * provided plaintext key against all active key hashes.
+ * provided plaintext key against active key hashes.
+ *
+ * Uses the first 8 characters of the plaintext key as a prefix filter
+ * to reduce the number of bcrypt comparisons from O(n) to O(1) in the
+ * common case (keys with prefix). Legacy keys without a stored prefix
+ * are always included in the candidate set.
  *
  * @param plaintextKey The key extracted from the request.
  * @param findActiveKeysFn Function that returns active keys (injectable for tests).
@@ -93,9 +94,10 @@ export async function findMatchingApiKey(
   plaintextKey: string,
   findActiveKeysFn: FindActiveKeysFn = defaultFindActiveKeys,
 ): Promise<MatchedApiKey | null> {
-  const activeKeys = await findActiveKeysFn();
+  const keyPrefix = plaintextKey.length >= 8 ? plaintextKey.slice(0, 8) : undefined;
+  const candidates = await findActiveKeysFn(keyPrefix);
 
-  for (const key of activeKeys) {
+  for (const key of candidates) {
     const matches = await bcrypt.compare(plaintextKey, key.keyHash);
     if (matches) {
       return {

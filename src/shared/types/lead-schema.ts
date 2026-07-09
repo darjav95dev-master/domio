@@ -135,10 +135,7 @@ export type LeadReassignInput = z.infer<typeof leadReassignSchema>;
 // Lead paginated result
 // ---------------------------------------------------------------------------
 
-export interface PaginatedResult<T> {
-  items: T[];
-  total: number;
-}
+import { PaginatedResult } from "./pagination";
 
 // ---------------------------------------------------------------------------
 // Public lead form schema (existing, from public form)

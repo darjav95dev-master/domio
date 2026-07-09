@@ -95,7 +95,7 @@ describe("leadPaginationSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.page).toBe(1);
-      expect(result.data.limit).toBe(25);
+      expect(result.data.limit).toBe(20);
     }
   });
 

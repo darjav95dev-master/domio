@@ -1,6 +1,7 @@
 import { leads, consentRecords, emailQueue } from "@/infrastructure/db/schema";
 import type { ApiKeyContext } from "@/infrastructure/tenant/ApiKeyContext";
 import { leadInstitutionalSchema, type LeadInstitutionalInput } from "../schemas/lead-institutional.schema";
+import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
 
 export interface CreateInstitutionalLeadInput {
   ctx: ApiKeyContext;
@@ -91,13 +92,11 @@ export async function createInstitutionalLead(
       .insert(emailQueue)
       .values({
         toEmail: data.email,
-        template: "lead-institutional-confirmation",
+        template: EMAIL_TEMPLATE_NAMES.LEAD_CONFIRMATION,
         payload: {
-          leadId: lead.id,
-          name: data.name,
-          email: data.email,
-          promocionId: data.promocionId,
-          tenantId: ctx.getTenantId(),
+          leadName: data.name,
+          promotionName: data.promocionId,
+          contactEmail: data.email,
         },
       })
       .returning();

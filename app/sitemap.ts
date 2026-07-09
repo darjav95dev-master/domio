@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { buildSitemapUrls } from "@/features/seo/server/sitemap-urls";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
 import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { getSiteUrl } from "@/shared/utils/seo/site-url";
 import {
@@ -37,7 +37,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Dynamic promotion detail pages (published only, via PublicContext)
-  const repo = new PromocionRepository(new PublicContext());
+  const repo = new CatalogRepository(new PublicContext());
   const promoEntries = await buildSitemapUrls(repo);
 
   // Convert SitemapEntry → MetadataRoute.Sitemap items

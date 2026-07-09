@@ -14,6 +14,7 @@ import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { contactFormSchema } from "../schemas/contact-form.schema";
 import { checkIpRateLimit } from "@/infrastructure/rate-limiting/ip-rate-limit";
 import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
+import { BACKOFFICE_LEADS_URL } from "@/shared/constants/tenant-hosts";
 import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
 import type { ContactFormInput } from "../schemas/contact-form.schema";
 
@@ -35,7 +36,7 @@ export interface CreateLeadInput extends ContactFormInput {
 
 const promocionIdSchema = z.string().uuid("Identificador de promoción no válido");
 
-const AGENT_NOTIFICATION_BACKOFFICE_URL = "https://panel.domio.com/leads";
+
 
 // ---------------------------------------------------------------------------
 // Server Action (entry point)
@@ -180,7 +181,7 @@ export async function createLeadService(
         agentName: agent.name,
         leadName: data.name,
         promotionName: promocion.name,
-        backofficeUrl: `${AGENT_NOTIFICATION_BACKOFFICE_URL}/${lead.id}`,
+        backofficeUrl: `${BACKOFFICE_LEADS_URL}/${lead.id}`,
       },
     });
 

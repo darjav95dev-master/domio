@@ -10,7 +10,7 @@ import {
   withTenant,
 } from "../isolation/db";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionContentBlockRepository } from "@/infrastructure/db/repositories/promocion-content-block.repository";
 import { db } from "@/infrastructure/db/client";
 import { promociones } from "@/infrastructure/db/schema";
 
@@ -59,7 +59,7 @@ describe("PromocionRepository content blocks", () => {
   beforeAll(async () => {
     if (!hasDatabaseUrl()) return;
     ctx = new AuthenticatedContext(TENANT_ID, USER_ID, "ADMIN");
-    repo = new PromocionRepository(ctx);
+    repo = new PromocionContentBlockRepository(ctx);
 
     // Create a portfolio promoción
     portfolioPromocionId = await db.transaction(async (tx) => {
@@ -185,7 +185,7 @@ describe("PromocionRepository content blocks", () => {
         USER_ID,
         "ADMIN",
       );
-      const otherRepo = new PromocionRepository(otherCtx);
+      const otherRepo = new PromocionContentBlockRepository(otherCtx);
       const blocks = await otherRepo.findAllContentBlocks(portfolioPromocionId);
 
       expect(blocks).toEqual([]);

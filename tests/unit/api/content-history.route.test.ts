@@ -70,7 +70,7 @@ describe("GET /api/internal/content/history", () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe("Unauthorized");
+    expect(body.error).toBe("Unauthenticated");
   });
 
   it("returns 403 when role is AGENT", async () => {

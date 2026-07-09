@@ -1,26 +1,37 @@
 # Technical Roadmap — Domio
 
-> Generado por: engineering-auditor (adaptado desde engineering-audit.md)
+> Generado por: engineering-auditor
 > Fecha: 2026-07-09
+> Versión: v4 — auditoría completa post-feature-027 (contract-tests)
 
 ---
 
 ## 1. Executive Summary
 
-**Score:** 78/100 — B+
+**Score:** 91/100 — A+
 
-**Estado general:** Domio es una plataforma SaaS inmobiliaria con Next.js 15, TypeScript strict, Drizzle ORM y PostgreSQL. El proyecto tiene 26+ features entregadas, una infraestructura de testing excepcional (unitarios, integración, RLS isolation, contrato y E2E) y un diseño de tenant isolation a doble capa sólido. Un bug crítico en producción bloquea la subida de media para todos los usuarios.
+**Estado general:** Domio es una plataforma de comercialización inmobiliaria construida sobre Next.js 15 App Router, TypeScript strict, Drizzle ORM y PostgreSQL con Row Level Security. El sistema ha completado 27 features con una calidad técnica sobresaliente. La auditoría v3 identificó cuatro bugs críticos/altos que han sido **completamente resueltos** en las iteraciones posteriores: el template de email ausente está registrado y funcionando, el rate limiting de login está conectado al flujo real via middleware, `PaginatedResult<T>` ha sido unificada en `shared/types/pagination.ts`, `ROLE_LABELS` local ha sido reemplazada por la constante compartida, y `withRateLimit` HOC dead code ha sido eliminado. La deuda técnica residual es baja y ninguna de ella bloquea producción.
 
-**Fortalezas:**
-- Testing de calidad excepcional: tests de aislamiento RLS, contrato y E2E completos
-- Tenant isolation a dos capas (PostgreSQL RLS + TenantContext) correctamente implementado
-- Transaccionalidad consistente con `withTransaction`
-- TypeScript strict, ESLint sonarjs, Husky pre-commit
-- Rate limiting con fail-open pattern correcto
+**Fortalezas principales:**
+- Tenant isolation a dos capas ejecutada con rigor: `TenantAwareRepository` + RLS con `FORCE ROW LEVEL SECURITY` + `SET LOCAL` via `set_config`
+- Email desacoplado del path crítico mediante `email_queue` persistente con worker y backoff exponencial
+- `CatalogRepository` separado de `PromocionRepository` — SRP resuelto en la extracción anterior
+- `TipologiaSyncService` extraído del repositorio — SRP resuelto
+- Rate limiting de login correctamente conectado en `middleware.ts` antes del guard de auth
+- Cursor pagination en catálogo público y API v1 (sin OFFSET) con sort por precio usando subquery CTE
+- Suite de tests excepcional: 4 capas (unit + integration + isolation RLS + contract + E2E POM)
+- `PaginatedResult<T>` unificada en `src/shared/types/pagination.ts` — DRY resuelto
+- `USER_ROLE_LABELS` desde `shared/constants/domain-labels` en todos los componentes de team
+- `UserRow` en `user-schema.ts` excluye `passwordHash` — separación correcta
+- `getServerSession()` loguea el error antes de retornar null — observabilidad mejorada
+- `withRateLimit` HOC eliminado — sin dead code en el path de API pública
+- `isPublishing` calculado una sola vez en el PATCH handler y pasado por parámetro
+- `slug` nullable en schema Drizzle — viola la unicidad solo durante el DRAFT, correctamente resuelto
 
 **Riesgos principales:**
-- Bug crítico: `/api/internal/media/upload` usa auth mock de desarrollo — devuelve 401 en producción
-- `PromocionRepository` de 1.602 líneas acumula 6 responsabilidades distintas
+- `UserRepository.findAll/findById/update/deactivate` usa `.select()` sin columnas explícitas, lo que incluye `passwordHash` e `invitationTokenHash` en el objeto en memoria aunque `mapUserRow` los excluya antes de exponerlos. Riesgo de leakage en logs o Sentry.
+- `getUnreadLeadIds` y `getUnreadCount` usan `NOT IN` subquery; `DashboardRepository.getUnreadLeadsCount` usa `LEFT JOIN + isNull`. Tres implementaciones paralelas del mismo concepto sin unificar.
+- Los filtros de precio en `findPublicWithCursor` generan un subquery `EXISTS` por cada parámetro, lo que puede producir planes ineficientes con múltiples filtros simultáneos sobre tablas grandes.
 
 ---
 
@@ -28,308 +39,401 @@
 
 ### Estado actual
 
-```
-app/                → Next.js App Router (rutas, páginas, API routes)
-src/features/       → Módulos de feature (actions, components, hooks, server, schemas)
-src/infrastructure/ → Servicios de infraestructura (db, auth, email, media, rate-limiting, tenant)
-src/shared/         → Código compartido (components, constants, types, utils)
-```
+- **Framework:** Next.js 15 App Router con rutas agrupadas `(public)` y `(auth)`
+- **Capas:** `app/` (route handlers + pages) → `src/features/` (lógica de negocio por feature) → `src/infrastructure/` (DB, auth, email, media, rate-limiting, tenant)
+- **Multi-tenancy:** `TenantContext` (tres subclases: `PublicContext`, `AuthenticatedContext`, `ApiKeyContext`) + RLS con `FORCE ROW LEVEL SECURITY` + `SET LOCAL` via `set_config('app.current_tenant_id', ..., true)`
+- **Repositorios:** `PromocionRepository` (backoffice CRUD, ~588 líneas) + `CatalogRepository` (public + API cursor pagination) + `TipologiaSyncService` (sync tipologías/unidades) — SRP correctamente segregado
+- **Email:** cola persistente `email_queue` + worker con retry exponencial y `FOR UPDATE SKIP LOCKED`
+- **Media:** Cloudflare R2 via `MediaService`; upload solo desde servidor
+- **Testing:** Vitest (unit, integration, contract, isolation) + Playwright E2E con POM
+- **Contract tests:** `tests/contract/v1/` con 7 suites incluyendo snapshot divergence y consumer mirror
 
 ### Fortalezas
-- Clara separación entre código público `(public)` y autenticado `(auth)`
-- Patrón `TenantAwareRepository` bien ejecutado como base de repositorios
-- Sistema de email en cola con worker desacoplado
-- Rate limiting `UpstashRateLimiter / NoopRateLimiter` con polimorfismo justificado
+
+- Separación limpia entre bounded contexts en `src/features/`
+- `TenantAwareRepository` como base de todos los repositorios: toda query pasa por transacción con `SET LOCAL`
+- `CatalogRepository` separado de `PromocionRepository` — responsabilidades claras
+- `TipologiaSyncService` en `src/features/promociones/services/` — sync desacoplado del CRUD
+- `CursorEncoder` en `src/infrastructure/db/repositories/cursor-encoder.ts` — utilidad pura
+- `shared/constants/` centraliza enums, labels y configuración sin magic strings
+- Serializer `promocion-serializer.ts` filtra `location` cuando `mapPrivacyMode='AREA'` — regla de privacidad en la serialización, no en el endpoint
 
 ### Debilidades
-- Dos sistemas de auth en paralelo: `context-middleware.ts` (legacy, dev-only) y `session.ts` (NextAuth, producción)
-- `PromocionRepository` con 6 responsabilidades mezcladas
-- `MediaService` no usa `TenantContext.withTransaction` como el resto
 
-### Hallazgos
+- `UserRepository` usa `.select()` sin columnas explícitas en `findAll`, `findById`, `update` y `deactivate` — el objeto en memoria incluye `passwordHash` aunque `mapUserRow` lo filtre antes de exponer
+- Tres variantes de "unread leads" con estrategias SQL distintas: `NOT IN` en `LeadRepository` vs `LEFT JOIN + isNull` en `DashboardRepository`
+- Los EXISTS subqueries en `findPublicWithCursor` (precio, dormitorios, baños, amenities) no están indexados por tipologías → potencial problema de performance con filtros combinados sobre catálogos grandes
+
+### Hallazgos de arquitectura
 
 | ID | Hallazgo | Archivos afectados | Impacto |
 |----|----------|--------------------|---------|
-| A1 | Upload route usa auth mock de desarrollo | `app/api/internal/media/upload/route.ts` | Crítico |
-| A2 | God Object: PromocionRepository (1.602 líneas) | `src/infrastructure/db/repositories/promocion.repository.ts` | Alto |
-| A3 | MediaService bypasa TenantContext pattern | `src/infrastructure/media/media.service.ts` | Medio |
-| A4 | Sistema de auth legacy sin eliminar | `src/infrastructure/tenant/context-middleware.ts` | Medio |
+| A1 | `.select()` sin columnas en UserRepository incluye `passwordHash` en memoria | `src/infrastructure/db/repositories/user.repository.ts:59,81,189` | Medio |
+| A2 | Tres implementaciones del concepto "unread leads" con estrategias SQL distintas | `lead.repository.ts:363,515` + `dashboard.repository.ts:25` | Bajo |
+| A3 | EXISTS subqueries en filtros de precio/dormitorios/baños en `findPublicWithCursor` sin índice en tipologías | `src/infrastructure/db/repositories/catalog.repository.ts:210-236` | Bajo (aceptable para MVP) |
 
 ---
 
-## 3. Deuda Técnica Crítica
+## 3. SOLID
 
-### [DT-01] Upload route usa auth mock en producción
+### SRP — Single Responsibility Principle
 
-**Problema:** `app/api/internal/media/upload/route.ts` llama a `resolveTenantContext` que requiere la cabecera `x-mock-session` (dev-only). En producción lanza `ContextResolutionError` con 401. Ningún usuario puede subir media en producción.
-**Archivos afectados:** `app/api/internal/media/upload/route.ts`
-**Impacto:** Crítico
-**Riesgo futuro:** Muy Alto
-**Coste fix:** Muy Bajo (1-2h)
-**Riesgo del refactor:** Muy Bajo
-**Beneficio esperado:** Muy Alto
-**Prioridad:** Hacer inmediatamente
+No se identifican violaciones actuales. Los refactors planificados de la auditoría v3 han sido aplicados:
 
-**Acción concreta:** Reemplazar `resolveAuthContext(request)` por el patrón estándar:
-```ts
-const session = await getServerSession();
-if (!session) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-const ctx = new AuthenticatedContext(session.tenantId, session.userId, session.role);
-```
-Actualizar tests de integración de upload para usar NextAuth mock en lugar de `x-mock-session`.
+- `PromocionRepository` acotado a backoffice CRUD (~588 líneas, aceptable)
+- `CatalogRepository` para public/API cursor pagination
+- `TipologiaSyncService` para la sincronización de tipologías/unidades
+- `CursorEncoder` como módulo utilitario puro
+
+### OCP, LSP, ISP, DIP
+
+No se identifican violaciones reales con impacto de mantenibilidad. Las interfaces de dependencia en rate limiter, email service y repositorios están bien segregadas. Las implementaciones no violan contratos. La DI es explícita en constructores.
 
 ---
 
-### [DT-02] God Object: PromocionRepository (1.602 líneas)
+## 4. YAGNI
 
-**Problema:** Un solo repositorio gestiona CRUD de promociones, content blocks, tipologías, unidades, historia de cambios y paginación pública. Cada cambio en cualquiera de estas áreas obliga a modificar el mismo fichero, aumentando el riesgo de regresiones entre responsabilidades no relacionadas.
-**Archivos afectados:** `src/infrastructure/db/repositories/promocion.repository.ts`
-**Impacto:** Alto
-**Riesgo futuro:** Alto
-**Coste fix:** Medio (4-8h)
-**Riesgo del refactor:** Medio (90+ tests)
-**Beneficio esperado:** Alto
-**Prioridad:** Planificar
+### `PaginatedResult` en `CatalogRepository`
 
-**Acción concreta:** Extraer `PromocionContentBlockRepository` en `src/infrastructure/db/repositories/promocion-content-block.repository.ts` con los métodos: `findContentBlock`, `findAllContentBlocks`, `upsertContentBlock`, `deleteContentBlock`, `reorderContentBlocks`, `validateBlocksForPublish`. Mantener la suite de tests existente verde durante todo el proceso.
+`CatalogRepository` importa `PaginatedResult` de `shared/types/pagination` pero no la usa en ningún método público (usa `CatalogCursorResult` y `ApiCursorResult` propias). La importación es dead import.
+
+| Código | Motivo | Riesgo de eliminar |
+|--------|--------|--------------------|
+| `import { PaginatedResult } from "@/shared/types/pagination"` en `catalog.repository.ts:15` | Import sin uso en el archivo | Muy bajo |
+
+**Prioridad:** Quick Win — eliminar el import.
+
+### Duplicaciones aceptables que NO se deben unificar
+
+- `CatalogCursorResult` y `ApiCursorResult` tienen campos idénticos pero semánticas distintas (público vs API). No unificar.
+- `PromocionListRow` como tipo exportado de `promocion.repository.ts` re-usado en `catalog.repository.ts` — correcto: compartir el tipo evita duplicar la definición de columnas.
 
 ---
 
-### [DT-03] N+1 queries en reorder y delete de content blocks
+## 5. KISS
 
-**Problema:** `reorderContentBlocks` emite una UPDATE individual por cada bloque. Con 10 bloques son 10 round-trips en la misma transacción. `deleteContentBlock` hace lo mismo al reindexar. Impacto directo en la UX del editor drag-and-drop.
-**Archivos afectados:** `src/infrastructure/db/repositories/promocion.repository.ts` (líneas 1254-1322)
-**Impacto:** Alto
-**Riesgo futuro:** Medio
-**Coste fix:** Bajo (2-4h)
-**Riesgo del refactor:** Bajo
-**Beneficio esperado:** Alto
-**Prioridad:** Planificar
+### Complejidad aceptable
 
-**Acción concreta:** Reemplazar el loop de UPDATEs por una sola query con CASE:
+- `fetchPublicWithPriceSort` usa un CTE con `price_agg` y cursor basado en precio. Es la única forma correcta de cursor pagination con sort por precio. No simplificar.
+- `computeConstructionWarning` en el route handler de `[id]/route.ts` tiene tres condiciones mutuamente excluyentes. Es legible y correcto. No simplificar.
+- El shim de compatibilidad NextAuth v4/v5 en `auth.config.ts` es necesario para los tests. No tocar.
+
+### Simplificaciones posibles
+
+- `UserRepository.findAll` hace dos queries (SELECT + COUNT) para paginación offset. No hay paginación real en el backoffice de usuarios — la API devuelve todos los usuarios sin cursor. La query COUNT es siempre sobre el mismo resultado que los items. Bajo volumen esperado de usuarios (<100), esto es correcto y no hay nada que simplificar.
+
+---
+
+## 6. DRY
+
+### Duplicaciones resueltas (comparado con v3)
+
+- `PaginatedResult<T>` → unificada en `src/shared/types/pagination.ts` ✓
+- `ROLE_LABELS` local → reemplazada por `USER_ROLE_LABELS` de `domain-labels.ts` en los tres componentes de team ✓
+- `isPublishing` → calculado una vez en PATCH handler y pasado por parámetro ✓
+- `withRateLimit` HOC → eliminado ✓
+
+### Duplicaciones residuales relevantes
+
+#### [DRY-01] `CATALOG_SELECT_COLUMNS` vs `PROMOCION_SELECT_COLUMNS`
+
+`catalog.repository.ts` define `CATALOG_SELECT_COLUMNS` con los mismos 22 campos que `PROMOCION_SELECT_COLUMNS` en `promocion.repository.ts`. Son idénticos. Si se añade un campo a `promociones`, hay que actualizarlo en dos sitios.
+
+**Archivos afectados:**
+- `src/infrastructure/db/repositories/catalog.repository.ts:23-46`
+- `src/infrastructure/db/repositories/promocion.repository.ts:29-52`
+
+**Impacto:** Cuando se añada un campo nuevo a `promociones` (e.g., `featured`), hay que acordarse de actualizarlo en ambos archivos. El riesgo es bajo hoy pero aumenta con cada campo nuevo.
+
+**Acción concreta:** Exportar `PROMOCION_SELECT_COLUMNS` desde `promocion.repository.ts` e importarlo en `catalog.repository.ts`. El tipo `PromocionListRow` ya se importa del mismo sitio — es coherente.
+
+**Prioridad:** Quick Win — 15 min, riesgo nulo.
+
+#### [DRY-02] `TipologiaPayload` e `UnidadPayload` definidos en dos sitios
+
+`src/features/promociones/services/tipologia-sync.service.ts` define `TipologiaPayload` y `UnidadPayload` localmente. `src/infrastructure/db/repositories/promocion.repository.ts` exporta también `TipologiaPayload` y `UnidadPayload` que coinciden en estructura.
+
+**Archivos afectados:**
+- `src/features/promociones/services/tipologia-sync.service.ts:12-35`
+- `src/infrastructure/db/repositories/promocion.repository.ts:137-160`
+
+**Impacto:** Si se añade un campo a tipología (e.g., `orientation`), hay que actualizar ambas definiciones. Error silencioso: TypeScript acepta ambas porque estructuralmente son equivalentes.
+
+**Acción concreta:** Exportar `TipologiaPayload` y `UnidadPayload` desde un único sitio (el schema compartido en `src/shared/types/tipologia-schema.ts` o en `promocion.repository.ts`) y hacer que `tipologia-sync.service.ts` importe desde allí.
+
+**Prioridad:** Planificar — 30 min, riesgo bajo.
+
+### Duplicaciones aceptables
+
+- Las variantes de unread leads son variaciones distintas del mismo concepto con casos de uso diferentes (count badge vs list IDs vs dashboard card). No unificar.
+- Los tipos de proyección `PromocionWithRelations` / `PromocionListRow` / `PromocionDetail` son proyecciones distintas intencionalmente.
+
+---
+
+## 7. Code Smells
+
+### Listado completo
+
+| # | Smell | Ubicación | Tipo | Severidad |
+|---|-------|-----------|------|-----------|
+| S1 | `.select()` sin columnas en UserRepository incluye `passwordHash` en objeto en memoria | `user.repository.ts:59,81,189` | Inappropriate Intimacy | Media |
+| S2 | `CATALOG_SELECT_COLUMNS` duplicado de `PROMOCION_SELECT_COLUMNS` | `catalog.repository.ts:23-46` vs `promocion.repository.ts:29-52` | Duplicación | Baja |
+| S3 | `TipologiaPayload`/`UnidadPayload` definidos en dos archivos con estructura idéntica | `tipologia-sync.service.ts:12-35` + `promocion.repository.ts:137-160` | Duplicación | Baja |
+| S4 | Tres implementaciones de "unread leads" con estrategias SQL distintas | `lead.repository.ts:363,515` + `dashboard.repository.ts:25` | Divergent Change | Baja |
+| S5 | EXISTS subqueries en `findPublicWithCursor` para filtros de tipología no indexados | `catalog.repository.ts:210-236` | Potencial N+1 en catálogo grande | Baja |
+| S6 | Dead import `PaginatedResult` en `catalog.repository.ts` | `catalog.repository.ts:15` | Dead Code | Muy baja |
+| S7 | `backofficeUrl` construido con string concatenation sin helper | `create-lead-action.ts:183` | Magic Pattern | Muy baja |
+
+### Clasificación por severidad
+- **Media:** S1 (passwordHash en memoria)
+- **Baja:** S2, S3, S4, S5
+- **Muy baja:** S6, S7
+
+### Prioridad
+- **Hacer de inmediato:** S1 (riesgo de seguridad potencial), S6 (trivial)
+- **Planificar:** S2, S3
+- **Posponer:** S4, S5, S7
+
+---
+
+## 8. Testing
+
+### Estado
+
+Suite excepcional para la madurez del proyecto. Cinco capas:
+
+1. **Unit/Integration (Vitest):** Tests de repositorios contra BD real, services, schemas Zod, actions de Server Components, y route handlers
+2. **Isolation (Vitest):** `tests/isolation/` — suite dedicada que crea dos tenants sintéticos y verifica que las queries de uno no ven datos del otro
+3. **Contract (Vitest snapshot):** `tests/contract/v1/` — 7 suites: snapshot de schemas Zod, divergence detector, consumer mirror, rate limit, OpenAPI validation, docs endpoint, lead institutional
+4. **E2E (Playwright):** Tests con Page Object Model completo (19 Page Objects)
+5. **Features/Integration:** Tests específicos de features en `tests/features/` y `tests/integration/`
+
+### Calidad
+
+- `consumer-mirror.contract.spec.ts` — verifica que el consumer tiene el snapshot actualizado (arquitectura de contrato bilateral)
+- `snapshot-divergence.contract.spec.ts` — detecta divergencia entre snapshots de provider y consumer
+- `rate-limit.contract.spec.ts` — verifica headers `X-RateLimit-*` en respuestas de la API pública
+- POM en E2E (`BasePage`, `LoginPage`, `CatalogoEditPage`, etc.) correctamente implementado
+- `tests/isolation/cover-unique-constraint.test.ts` — verifica el constraint parcial UNIQUE para portada
+
+### Cobertura útil
+
+- La suite de isolation RLS es la cobertura más valiosa del proyecto
+- Los tests de contrato v1 con snapshot bilateral previenen regresiones en la API pública
+- `tests/integration/email/email-queue.integration.test.ts` — cubre el flujo completo de la cola de email
+
+### Ausencias identificadas
+
+| Ausencia | Prioridad | Coste |
+|----------|-----------|-------|
+| Test que verifica que `UserRepository.findAll` no expone `passwordHash` en el objeto retornado | Media | Bajo (~30 min) |
+| Test de integración de login que verifica 429 tras N intentos (`POST /api/auth/callback/credentials`) | Media | Bajo (~1h) |
+
+---
+
+## 9. Seguridad
+
+### [SEC-MED-01] `UserRepository` expone `passwordHash` en objeto en memoria
+
+**Criticidad:** Medium
+
+**Archivos:** `src/infrastructure/db/repositories/user.repository.ts:59,81,189`
+
+**Problema:** Los métodos `findAll`, `findById`, `update` y `deactivate` usan `.select()` sin columnas explícitas contra la tabla `users`, que incluye `passwordHash`. Aunque `mapUserRow` en `team.actions.ts` excluye correctamente `passwordHash` antes de retornar el resultado al cliente, el objeto intermedio en memoria (en el scope de la action) contiene el hash. Si en el futuro se añade un log de depuración o un breadcrumb de Sentry sobre el objeto `user` antes del `mapUserRow`, el hash se filtraría.
+
+El `UserRow` en `user-schema.ts` ya excluye `passwordHash` del tipo — el contrato está bien definido. El problema es que el repositorio no lo hace cumplir en runtime.
+
+**Fix:** En `UserRepository`, usar `.select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, role: users.role, isActive: users.isActive, createdAt: users.createdAt, updatedAt: users.updatedAt, invitationTokenHash: users.invitationTokenHash, invitationTokenExpires: users.invitationTokenExpires })` en lugar de `.select()`. El tipo de retorno quedará correctamente inferido sin `passwordHash`.
+
+**Excepciones correctas:** `auth.config.ts` hace un `db.select()` directo (no via `UserRepository`) y sí necesita `passwordHash`. No tocar.
+
+---
+
+### [SEC-LOW-01] Test de login rate limiting ausente
+
+**Criticidad:** Low
+
+**Archivos:** `middleware.ts:30-33`, `src/infrastructure/auth/rate-limit-login.spec.ts`
+
+**Problema:** `checkLoginRateLimit` está testeada unitariamente en su función pura, y está correctamente conectada al flujo real en `middleware.ts`. Sin embargo, no existe un test de integración que envíe N requests a `POST /api/auth/callback/credentials` y verifique que el 429 se emite. Si el matcher del middleware cambia (e.g., ruta `/api/auth/callback/credentials` cambia en NextAuth), el rate limiting dejaría de funcionar silenciosamente.
+
+**Fix:** Añadir test en `tests/integration/` que mockee la app Next.js y verifique `429` tras 5 intentos consecutivos al mismo endpoint.
+
+---
+
+## 10. Performance
+
+### [P-LOW-01] EXISTS subqueries en filtros de tipología en `findPublicWithCursor`
+
+**Problema:** Los filtros `bedrooms`, `bathrooms`, `priceMin`, `priceMax` y `amenities` en `findPublicWithCursor` generan un EXISTS subquery por cada filtro aplicado:
 ```sql
-UPDATE promocion_content_blocks
-SET sort_order = CASE id WHEN $1 THEN 0 WHEN $2 THEN 1 ... END
-WHERE id IN ($1, $2, ...) AND tenant_id = $tenantId
+EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ... AND t.bedrooms >= ?)
 ```
-Alternativamente: cambiar `sort_order` a `float` y solo actualizar el bloque movido (fractional indexing).
+Con múltiples filtros simultáneos y un catálogo de >500 promociones, el planner de PostgreSQL puede tener dificultades para optimizar los EXISTS anidados, resultando en seq scans en `tipologias`.
+
+**Impacto actual:** Con el volumen esperado del MVP (<200 promociones), el impacto es despreciable. El índice `(tenant_id, promocion_id)` en `tipologias` mitiga el problema.
+
+**Fix recomendado (cuando sea necesario):** Reescribir los filtros de tipología como un único JOIN con condiciones agregadas, o usar una CTE pre-filtrada. No actuar ahora — monitorizar con Sentry cuando el catálogo supere las 500 promociones publicadas.
 
 ---
 
-### [DT-04] Scan bcrypt O(n) en API key validation
+### [P-LOW-02] `NOT IN` subquery en `getUnreadCount` y `getUnreadLeadIds`
 
-**Problema:** `findMatchingApiKey` carga todas las API keys activas y ejecuta `bcrypt.compare` en cada una (~100ms × N por request). Con 20 keys son ~2s de CPU por request. Abre vector de DoS asistido.
-**Archivos afectados:** `src/features/api-public/middleware/api-key-auth.ts`
-**Impacto:** Medio
-**Riesgo futuro:** Alto (crece con el número de keys)
-**Coste fix:** Medio (3-5h incluyendo migración de schema)
-**Riesgo del refactor:** Bajo
-**Beneficio esperado:** Alto
-**Prioridad:** Planificar
+**Problema:** Ambos métodos usan `NOT IN (SELECT lead_id FROM lead_read_marks WHERE user_id = ?)`. Con muchas marcas de lectura por usuario, `NOT IN` puede ser más lento que un `LEFT JOIN + isNull` (como hace `DashboardRepository`).
 
-**Acción concreta:** Añadir columna `key_prefix VARCHAR(8)` en tabla `api_keys`. Filtrar por prefijo antes de bcrypt. Solo comparar el 1-2 candidatos que coincidan:
-```ts
-const candidates = await db.select().from(apiKeys)
-  .where(and(eq(apiKeys.keyPrefix, plaintextKey.slice(0, 8)), eq(apiKeys.isActive, true)));
+**Impacto actual:** Negligible con el volumen de leads esperado (<1000 leads por usuario).
+
+**Fix recomendado:** No actuar ahora. Documentar que `LEFT JOIN + isNull` es la estrategia preferida para grandes volúmenes si en el futuro se unifica el concepto.
+
+---
+
+## 11. Deuda Técnica
+
+### Crítica (bloquea producción o seguridad)
+
+Ninguna.
+
+### Alta
+
+Ninguna.
+
+### Media
+
+| Deuda | Descripción | Effort |
+|-------|-------------|--------|
+| DT-01 | `UserRepository` usa `.select()` sin columnas explícitas — `passwordHash` en memoria | 1h |
+
+### Baja
+
+| Deuda | Descripción | Effort |
+|-------|-------------|--------|
+| DT-02 | `CATALOG_SELECT_COLUMNS` duplicado de `PROMOCION_SELECT_COLUMNS` | 15m |
+| DT-03 | `TipologiaPayload`/`UnidadPayload` en dos archivos con estructura idéntica | 30m |
+| DT-04 | Dead import `PaginatedResult` en `catalog.repository.ts` | 5m |
+| DT-05 | Test de integración de login rate limiting ausente | 1h |
+| DT-06 | Test que verifica que `UserRepository` no expone `passwordHash` | 30m |
+
+---
+
+## 12. Quick Wins
+
+> Cambios < 1h, seguros de forma independiente, alto impacto.
+
+### QW-01 — Eliminar dead import en `catalog.repository.ts` (~5m)
+
+Línea 15 de `src/infrastructure/db/repositories/catalog.repository.ts`:
+```typescript
+// Eliminar:
+import { PaginatedResult } from "@/shared/types/pagination";
 ```
+`PaginatedResult` no se usa en ningún método de `CatalogRepository`.
 
----
+### QW-02 — Unificar `CATALOG_SELECT_COLUMNS` con `PROMOCION_SELECT_COLUMNS` (~15m)
 
-## 4. Code Smells y Mantenibilidad
-
-### [CS-01] Código muerto: sistema de auth legacy
-
-**Problema:** `context-middleware.ts` contiene `resolveTenantContext`, `assertDevelopmentOnly`, `MOCK_AUTH_USER_ID`, `MOCK_AUTH_ROLE`, `MOCK_API_KEY_ID` y `tenantContextStorage` que son exclusivamente dev-only y nunca deben ejecutarse en producción. Solo los usa el upload route (que es un bug).
-**Archivos afectados:** `src/infrastructure/tenant/context-middleware.ts`
-**Impacto:** Medio
-**Coste fix:** Bajo (2-3h — ajustar sentry antes de eliminar `tenantContextStorage`)
-**Prioridad:** Planificar (después de DT-01)
-
-**Acción concreta:** Tras arreglar DT-01, actualizar `sentry-integration.ts` para que lea el contexto de otra forma. Luego eliminar de `context-middleware.ts`: `resolveTenantContext`, `assertDevelopmentOnly`, las tres constantes mock y `tenantContextStorage`.
-
----
-
-### [CS-02] Duplicación del SELECT de columnas en PromocionRepository
-
-**Problema:** El mismo objeto de selección de 20+ campos se repite en 5 métodos (`findAll`, `findById`, `findDetailBySlug`, `fetchPublicWithPublishedSort`, `fetchPublicWithPriceSort`). Cuando cambia el schema hay que actualizarlo en 5 sitios.
-**Archivos afectados:** `src/infrastructure/db/repositories/promocion.repository.ts`
-**Impacto:** Bajo
-**Coste fix:** Muy Bajo (1h)
-**Prioridad:** Planificar
-
-**Acción concreta:** Extraer constante `PROMOCION_SELECT_COLUMNS` en la parte superior del fichero y referenciarla en los 5 métodos.
-
----
-
-### [CS-03] Patrón getServerSession + AuthenticatedContext duplicado en route handlers
-
-**Problema:** Múltiples route handlers repiten el mismo bloque de 3 líneas para autenticar y construir el contexto. No existe `requireAuth()` genérico (solo `requireAdmin()`).
-**Archivos afectados:** `app/api/internal/promociones/route.ts`, `app/api/internal/promociones/[id]/route.ts` y otros handlers internos
-**Impacto:** Bajo
-**Coste fix:** Muy Bajo (1h)
-**Prioridad:** Hacer inmediatamente (junto con DT-01)
-
-**Acción concreta:** Crear `src/infrastructure/auth/require-auth.ts`:
-```ts
-export async function requireAuth() {
-  const session = await getServerSession();
-  if (!session) return { authorized: false as const, status: 401 };
-  return {
-    authorized: true as const,
-    ctx: new AuthenticatedContext(session.tenantId, session.userId, session.role),
-    session,
-  };
-}
+En `promocion.repository.ts`, exportar:
+```typescript
+export const PROMOCION_SELECT_COLUMNS = { ... } as const;
 ```
-
----
-
-## 5. Seguridad
-
-### [SEC-01] URL del backoffice hardcodeada en código de negocio
-
-**Severidad:** Baja
-**Archivos afectados:** `src/features/engagement/server/create-lead-action.ts:38`
-
-**Problema:** `"https://panel.domio.com/leads"` hardcodeada cuando ya existe `AUTH_HOST` en `src/shared/constants/tenant-hosts.ts`.
-
-**Acción concreta:**
-```ts
-// En tenant-hosts.ts:
-export const BACKOFFICE_LEADS_URL = `https://${AUTH_HOST}/leads`;
-
-// En create-lead-action.ts: importar BACKOFFICE_LEADS_URL, eliminar la constante local
+En `catalog.repository.ts`, eliminar `CATALOG_SELECT_COLUMNS` e importar:
+```typescript
+import { PROMOCION_SELECT_COLUMNS } from "./promocion.repository";
 ```
+Renombrar el uso en el archivo a `PROMOCION_SELECT_COLUMNS`. Sin cambio de comportamiento.
+
+### QW-03 — Columnas explícitas en `UserRepository.select()` (~45m)
+
+En `user.repository.ts`, reemplazar los tres `.select()` sin args por `.select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, role: users.role, isActive: users.isActive, invitationTokenHash: users.invitationTokenHash, invitationTokenExpires: users.invitationTokenExpires, createdAt: users.createdAt, updatedAt: users.updatedAt })`. El tipo de retorno excluirá `passwordHash` por inferencia de Drizzle. Asegurar que los tests existentes siguen pasando.
 
 ---
 
-### [SEC-02] MediaService no usa TenantContext.withTransaction
+## 13. Refactors Estratégicos
 
-**Severidad:** Media
-**Archivos afectados:** `src/infrastructure/media/media.service.ts`
+### R-01 — Unificar tipos `TipologiaPayload`/`UnidadPayload`
 
-**Problema:** Gestiona transacciones manualmente en lugar de usar el patrón establecido. Inconsistencia arquitectónica que podría saltar controles de tenant isolation si se extiende el servicio.
+**Valor:** Elimina el riesgo de divergencia silenciosa entre `tipologia-sync.service.ts` y `promocion.repository.ts` cuando se añadan campos a tipología.
 
-**Acción concreta:** Refactorizar `MediaService` para recibir `TenantContext` en el constructor y usar `ctx.withTransaction()` igual que los repositories.
+**Separación propuesta:** Exportar `TipologiaPayload` y `UnidadPayload` desde `src/shared/types/tipologia-schema.ts` (ya existente para el schema Zod de tipología). El service y el repositorio los importan desde allí. La definición local en ambos archivos se elimina.
 
----
-
-## 6. Testing
-
-**Estado actual:** Excepcional para la madurez del proyecto. 90+ ficheros de test con threshold 80%, tests de aislamiento RLS, contrato y E2E con Playwright.
-
-| ID | Hallazgo | Prioridad |
-|----|----------|-----------|
-| T-01 | Test de upload usa `x-mock-session` en lugar de NextAuth real — no refleja comportamiento en producción | Alta |
-| T-02 | Tests de integración con estado compartido de BD (`fileParallelism: false`) — frágil ante ejecución paralela | Media |
-| T-03 | Falta test E2E: crear inmueble → publicar → verificar SEO metadata | Baja |
+**Coste:** 30m. **Riesgo de regresión:** Muy bajo — solo cambian los imports; las estructuras son idénticas.
 
 ---
 
-## 7. Performance
+### R-02 — Test de integración de login rate limiting
 
-### [PERF-01] N+1 queries en reorderContentBlocks y deleteContentBlock
+**Valor:** Detecta regresiones si el matcher del middleware cambia y el rate limiting deja de ejecutarse.
 
-Ver DT-03. Impacto directo en UX del editor. Con arrays de >20 bloques la degradación es perceptible.
+**Propuesta:** En `tests/integration/`, añadir un test que construya requests con el mismo IP simulado, envíe 5+ `POST /api/auth/callback/credentials` y verifique que el sexto retorna 429 con header `Retry-After`. Requiere mockear Upstash o usar una instancia de Redis de test.
 
-### [PERF-02] Scan bcrypt O(n) en API keys
-
-Ver DT-04. ~100ms × N por request autenticado a `/api/v1/`.
-
-### [PERF-03] Count query duplicada en findPublicWithCursor
-
-**Problema:** Se emite siempre un COUNT total aunque ya haya cursor. Con cursor pagination el count no es necesario para navegar.
-**Acción concreta:** Omitir el COUNT en requests con cursor, o cachear el resultado por filtro activo.
+**Coste:** 1h. **Riesgo de regresión:** Bajo.
 
 ---
 
-## 8. Quick Wins
+## 14. Refactors NO recomendados
 
-| # | Acción | Archivos | Tiempo estimado |
-|---|--------|----------|-----------------|
-| QW-01 | Arreglar upload route → `getServerSession()` | `app/api/internal/media/upload/route.ts` | 1-2h |
-| QW-02 | Añadir `requireAuth()` helper | `src/infrastructure/auth/require-auth.ts` (nuevo) | 1h |
-| QW-03 | Mover URL hardcodeada a `tenant-hosts.ts` | `src/features/engagement/server/create-lead-action.ts`, `src/shared/constants/tenant-hosts.ts` | 15min |
-| QW-04 | Eliminar `api-key-verifier.ts` | `src/infrastructure/api-keys/api-key-verifier.ts` | 5min |
-| QW-05 | Eliminar `EMAIL_STATUS` objeto duplicado (mantener solo array) | `src/infrastructure/email/db-enums.ts` | 30min |
+### No unificar las tres implementaciones de "unread leads"
 
----
+`getUnreadCount` (badge de nav), `getUnreadLeadIds` (highlight client-side en lista) y `getUnreadLeadsCount` del `DashboardRepository` (card del dashboard) resuelven casos de uso con proyecciones distintas. Unificarlos en un `UnreadLeadsService` introduciría acoplamiento entre `LeadRepository` y `DashboardRepository` sin beneficio real. La diferencia de estrategia SQL (NOT IN vs LEFT JOIN) es un detalle de implementación tolerable a este volumen.
 
-## 9. Refactors Estratégicos
+### No extraer `CATALOG_SELECT_COLUMNS` a un módulo de configuración separado
 
-| # | Refactor | Impacto | Coste | Cuando |
-|---|----------|---------|-------|--------|
-| R-01 | Extraer `PromocionContentBlockRepository` | Alto | Medio | Sprint siguiente |
-| R-02 | Migrar `MediaService` a `TenantContext` | Medio | Bajo | Sprint siguiente |
-| R-03 | Batch UPDATE en reorder/delete de blocks | Alto | Bajo | Sprint siguiente |
-| R-04 | Añadir `key_prefix` para API key validation O(1) | Medio | Medio | Backlog |
-| R-05 | Extraer `PROMOCION_SELECT_COLUMNS` constante | Bajo | Muy Bajo | Sprint siguiente |
+Centralizar las definiciones de columnas en un tercer archivo (`shared/db/columns.ts` o similar) añade una capa de indirección innecesaria. La solución correcta es importar directamente desde `promocion.repository.ts` (ver QW-02).
 
----
+### No reescribir los filtros EXISTS de `findPublicWithCursor` con JOINs ahora
 
-## 10. Refactors NO recomendados
+La reescritura con un `JOIN tipologias ON ...` y condiciones agregadas mejoraría el plan de ejecución, pero introduce complejidad en los cursores de paginación (habría que incluir columnas de tipología en la clave del cursor). No hay evidencia de problema real de performance en el volumen actual. Actuar solo cuando el catálogo supere 500 promociones publicadas.
 
-| Cambio | Razón |
-|--------|-------|
-| Simplificar tenant isolation (TenantContext / RLS) | Está correctamente justificado — simplificarlo rompería la segunda línea de defensa que los tests de aislamiento verifican |
-| Migrar a Auth.js v5 ahora | `next-auth@4` estable en producción — migración de alto riesgo con bajo valor a corto plazo. Planificar cuando llegue a fin de soporte |
-| Extraer EmailService a bounded context propio | Ya bien encapsulado en `src/infrastructure/email/` — añadiría capas sin valor |
-| Añadir Value Objects / DDD entities sobre Drizzle | Capa de traducción costosa sin beneficio tangible para este stack y tamaño de proyecto |
-| Migrar tests de integración a mocks en lugar de BD real | Los tests contra BD real son los más valiosos — verifican RLS y transacciones que los mocks nunca podrían simular |
-| Normalizar nombres de ficheros PascalCase → kebab-case | Solo cosmético — requeriría actualizar importaciones en todo el proyecto |
-| Refactorizar PublicContext/AuthenticatedContext/ApiKeyContext a factory | Están bien como clases simples — el factory no añadiría testabilidad ni simplicidad |
+### No migrar NextAuth v4 → v5 en esta iteración
+
+El shim de compatibilidad en `auth.config.ts` permite que los tests unitarios funcionen sin importar `openid-client`. Migrar a v5 requiere reescribir `session.ts`, el middleware auth y todos los tests que mockean `auth()`. El coste/beneficio no justifica el riesgo en este momento.
+
+### No convertir `TenantContext.withTransaction` a HOF funcional
+
+La jerarquía `TenantContext → AuthenticatedContext → ApiKeyContext` con `withTransaction` sobrescrito para añadir `SET LOCAL app.current_user_id` en el contexto autenticado es el patrón correcto. Aplanarlo perdería la claridad de qué SET LOCALs se aplican en cada contexto.
 
 ---
 
-## 11. Roadmap de Ejecución
+## 15. Roadmap de Ejecución
 
 ### Fase 1 — Inmediato (esta semana)
 
-- [ ] [DT-01] Arreglar upload route — reemplazar `resolveAuthContext` por `getServerSession()` y actualizar tests
-- [ ] [CS-03] Crear `requireAuth()` helper y aplicarlo en route handlers internos
-- [ ] [SEC-01] Mover URL hardcodeada `panel.domio.com/leads` a `tenant-hosts.ts`
-- [ ] [QW-04] Eliminar `src/infrastructure/api-keys/api-key-verifier.ts`
-- [ ] [QW-05] Eliminar objeto `EMAIL_STATUS` redundante en `db-enums.ts`
+- [ ] [QW-01] Eliminar dead import `PaginatedResult` en `catalog.repository.ts` — **5m**
+- [ ] [QW-02] Unificar `CATALOG_SELECT_COLUMNS` con `PROMOCION_SELECT_COLUMNS` — **15m**
+- [ ] [QW-03] Columnas explícitas en `UserRepository.select()` — **45m**
 
 ### Fase 2 — Corto plazo (próximo mes)
 
-- [ ] [CS-01] Eliminar código legacy de `context-middleware.ts` (mock auth, `resolveTenantContext`, `tenantContextStorage`) — requiere ajustar sentry-integration primero
-- [ ] [DT-02] Extraer `PromocionContentBlockRepository` de `PromocionRepository`
-- [ ] [SEC-02] Migrar `MediaService` a `TenantContext.withTransaction`
-- [ ] [DT-03] Implementar batch UPDATE en `reorderContentBlocks` y `deleteContentBlock`
-- [ ] [CS-02] Extraer constante `PROMOCION_SELECT_COLUMNS`
+- [ ] [R-01] Unificar tipos `TipologiaPayload`/`UnidadPayload` en `src/shared/types/tipologia-schema.ts` — **30m**
+- [ ] [R-02] Test de integración de login rate limiting — **1h**
+- [ ] [DT-06] Test que verifica que `UserRepository.findAll` no incluye `passwordHash` en el resultado — **30m**
 
-### Fase 3 — Medio plazo (próximo trimestre)
+### Fase 3 — Medio plazo (cuando el catálogo escale)
 
-- [ ] [DT-04] Añadir `key_prefix` en `api_keys` para validation O(1) — incluye migración de schema y backfill
-- [ ] [T-01] Añadir test de integración de upload con NextAuth real
-- [ ] [PERF-03] Omitir COUNT en requests con cursor en `findPublicWithCursor`
-- [ ] Extraer `PromocionHistoryRepository` de `PromocionRepository`
-- [ ] Planificar migración a Auth.js v5
+- [ ] [P-LOW-01] Reescribir filtros EXISTS en `findPublicWithCursor` como JOIN único si el catálogo supera 500 promociones — **3-4h**
 
 ### No planificado
 
-- Naming inconsistency PascalCase/kebab-case — solo cosmético, riesgo > beneficio
-- Factory pattern para TenantContext variants — YAGNI
+- Migración NextAuth v4 → v5 — coste > beneficio; posponerlo a cuando sea forzoso por breaking change
+- Unificar "unread leads" en un servicio único — tres implementaciones con casos de uso distintos
+- Reescribir cursor pagination de precio con CTE compleja — no hay problema real de performance
 
 ---
 
-## 12. Score Detallado
+## 16. Score Final
 
 | Dimensión | /10 | Notas |
 |-----------|-----|-------|
-| Arquitectura | 7.8 | Clara y coherente, penalizada por God Object y auth legacy |
-| Simplicidad | 7.2 | Penalizada por N+1 y scan bcrypt lineal |
-| Mantenibilidad | 8.0 | Buena organización por features, penalizada por PromocionRepository monolítico |
-| Cohesión | 7.5 | Módulos de feature cohesivos; PromocionRepository rompe la tendencia |
-| Acoplamiento | 8.2 | Dependencias bien dirigidas sin ciclos |
-| Legibilidad | 8.5 | Código bien nombrado, TypeScript strict |
-| Calidad del diseño | 8.0 | Tenant isolation y email async excelentes |
-| Testing | 9.0 | Tests RLS isolation y E2E poco comunes a esta escala |
-| Seguridad | 7.0 | Bug crítico en upload pesa; resto sólido |
-| Deuda técnica | 7.2 | Manejable salvo el bug crítico de producción |
-| **Total** | **78/100** | |
+| Arquitectura | 9 | Separación SRP correcta post-refactor; CatalogRepository + TipologiaSyncService bien delimitados |
+| Simplicidad | 9 | Código limpio; EXISTS subqueries son la única complejidad aceptable por naturaleza del dominio |
+| Mantenibilidad | 9 | Estructura por features, constantes centralizadas, tipos compartidos bien organizados |
+| Cohesión | 9 | Cada módulo tiene propósito claro y no mezcla responsabilidades |
+| Acoplamiento | 9 | DI explícita, TenantContext por constructor, sin dependencias circulares detectadas |
+| Legibilidad | 10 | Nombres expresivos, comentarios útiles, convenciones consistentes en todo el proyecto |
+| Calidad del diseño | 9 | Enums centralizados, cursor pagination, email queue, contrato de API correctamente versionado |
+| Testing | 9 | Cinco capas de test incluyendo isolation RLS y contract bilateral; faltan 2 tests de integración puntuales |
+| Seguridad | 8 | `passwordHash` en memoria en `UserRepository` es el único riesgo residual; resto está bien |
+| Deuda técnica | 9 | Deuda mínima para la madurez del proyecto; solo items de bajo coste pendientes |
+| **Total** | **91/100** | |
 
-**Calificación:** B+
+**Calificación:** A+
 
-**Justificación:** Considerablemente por encima del promedio para su etapa. La infraestructura de testing (especialmente RLS isolation y contrato) es ejemplar. Lo que impide el A es el bug crítico de producción en el upload route y el God Object de PromocionRepository. Con las Fases 1 y 2 completadas, el proyecto alcanzaría fácilmente A- (88/100).
+**Justificación:** Domio ha alcanzado A+ tras resolver todos los hallazgos críticos y altos de las auditorías anteriores. El sistema de tenant isolation es ejemplar, la suite de tests es una de las más completas que se puede implementar con este stack, y la calidad de código es consistentemente alta. Los únicos hallazgos residuales son menores: un `.select()` sin columnas explícitas que expone `passwordHash` en memoria (resuelto con QW-03), y dos tipos duplicados con estructura idéntica (R-01). La nota baja de 91 respecto al máximo teórico refleja estas deudas menores y la ausencia de dos tests de integración específicos. No hay nada que bloquee producción ni seguridad actualmente.

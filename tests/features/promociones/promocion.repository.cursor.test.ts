@@ -1,6 +1,6 @@
 /* eslint-disable sonarjs/no-duplicate-string */
 import { describe, it, expect, vi } from "vitest";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
 import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import {
   createMockTx,
@@ -72,7 +72,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
   describe("basic behavior", () => {
     it("returns only PUBLISHED promociones for the public context", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       const items = [makePromo({ id: "p1", status: "PUBLISHED" })];
       setupMockTx(mockWithTx, [makeCountResult(1), items]);
@@ -86,7 +86,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("returns empty cursor when no results", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(0), []]);
 
@@ -99,7 +99,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("returns nextCursor=null when fewer results than limit", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       const items = [
         makePromo({ id: "p1", createdAt: new Date("2026-07-02T12:00:00Z") }),
@@ -115,7 +115,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("returns nextCursor when there are more results than limit", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       // Mock returns limit+1 items to signal there's a next page
       const items = [
@@ -136,7 +136,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
   describe("pagination", () => {
     it("cursor pagination works without duplicates across pages", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       // Page 1: mock returns limit+1 items to signal more pages
       const page1Items = [
@@ -188,7 +188,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
   describe("filters", () => {
     it("filters by island", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -199,7 +199,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by municipality", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -212,7 +212,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by property type", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -225,7 +225,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by operation", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -236,7 +236,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by price range (min)", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -247,7 +247,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by price range (max)", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -258,7 +258,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by bedrooms", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -269,7 +269,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by bathrooms", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -280,7 +280,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by amenities", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -293,7 +293,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
 
     it("filters by construction status", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
 
@@ -308,7 +308,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
   describe("sorting", () => {
     it("defaults to published (created_at DESC) sort", async () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
-      const repo = new PromocionRepository(ctx);
+      const repo = new CatalogRepository(ctx);
 
       setupMockTx(mockWithTx, [makeCountResult(0), []]);
 

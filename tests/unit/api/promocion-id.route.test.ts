@@ -30,6 +30,10 @@ const mockGenerateSlug = vi.hoisted(() => vi.fn());
 
 const mockRevalidateTag = vi.hoisted(() => vi.fn());
 
+const mockValidateMediaForPublish = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ valid: true }),
+);
+
 vi.mock("@/infrastructure/auth/session", () => ({
   getServerSession: mockSession.getServerSession,
 }));
@@ -41,12 +45,23 @@ vi.mock(
   }),
 );
 
+vi.mock(
+  "@/infrastructure/db/repositories/promocion-content-block.repository",
+  () => ({
+    PromocionContentBlockRepository: mockRepository.PromocionRepository,
+  }),
+);
+
 vi.mock("@/infrastructure/slug/generate-slug", () => ({
   generateSlug: mockGenerateSlug,
 }));
 
 vi.mock("next/cache", () => ({
   revalidateTag: mockRevalidateTag,
+}));
+
+vi.mock("@/features/promociones/actions/media.actions", () => ({
+  validateMediaForPublish: mockValidateMediaForPublish,
 }));
 
 const { GET, PATCH, DELETE } = await import(
@@ -140,6 +155,7 @@ function mockRepositoryImpl(overrides?: {
     update: overrides?.update ?? mockUpdate,
     delete: overrides?.delete ?? mockDeleteFn,
     findContentBlock: overrides?.findContentBlock ?? mockFindContentBlock,
+    validateBlocksForPublish: vi.fn().mockResolvedValue({ valid: true }),
   }));
 }
 

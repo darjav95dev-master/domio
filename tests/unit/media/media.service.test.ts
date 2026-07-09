@@ -4,6 +4,7 @@ import { db } from "@/infrastructure/db/client";
 import { type MediaAsset, mediaAssets } from "@/infrastructure/db/schema/media-assets";
 import { MediaService } from "@/infrastructure/media/media.service";
 import type { UploadInput } from "@/infrastructure/media/types";
+import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
 
 const { sendMock, getSignedUrlMock } = vi.hoisted(() => ({
   sendMock: vi.fn(),
@@ -37,6 +38,17 @@ vi.mock("@/infrastructure/db/client", () => ({
 
 const tenantId = "00000000-0000-0000-0000-000000000002";
 const ownerId = "00000000-0000-0000-0000-000000000001";
+
+function createMockContext(): TenantContext {
+  return {
+    type: "public" as const,
+    getTenantId: () => tenantId,
+    withTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
+      return db.transaction(fn as never);
+    },
+    resolveFilters: undefined,
+  } as unknown as TenantContext;
+}
 
 function makeInput(overrides: Partial<UploadInput> = {}): UploadInput {
   return {
@@ -115,7 +127,7 @@ describe("MediaService", () => {
       const input = makeInput();
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).resolves.toEqual(asset);
 
       expect(sendMock).toHaveBeenCalledTimes(1);
@@ -137,7 +149,7 @@ describe("MediaService", () => {
       const input = makeInput({ altText: "" });
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).rejects.toThrow("alt_text is required");
 
       expect(sendMock).not.toHaveBeenCalled();
@@ -148,7 +160,7 @@ describe("MediaService", () => {
       const input = makeInput({ altText: "   " });
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).rejects.toThrow("alt_text is required");
 
       expect(sendMock).not.toHaveBeenCalled();
@@ -159,7 +171,7 @@ describe("MediaService", () => {
       const input = makeInput({ altText: "a".repeat(501) });
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).rejects.toThrow("alt_text must be 500 characters or less");
 
       expect(sendMock).not.toHaveBeenCalled();
@@ -171,7 +183,7 @@ describe("MediaService", () => {
       });
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).rejects.toThrow("file exceeds maximum size of 10 MB");
 
       expect(sendMock).not.toHaveBeenCalled();
@@ -181,7 +193,7 @@ describe("MediaService", () => {
       const input = makeInput({ file: Buffer.alloc(0) });
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).rejects.toThrow("file cannot be empty");
 
       expect(sendMock).not.toHaveBeenCalled();
@@ -191,7 +203,7 @@ describe("MediaService", () => {
       const input = makeInput({ mimeType: "text/html" });
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).rejects.toThrow(
         /image\/jpeg|image\/png|image\/webp|image\/avif|application\/pdf/,
       );
@@ -205,7 +217,7 @@ describe("MediaService", () => {
       });
 
       await expect(
-        new MediaService(tenantId).uploadImage(input),
+        new MediaService(createMockContext()).uploadImage(input),
       ).rejects.toThrow(/IMAGE_GALLERY|PLAN|DOCUMENT/);
 
       expect(sendMock).not.toHaveBeenCalled();
@@ -225,7 +237,7 @@ describe("MediaService", () => {
       setupTxSelect(asset);
       getSignedUrlMock.mockResolvedValue("https://signed-url.example.com/doc");
 
-      const url = await new MediaService(tenantId).signedReadUrl(asset.id);
+      const url = await new MediaService(createMockContext()).signedReadUrl(asset.id);
 
       expect(url).toBe("https://signed-url.example.com/doc");
       expect(getSignedUrlMock).toHaveBeenCalledWith(
@@ -242,7 +254,7 @@ describe("MediaService", () => {
       const asset = fakeAsset({ kind: "IMAGE_GALLERY" });
       setupTxSelect(asset);
 
-      const url = await new MediaService(tenantId).signedReadUrl(asset.id);
+      const url = await new MediaService(createMockContext()).signedReadUrl(asset.id);
 
       expect(url).toBe("https://test.example.com/" + asset.r2Key);
       expect(getSignedUrlMock).not.toHaveBeenCalled();
@@ -254,7 +266,7 @@ describe("MediaService", () => {
       setupTxSelect(asset);
       getSignedUrlMock.mockResolvedValue("https://signed-url.example.com/custom");
 
-      const url = await new MediaService(tenantId).signedReadUrl(asset.id, 1800);
+      const url = await new MediaService(createMockContext()).signedReadUrl(asset.id, 1800);
 
       expect(url).toBe("https://signed-url.example.com/custom");
       expect(getSignedUrlMock).toHaveBeenCalledWith(
@@ -267,13 +279,13 @@ describe("MediaService", () => {
 
   describe("getPublicUrl", () => {
     it("returns a public URL from an R2 key", () => {
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
       const url = service.getPublicUrl("some-key.jpg");
       expect(url).toBe("https://test.example.com/some-key.jpg");
     });
 
     it("produces a well-formed URL", () => {
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
       const url = service.getPublicUrl("photo-123.webp");
 
       expect(url).toMatch(/^https:\/\/test\.example\.com\//);
@@ -293,7 +305,7 @@ describe("MediaService", () => {
         from: vi.fn().mockReturnValue({ where: selectWhere }),
       });
 
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
 
       await service.reorderGallery(ownerId, assetIds);
 
@@ -308,7 +320,7 @@ describe("MediaService", () => {
     });
 
     it("empty array is a no-op — returns without calling the database", async () => {
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
 
       await service.reorderGallery(ownerId, []);
 
@@ -324,7 +336,7 @@ describe("MediaService", () => {
         from: vi.fn().mockReturnValue({ where: selectWhere }),
       });
 
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
       const assetIds = ["id-1", "id-2", "id-3"];
 
       await expect(
@@ -347,7 +359,7 @@ describe("MediaService", () => {
         from: vi.fn().mockReturnValue({ where: selectWhere }),
       });
 
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
 
       await service.setCover(ownerId, coverAssetId);
 
@@ -372,7 +384,7 @@ describe("MediaService", () => {
         from: vi.fn().mockReturnValue({ where: selectWhere }),
       });
 
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
 
       await service.setCover(ownerId, coverAssetId);
       await expect(
@@ -386,7 +398,7 @@ describe("MediaService", () => {
         from: vi.fn().mockReturnValue({ where: selectWhere }),
       });
 
-      const service = new MediaService(tenantId);
+      const service = new MediaService(createMockContext());
 
       await expect(
         service.setCover(ownerId, "nonexistent-id"),
@@ -409,7 +421,7 @@ describe("MediaService", () => {
       const asset = fakeAsset();
       setupTxSelect(asset);
 
-      await new MediaService(tenantId).delete(asset.id);
+      await new MediaService(createMockContext()).delete(asset.id);
 
       // R2 deletion
       expect(DeleteObjectCommand).toHaveBeenCalledWith(
@@ -429,7 +441,7 @@ describe("MediaService", () => {
       setupTxSelect(null);
 
       await expect(
-        new MediaService(tenantId).delete("nonexistent-id"),
+        new MediaService(createMockContext()).delete("nonexistent-id"),
       ).rejects.toThrow("Asset not found");
 
       expect(db.transaction).toHaveBeenCalled();
@@ -440,7 +452,7 @@ describe("MediaService", () => {
       const asset = fakeAsset({ isCover: true });
       setupTxSelect(asset);
 
-      await new MediaService(tenantId).delete(asset.id);
+      await new MediaService(createMockContext()).delete(asset.id);
 
       // Cover should be cleaned (removed with the row), not transferred
       expect(tx.update).not.toHaveBeenCalled();

@@ -27,7 +27,7 @@ export const promociones = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    slug: text("slug").notNull(),
+    slug: text("slug"),
     name: text("name").notNull(),
     kind: promocionKindEnum("kind").notNull(),
     status: promocionStatusEnum("status").notNull(),

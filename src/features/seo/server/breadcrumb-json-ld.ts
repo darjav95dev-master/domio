@@ -7,8 +7,8 @@ import { getSiteUrl } from "@/shared/utils/seo/site-url";
 export interface BreadcrumbJsonLdInput {
   /** Promotion display name. */
   name: string;
-  /** Promotion slug used in the URL path. */
-  slug: string;
+  /** Promotion slug used in the URL path (null for unpublished promotions). */
+  slug: string | null;
 }
 
 export interface BreadcrumbJsonLdElement {
@@ -62,7 +62,7 @@ export function buildBreadcrumbJsonLd(
         "@type": "ListItem",
         position: 3,
         name: input.name,
-        item: `${siteUrl}/inmuebles/${input.slug}`,
+        item: `${siteUrl}/inmuebles/${input.slug ?? ""}`,
       },
     ],
   };

@@ -1,6 +1,5 @@
 import { type NextRequest } from "next/server";
-import { getServerSession } from "@/infrastructure/auth/session";
-import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
 import { PromocionDraftSchema } from "@/shared/schemas/promocion.schema";
 
@@ -51,19 +50,13 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: ERR_UNAUTHENTICATED }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
     const { id } = await params;
 
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
+    const repository = new PromocionRepository(auth.ctx);
 
     // Parse JSON body
     let body: unknown;
@@ -83,7 +76,6 @@ export async function PATCH(
       return validationErrorResponse(parsed.error.issues);
     }
 
-    const repository = new PromocionRepository(authCtx);
     const current = await repository.findById(id);
 
     if (!current) {
@@ -92,8 +84,8 @@ export async function PATCH(
 
     // AGENT role scope: only assigned promociones
     if (
-      authCtx.role === "AGENT" &&
-      current.assignedAgentId !== authCtx.userId
+      auth.ctx.role === "AGENT" &&
+      current.assignedAgentId !== auth.ctx.userId
     ) {
       return Response.json(
         { error: ERR_FORBIDDEN },
@@ -129,21 +121,13 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const session = await getServerSession();
-  if (!session) {
-    return Response.json({ error: ERR_UNAUTHENTICATED }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   try {
     const { id } = await params;
 
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
-
-    const repository = new PromocionRepository(authCtx);
+    const repository = new PromocionRepository(auth.ctx);
     const current = await repository.findById(id);
 
     if (!current) {
@@ -152,8 +136,8 @@ export async function DELETE(
 
     // AGENT role scope: only assigned promociones
     if (
-      authCtx.role === "AGENT" &&
-      current.assignedAgentId !== authCtx.userId
+      auth.ctx.role === "AGENT" &&
+      current.assignedAgentId !== auth.ctx.userId
     ) {
       return Response.json(
         { error: ERR_FORBIDDEN },

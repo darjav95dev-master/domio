@@ -251,13 +251,14 @@ describe("template registry", () => {
   });
 
   describe("getAllTemplateNames", () => {
-    it("returns all 4 template names", () => {
+    it("returns all 5 template names", () => {
       const names = getAllTemplateNames();
-      expect(names).toHaveLength(4);
+      expect(names).toHaveLength(5);
       expect(names).toContain(EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT);
       expect(names).toContain(EMAIL_TEMPLATE_NAMES.LEAD_CONFIRMATION);
       expect(names).toContain(EMAIL_TEMPLATE_NAMES.TEAM_INVITATION);
       expect(names).toContain(EMAIL_TEMPLATE_NAMES.PASSWORD_RECOVERY);
+      expect(names).toContain(EMAIL_TEMPLATE_NAMES.CONTACT_FORM_NOTIFICATION);
     });
   });
 });

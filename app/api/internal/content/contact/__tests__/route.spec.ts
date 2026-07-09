@@ -75,7 +75,7 @@ describe("GET /api/internal/content/contact", () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body.error).toBe("Unauthorized");
+    expect(body.error).toBe("Unauthenticated");
   });
 
   it("returns 403 when user has AGENT role", async () => {
@@ -161,7 +161,7 @@ describe("PUT /api/internal/content/contact", () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body.error).toBe("Unauthorized");
+    expect(body.error).toBe("Unauthenticated");
   });
 
   it("returns 403 when user has AGENT role", async () => {

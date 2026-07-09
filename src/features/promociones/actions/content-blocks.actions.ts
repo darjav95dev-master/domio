@@ -2,7 +2,7 @@
 
 import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionContentBlockRepository } from "@/infrastructure/db/repositories/promocion-content-block.repository";
 import { contentBlockSchema } from "@/shared/types/content-block-schema";
 import type { ContentBlockType } from "@/shared/constants/db-enums";
 
@@ -47,7 +47,7 @@ export async function upsertContentBlockAction(
       session.userId,
       session.role,
     );
-    const repository = new PromocionRepository(authCtx);
+    const repository = new PromocionContentBlockRepository(authCtx);
 
     const block = await repository.upsertContentBlock(
       promocionId,
@@ -91,7 +91,7 @@ export async function deleteContentBlockAction(
       session.userId,
       session.role,
     );
-    const repository = new PromocionRepository(authCtx);
+    const repository = new PromocionContentBlockRepository(authCtx);
 
     await repository.deleteContentBlock(promocionId, blockId);
 
@@ -123,7 +123,7 @@ export async function reorderContentBlocksAction(
       session.userId,
       session.role,
     );
-    const repository = new PromocionRepository(authCtx);
+    const repository = new PromocionContentBlockRepository(authCtx);
 
     await repository.reorderContentBlocks(promocionId, orderedBlockIds);
 

@@ -99,6 +99,7 @@ const defaultContent = {
 describe("Email Worker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers(); // defensive reset in case a prior file leaked fake timers
     vi.useFakeTimers();
     vi.setSystemTime(new Date(BASE_TIME));
 

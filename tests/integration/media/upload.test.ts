@@ -1,10 +1,24 @@
 import { describe, it, expect, vi } from "vitest";
 import { POST } from "@app/api/internal/media/upload/route";
 
-const { sendMock, JPEG_MIME_TYPE, VALID_ALT_TEXT } = vi.hoisted(() => ({
-  sendMock: vi.fn().mockResolvedValue({}),
-  JPEG_MIME_TYPE: "image/jpeg",
-  VALID_ALT_TEXT: "Living room with sea view",
+const { sendMock, JPEG_MIME_TYPE, VALID_ALT_TEXT, mockSession } = vi.hoisted(() => {
+  const session = {
+    userId: "user-1",
+    tenantId: "00000000-0000-0000-0000-000000000001",
+    role: "ADMIN" as const,
+    name: "Test Admin",
+  };
+
+  return {
+    sendMock: vi.fn().mockResolvedValue({}),
+    JPEG_MIME_TYPE: "image/jpeg",
+    VALID_ALT_TEXT: "Living room with sea view",
+    mockSession: session,
+  };
+});
+
+vi.mock("@/infrastructure/auth/session", () => ({
+  getServerSession: vi.fn(() => Promise.resolve(mockSession)),
 }));
 
 vi.mock("@/infrastructure/media/r2-client", () => ({
@@ -45,16 +59,9 @@ vi.mock("@/infrastructure/db/client", () => {
 const UPLOAD_URL = "https://panel.domio.com/api/internal/media/upload";
 const VALID_OWNER_ID = "a4c9f123-4567-89ab-cdef-0123456789ab";
 
-function createRequest(formData: FormData, includeSession = true) {
-  const headers: Record<string, string> = {};
-
-  if (includeSession) {
-    headers["x-mock-session"] = "test";
-  }
-
+function createRequest(formData: FormData, _includeSession = true) {
   return new Request(UPLOAD_URL, {
     method: "POST",
-    headers,
     body: formData,
   });
 }
@@ -180,8 +187,13 @@ describe("POST /api/internal/media/upload", () => {
   });
 
   it("should return 401 when authentication is missing", async () => {
+    const { getServerSession } = await import(
+      "@/infrastructure/auth/session"
+    );
+    vi.mocked(getServerSession).mockResolvedValueOnce(null);
+
     const response = await POST(
-      createRequest(createValidFormData(), false) as unknown as Parameters<
+      createRequest(createValidFormData()) as unknown as Parameters<
         typeof POST
       >[0],
     );

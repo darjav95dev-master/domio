@@ -1,6 +1,6 @@
 import { ApiKeyContext } from "@/infrastructure/tenant/ApiKeyContext";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
-import type { ApiCursorOptions, ApiCursorResult } from "@/infrastructure/db/repositories/promocion.repository";
+import { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
+import type { ApiCursorOptions, ApiCursorResult } from "@/infrastructure/db/repositories/catalog.repository";
 
 const DEFAULT_API_LIMIT = 20;
 const MAX_API_LIMIT = 100;
@@ -31,7 +31,7 @@ export async function getPromociones(
   const { ctx, cursor, limit } = input;
   const clampedLimit = Math.min(Math.max(1, limit ?? DEFAULT_API_LIMIT), MAX_API_LIMIT);
 
-  const repository = new PromocionRepository(ctx);
+  const repository = new CatalogRepository(ctx);
   const options: ApiCursorOptions = { limit: clampedLimit };
 
   if (cursor) {

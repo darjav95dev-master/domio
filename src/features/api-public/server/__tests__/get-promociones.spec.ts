@@ -12,15 +12,15 @@ vi.mock("@/infrastructure/tenant/ApiKeyContext", () => ({
   })),
 }));
 
-// ─── Mock PromocionRepository — we extend it for API cursor pagination ───────
+// ─── Mock CatalogRepository ───────────────────────────────────────────────────
 
 const mockFindForApiCursor = vi.fn();
-const mockPromocionRepository = vi.fn().mockImplementation(() => ({
+const mockCatalogRepository = vi.fn().mockImplementation(() => ({
   findForApiCursor: mockFindForApiCursor,
 }));
 
-vi.mock("@/infrastructure/db/repositories/promocion.repository", () => ({
-  PromocionRepository: mockPromocionRepository,
+vi.mock("@/infrastructure/db/repositories/catalog.repository", () => ({
+  CatalogRepository: mockCatalogRepository,
 }));
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

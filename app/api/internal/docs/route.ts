@@ -1,4 +1,4 @@
-import { getServerSession } from "@/infrastructure/auth/session";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { generateOpenAPISpec } from "@/features/api-public/openapi/generate-openapi";
 
 // ---------------------------------------------------------------------------
@@ -10,11 +10,8 @@ import { generateOpenAPISpec } from "@/features/api-public/openapi/generate-open
 // ---------------------------------------------------------------------------
 
 export async function GET(): Promise<Response> {
-  const session = await getServerSession();
-
-  if (!session) {
-    return Response.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
 
   const spec = generateOpenAPISpec();
 

@@ -1,24 +1,11 @@
-import { getServerSession } from "@/infrastructure/auth/session";
-import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { DashboardRepository } from "@/infrastructure/db/repositories/dashboard.repository";
 
 export async function GET(): Promise<Response> {
   try {
-    const session = await getServerSession();
-
-    if (!session) {
-      return Response.json(
-        { error: "Authentication required" },
-        { status: 401 },
-      );
-    }
-
-    const authCtx = new AuthenticatedContext(
-      session.tenantId,
-      session.userId,
-      session.role,
-    );
-    const repository = new DashboardRepository(authCtx);
+    const auth = await requireAuth();
+    if (!auth.authorized) return auth.response;
+    const repository = new DashboardRepository(auth.ctx);
     const count = await repository.getUnreadLeadsCount();
 
     return Response.json({ count }, { status: 200 });

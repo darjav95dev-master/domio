@@ -9,7 +9,7 @@ import { OPERATION_TYPE_LABELS } from "@/shared/constants/domain-labels";
 
 export interface CatalogItem {
   id: string;
-  slug: string;
+  slug: string | null;
   name: string;
   kind: string;
   status: string;

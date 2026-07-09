@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import PublicLayout from "@app/(public)/layout";
+
+// ponytail: Footer is now async (reads contact_config from DB); stub it so this
+// layout test doesn't need a DB connection.
+vi.mock("@/shared/components/footer", () => ({
+  Footer: () => <footer role="contentinfo" />,
+}));
 
 describe("PublicLayout (T008)", () => {
   it("renders children inside main", () => {
