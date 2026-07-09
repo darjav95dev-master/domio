@@ -421,7 +421,23 @@ Contenidos de bloques 1, 3, 5 (métricas+testimonios), 6 y 7 se leen de `content
 
 ---
 
-### F026 · e2e-tests
+### F026 · contract-tests
+
+**Tamaño**: M (3–5 días)
+**Dependencias**: F024
+
+**Descripción**: Suite de tests de contrato para la API pública v1 en `tests/contract/v1/`. Schemas zod versionados para request y response de cada endpoint. Espejo del consumidor: tests que simulan el comportamiento del sistema consumidor externo y verifican que la respuesta de Domio cumple el contrato. Casos:
+
+- **GET /promociones**: respuesta con schema correcto, filtrado obligatorio (sin external ni no-PUBLISHED), cursor pagination, modo de privacidad (sin coordenadas exactas si AREA), rate limiting.
+- **POST /leads/institutional**: payload válido → 201, sin consentimiento → 422 con campo específico, payload malformado → 400, rate limiting.
+- **No-divergencia**: test que compara el schema actual contra el snapshot versionado. Si hay cambios incompatibles, falla y bloquea merge (regla §7.12).
+- **OpenAPI**: generación automática desde schemas zod, endpoint interno `/api/internal/docs` (no expuesto en producción pública).
+
+**Criterio de salida**: Tests de contrato pasan para todos los endpoints v1. Snapshot versionado. CI bloquea merges que rompan el contrato.
+
+---
+
+### F027 · e2e-tests
 
 **Tamaño**: M (3–5 días)
 **Dependencias**: F019, F020, F021, F022, F023, F024, F025
@@ -437,22 +453,6 @@ Contenidos de bloques 1, 3, 5 (métricas+testimonios), 6 y 7 se leen de `content
 Limpiar estado (DB) antes de cada test. Selectores accesibles: `getByRole` > `getByTestId` > `getByText`.
 
 **Criterio de salida**: Los 5 recorridos pasan en CI. Page Object Model usado consistentemente. Sin selectores frágiles.
-
----
-
-### F027 · contract-tests
-
-**Tamaño**: M (3–5 días)
-**Dependencias**: F024
-
-**Descripción**: Suite de tests de contrato para la API pública v1 en `tests/contract/v1/`. Schemas zod versionados para request y response de cada endpoint. Espejo del consumidor: tests que simulan el comportamiento del sistema consumidor externo y verifican que la respuesta de Domio cumple el contrato. Casos:
-
-- **GET /promociones**: respuesta con schema correcto, filtrado obligatorio (sin external ni no-PUBLISHED), cursor pagination, modo de privacidad (sin coordenadas exactas si AREA), rate limiting.
-- **POST /leads/institutional**: payload válido → 201, sin consentimiento → 422 con campo específico, payload malformado → 400, rate limiting.
-- **No-divergencia**: test que compara el schema actual contra el snapshot versionado. Si hay cambios incompatibles, falla y bloquea merge (regla §7.12).
-- **OpenAPI**: generación automática desde schemas zod, endpoint interno `/api/internal/docs` (no expuesto en producción pública).
-
-**Criterio de salida**: Tests de contrato pasan para todos los endpoints v1. Snapshot versionado. CI bloquea merges que rompan el contrato.
 
 ---
 
