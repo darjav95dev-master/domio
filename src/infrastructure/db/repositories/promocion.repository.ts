@@ -69,6 +69,17 @@ export interface CatalogCursorResult {
   total: number;
 }
 
+export interface ApiCursorOptions {
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ApiCursorResult {
+  items: PromocionListRow[];
+  nextCursor: string | null;
+  total: number;
+}
+
 interface CursorPayload {
   sortKey: string;
   id: string;
@@ -230,6 +241,105 @@ export class PromocionRepository extends TenantAwareRepository {
   constructor(ctx: TenantContext) {
     super(ctx);
     this.authCtx = ctx.type === "authenticated" ? (ctx as AuthenticatedContext) : null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // API Public — cursor pagination with mandatory filters
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Fetches promociones for the API pública v1.
+   *
+   * Applies mandatory filters:
+   * - kind = 'portfolio' (from ApiKeyContext resolveFilters)
+   * - status = 'PUBLISHED' (from ApiKeyContext resolveFilters)
+   *
+   * Cursor pagination based on updated_at DESC, id DESC.
+   */
+  async findForApiCursor(
+    options: ApiCursorOptions = {},
+  ): Promise<ApiCursorResult> {
+    return this.withTransaction(async (tx) => {
+      const limit = Math.min(Math.max(1, options.limit ?? 20), 100);
+
+      // Mandatory filters from ApiKeyContext
+      const conditions: (ReturnType<typeof eq> | ReturnType<typeof or> | ReturnType<typeof lt>)[] = [
+        eq(promociones.tenantId, this.ctx.getTenantId()),
+        eq(promociones.kind, "portfolio"),
+        eq(promociones.status, "PUBLISHED"),
+      ];
+
+      // Cursor: (updated_at, id) — keyset pagination
+      if (options.cursor) {
+        const { sortKey, id } = decodeCursor(options.cursor);
+        const cursorDate = new Date(sortKey);
+        conditions.push(
+          or(
+            lt(promociones.updatedAt, cursorDate),
+            and(
+              eq(promociones.updatedAt, cursorDate),
+              lt(promociones.id, id),
+            ),
+          ),
+        );
+      }
+
+      const whereClause = and(...conditions);
+
+      // Count total
+      const [totalRow] = await tx
+        .select({ count: count() })
+        .from(promociones)
+        .where(whereClause);
+
+      const total = Number(totalRow?.count ?? 0);
+      if (total === 0) {
+        return { items: [], nextCursor: null, total: 0 };
+      }
+
+      // Fetch items
+      const items = await tx
+        .select({
+          id: promociones.id,
+          tenantId: promociones.tenantId,
+          slug: promociones.slug,
+          name: promociones.name,
+          kind: promociones.kind,
+          status: promociones.status,
+          operation: promociones.operation,
+          propertyType: promociones.propertyType,
+          constructionStatus: promociones.constructionStatus,
+          island: promociones.island,
+          municipality: promociones.municipality,
+          address: promociones.address,
+          location: promociones.location,
+          locationApprox: promociones.locationApprox,
+          mapPrivacyMode: promociones.mapPrivacyMode,
+          seoTitle: promociones.seoTitle,
+          seoDescription: promociones.seoDescription,
+          assignedAgentId: promociones.assignedAgentId,
+          assignedAgentName: users.name,
+          draftPayload: promociones.draftPayload,
+          createdAt: promociones.createdAt,
+          updatedAt: promociones.updatedAt,
+        })
+        .from(promociones)
+        .leftJoin(users, eq(promociones.assignedAgentId, users.id))
+        .where(whereClause)
+        .orderBy(desc(promociones.updatedAt), desc(promociones.id))
+        .limit(limit + 1);
+
+      const hasMore = items.length > limit;
+      const pageItems = hasMore ? items.slice(0, limit) : items;
+
+      let nextCursor: string | null = null;
+      if (hasMore && pageItems.length > 0) {
+        const last = pageItems[pageItems.length - 1]!;
+        nextCursor = encodeCursor(last.updatedAt.toISOString(), last.id);
+      }
+
+      return { items: pageItems, nextCursor, total };
+    });
   }
 
   async findAll(
@@ -1487,6 +1597,6 @@ export class PromocionRepository extends TenantAwareRepository {
 type PromocionRow = typeof promociones.$inferSelect;
 
 /** Row returned by findAll — includes assignedAgentName from users join. */
-type PromocionListRow = PromocionRow & {
+export type PromocionListRow = PromocionRow & {
   assignedAgentName: string | null;
 };

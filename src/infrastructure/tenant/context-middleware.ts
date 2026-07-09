@@ -84,7 +84,7 @@ export function resolveTenantContext(
     // TODO(F016): Validate API key against api_keys table
     assertDevelopmentOnly("ApiKeyContext mock key lookup");
 
-    return new ApiKeyContext(tenantEnv.PUBLIC_TENANT_ID, MOCK_API_KEY_ID);
+    return new ApiKeyContext(tenantEnv.PUBLIC_TENANT_ID, MOCK_API_KEY_ID, 60);
   }
 
   const host = normalizeHost(input.host);

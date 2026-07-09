@@ -1,114 +1,98 @@
-import { NextRequest, NextResponse } from "next/server";
+import { validateApiKey } from "@/features/api-public/middleware/api-key-auth";
+import { createInstitutionalLead } from "@/features/api-public/server/create-institutional-lead";
 import {
-  resolveTenantContext,
-  tenantContextStorage,
-  ContextResolutionError,
-} from "@/infrastructure/tenant/context-middleware";
-import { consentRecords } from "@/infrastructure/db/schema";
-import { leads } from "@/infrastructure/db/schema";
-import { leadCreationSchema } from "@/shared/types/lead-creation-schema";
+  createRateLimitResponse,
+  addRateLimitHeaders,
+} from "@/infrastructure/rate-limiting/api-key-middleware";
+import { applyRateLimit } from "@/features/api-public/with-rate-limit";
+import { ContextResolutionError } from "@/infrastructure/tenant/context-middleware";
+import { logger } from "@/shared/utils/logger";
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/leads/institutional
 //
-// Crea un lead institucional con consentimiento RGPD.
-// Requiere API Key via header Authorization: Bearer <key> o x-api-key.
+// Crea un lead institucional con consentimiento RGPD obligatorio.
+// El lead se persiste con source='institutional' en una transacción atómica
+// que incluye el consent_record y el encolado del email de notificación.
+//
+// Requiere autenticación por API key via header X-API-Key o Authorization: Bearer.
+// Rate limiting por API key.
 // ---------------------------------------------------------------------------
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handler(request: Request): Promise<Response> {
   try {
-    // 1. Resolve tenant context (API key auth)
-    const url = new URL(request.url);
-    const ctx = resolveTenantContext({
-      host: url.host,
-      pathname: url.pathname,
-      headers: request.headers,
-    });
+    // 1. Authenticate via API key
+    const ctx = await validateApiKey(request);
 
-    // 2. Parse and validate request body
-    const body = await request.json();
-    const parsed = leadCreationSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: "El consentimiento RGPD es obligatorio",
-          details: parsed.error.flatten().fieldErrors,
-        },
-        { status: 422 },
-      );
+    // 2. Rate limit check (runs after auth — auth provides the API key ID)
+    const rateCheck = await applyRateLimit(ctx.apiKeyId, ctx.rateLimitPerMin);
+    if (!rateCheck.allowed) {
+      return createRateLimitResponse(rateCheck.result);
     }
 
-    const data = parsed.data;
+    // 3. Parse and validate request body
+    const body = await request.json();
 
-    // 3. Get IP and user-agent from request headers
+    // 4. Get IP and user-agent for consent record
     const ip =
       request.headers.get("x-forwarded-for") ??
       request.headers.get("x-real-ip") ??
       undefined;
     const userAgent = request.headers.get("user-agent") ?? undefined;
 
-    // 4. Create lead + consent record atomically within the tenant context
-    return await tenantContextStorage.run(ctx, async () => {
-      const result = await ctx.withTransaction(async (tx) => {
-        const [lead] = await tx
-          .insert(leads)
-          .values({
-            tenantId: ctx.getTenantId(),
-            promocionId: data.promocionId,
-            tipologiaId: data.tipologiaId ?? null,
-            source: "institutional",
-            channel: data.channel ?? null,
-            name: data.name,
-            email: data.email,
-            phone: data.phone ?? null,
-            message: data.message ?? null,
-          })
-          .returning();
-
-        if (!lead) {
-          throw new Error("Failed to create lead");
-        }
-
-        const [consent] = await tx
-          .insert(consentRecords)
-          .values({
-            tenantId: ctx.getTenantId(),
-            leadId: lead.id,
-            legalBasis: data.consentLegalBasis,
-            textAccepted: data.consentTextAccepted,
-            ip: ip ?? null,
-            userAgent: userAgent ?? null,
-          })
-          .returning();
-
-        if (!consent) {
-          throw new Error("Failed to create consent record");
-        }
-
-        return { leadId: lead.id, consentId: consent.id };
-      });
-
-      return NextResponse.json(result, { status: 201 });
+    // 5. Create lead + consent + enqueue email atomically
+    const result = await createInstitutionalLead({
+      ctx,
+      payload: body,
+      ip,
+      userAgent,
     });
+
+    return addRateLimitHeaders(Response.json(result, { status: 201 }), rateCheck.result);
   } catch (error) {
     if (error instanceof ContextResolutionError) {
-      return NextResponse.json(
+      return Response.json(
         { error: error.message },
         { status: error.status },
       );
     }
 
+    // Validation errors (422)
+    if (
+      error instanceof Error &&
+      "statusCode" in error &&
+      (error as Error & { statusCode: number }).statusCode === 422
+    ) {
+      const typedError = error as Error & {
+        details: Record<string, string[] | undefined>;
+        statusCode: number;
+      };
+      return Response.json(
+        {
+          error: "Validation failed",
+          details: typedError.details,
+        },
+        { status: 422 },
+      );
+    }
+
     if (error instanceof SyntaxError) {
-      return NextResponse.json(
+      return Response.json(
         { error: "Invalid JSON body" },
         { status: 400 },
       );
     }
 
-    return NextResponse.json(
+    logger.error(
+      "Error in POST /api/v1/leads/institutional:",
+      error instanceof Error ? error.message : String(error),
+    );
+
+    return Response.json(
       { error: "Internal server error" },
       { status: 500 },
     );
   }
 }
+
+export const POST = handler;
