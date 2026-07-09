@@ -5,6 +5,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 const API_URL = "https://domio.com/api/v1/leads/institutional";
 const TENANT_ID = "00000000-0000-4000-8000-000000000001";
+const TEST_EMAIL = "test@example.com";
+const TEST_CONSENT_BASIS = "RGPD consent";
 
 // ---------------------------------------------------------------------------
 // Mocks — using vi.hoisted for proper hoisting with vi.mock
@@ -79,7 +81,7 @@ describe("POST /api/v1/leads/institutional", () => {
       headers: { "content-type": "application/json", "x-api-key": "test-key" },
       body: JSON.stringify({
         name: "Test User",
-        email: "test@example.com",
+        email: TEST_EMAIL,
       }),
     });
 
@@ -113,13 +115,13 @@ describe("POST /api/v1/leads/institutional", () => {
       headers: { "content-type": "application/json", "x-api-key": "test-key" },
       body: JSON.stringify({
         name: "Test User",
-        email: "test@example.com",
+        email: TEST_EMAIL,
         phone: "+34600123456",
         message: "Quiero información",
         promocionId: "00000000-0000-4000-8000-000000000040",
         tipologiaId: "00000000-0000-4000-8000-000000000041",
         consent: {
-          legalBasis: "RGPD consent",
+          legalBasis: TEST_CONSENT_BASIS,
           textAccepted: "Acepto la política de privacidad",
         },
       }),
@@ -144,8 +146,8 @@ describe("POST /api/v1/leads/institutional", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "Test User",
-        email: "test@example.com",
-        consent: { legalBasis: "RGPD consent", textAccepted: "Acepto" },
+        email: TEST_EMAIL,
+        consent: { legalBasis: TEST_CONSENT_BASIS, textAccepted: "Acepto" },
       }),
     });
 
@@ -181,8 +183,8 @@ describe("POST /api/v1/leads/institutional", () => {
       headers: { "content-type": "application/json", "x-api-key": "test-key" },
       body: JSON.stringify({
         name: "Test User",
-        email: "test@example.com",
-        consent: { legalBasis: "RGPD consent", textAccepted: "Acepto" },
+        email: TEST_EMAIL,
+        consent: { legalBasis: TEST_CONSENT_BASIS, textAccepted: "Acepto" },
       }),
     });
 
