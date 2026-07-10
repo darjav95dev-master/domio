@@ -30,10 +30,10 @@ export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
   const cards = promociones.slice(0, 3);
 
   return (
-    <section className="py-section-lg px-6 md:px-[56px]" aria-labelledby="portfolio-title">
+    <section className="py-section-lg px-6 md:px-[56px] bg-bg-surface-sunken" aria-labelledby="portfolio-title">
       <div className="max-w-7xl mx-auto">
         {/* Section header */}
-        <div className="mb-12">
+        <div className="mb-8">
           <span className="font-mono text-[13px] uppercase tracking-[0.18em] text-accent-default relative pl-6 before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[20px] before:h-[2px] before:bg-gradient-to-r before:from-accent-default before:to-transparent">
             Promociones
           </span>

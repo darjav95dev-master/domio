@@ -8,10 +8,10 @@ export function Trust({ data }: TrustProps) {
   const { title, subtitle, metrics, testimonios } = data;
 
   return (
-    <section className="py-section-lg px-6 md:px-[56px] bg-bg-surface" aria-labelledby="trust-title">
+    <section className="py-section-lg px-6 md:px-[56px]" aria-labelledby="trust-title">
       <div className="max-w-7xl mx-auto">
         {/* ── Section header ─────────────────────────────────────────── */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <span className="font-mono text-[13px] uppercase tracking-[0.18em] text-accent-default relative inline-flex items-center gap-3 before:content-[''] before:w-[24px] before:h-[2px] before:bg-gradient-to-r before:from-transparent before:to-accent-default after:content-[''] after:w-[24px] after:h-[2px] after:bg-gradient-to-r after:from-accent-default after:to-transparent">
             Confianza
           </span>
@@ -29,7 +29,7 @@ export function Trust({ data }: TrustProps) {
         </div>
 
         {/* ── Metrics grid: 4-col ─────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {metrics.map((metric, i) => (
             <div
               key={i}
