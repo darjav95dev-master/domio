@@ -35,6 +35,34 @@ const PASSWORD_HASH_SALT_ROUNDS = 10;
 const DEMO_PASSWORD = "Domio2026!";
 const TENANT_SLUG = "domio";
 
+// Demo photos — free, license-clear Unsplash images (same set used by the
+// CoviCanarias reference interface). Local/demo only; in dev/prod real photos
+// are uploaded to R2 via the backoffice. getPublicMediaUrl serves absolute
+// URLs as-is.
+const U = (id: string, w = 1400) =>
+  `https://images.unsplash.com/photo-${id}?w=${w}&q=80&auto=format&fit=crop`;
+
+const HERO_IMAGE_URL =
+  "https://images.unsplash.com/photo-1641579707460-d4242c635c81?q=80&w=2802&auto=format&fit=crop&ixlib=rb-4.1.0";
+
+// Per-promoción [cover, gallery interior] — matched to the property type:
+// apartment blocks → pisos/apartamentos, house/villa → chalet/casa,
+// terrace → ático, interiors → local/oficina.
+const PROMO_IMAGES: Record<string, [string, string]> = {
+  // Pisos / apartamentos → building exteriors
+  "residencial-las-americas": [U("1545324418-cc1a3fa10c00"), U("1600210491892-03d54c0aaf87")], // edificio + salón
+  "apartamentos-costa-adeje": [U("1460317442991-0ec209397118"), U("1556909114-f6e7ad7d3136")], // edificio + cocina
+  "pisos-santa-cruz-centro": [U("1486325212027-8081e485255e"), U("1600210491892-03d54c0aaf87")], // skyline urbano + salón
+  // Villa / casa → house exteriors
+  "villas-la-laguna": [U("1564013799919-ab600027ffc6"), U("1505693416388-ac5ce068fe85")], // villa+piscina + dormitorio
+  "casa-arona-sur": [U("1568605114967-8130f3a36994"), U("1505693416388-ac5ce068fe85")], // casa + dormitorio
+  // Ático → terraza
+  "atico-santa-cruz-mar": [U("1600607687939-ce8a6c25118c"), U("1600210491892-03d54c0aaf87")], // terraza + salón
+  // Local / oficina → interiores
+  "local-comercial-la-laguna": [U("1502672260266-1c1ef2d93688"), U("1600566753190-17f0baa2a6c3")], // interior + zonas comunes
+  "oficina-santa-cruz-business": [U("1493809842364-78817add7ffb"), U("1600566753190-17f0baa2a6c3")], // interior + zonas comunes
+};
+
 // ─── DB client ─────────────────────────────────────────────────────────────────
 
 async function getDb() {
@@ -775,7 +803,7 @@ const GLOBAL_CONTENT_BLOCKS_SEED = [
       lead: "Descubre las mejores propiedades en Tenerife. Venta y alquiler de pisos, áticos, chalets y locales comerciales con el respaldo de Domio.",
       ctaPrimary: "Ver propiedades",
       ctaSecondary: "Contactar",
-      backgroundImageId: null,
+      backgroundImageId: HERO_IMAGE_URL,
       trustStats: [
         { value: "15", unit: "años", label: "de experiencia" },
         { value: "500", unit: "inmuebles", label: "gestionados" },
@@ -867,7 +895,7 @@ async function stepMediaAssets(
         ownerType: "PROMOCION",
         ownerId: promId,
         kind: "IMAGE_GALLERY",
-        r2Key: "/placeholder/image-1.jpg",
+        r2Key: (PROMO_IMAGES[p.slug] ?? [U("1568605114967-8130f3a36994"), U("1600210491892-03d54c0aaf87")])[0],
         mimeType: "image/jpeg",
         altText: `${p.name} — imagen principal`,
         sortOrder: 0,
@@ -882,7 +910,7 @@ async function stepMediaAssets(
         ownerType: "PROMOCION",
         ownerId: promId,
         kind: "IMAGE_GALLERY",
-        r2Key: "/placeholder/image-2.jpg",
+        r2Key: (PROMO_IMAGES[p.slug] ?? [U("1568605114967-8130f3a36994"), U("1600210491892-03d54c0aaf87")])[1],
         mimeType: "image/jpeg",
         altText: `${p.name} — vista general`,
         sortOrder: 1,

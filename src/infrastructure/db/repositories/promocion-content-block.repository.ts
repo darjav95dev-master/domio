@@ -7,7 +7,7 @@ import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAw
 import { contentBlockSchema } from "@/shared/types/content-block-schema";
 import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion-content-blocks";
 import type { ContentBlockType } from "@/shared/constants/db-enums";
-import type { TenantContext, Transaction } from "@/infrastructure/tenant/TenantContext";
+import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
 
 // ---------------------------------------------------------------------------
 // PromocionContentBlockRepository

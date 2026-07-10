@@ -1,7 +1,8 @@
-import type { Promocion } from "@/infrastructure/db/schema/promociones";
+import { MediaImage } from "@/shared/components/media-image";
+import type { FeaturedPromocion } from "@/features/home/types";
 
 interface FeaturedPortfolioProps {
-  promociones: Promocion[];
+  promociones: FeaturedPromocion[];
 }
 
 /**
@@ -16,7 +17,7 @@ export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
       <section className="py-section-lg px-gutter" aria-labelledby="portfolio-title">
         <div className="max-w-7xl mx-auto text-center">
           <h2 id="portfolio-title" className="font-display text-display-md text-fg-default mb-4">
-            Portafolio destacado
+            Promociones destacadas
           </h2>
           <p className="font-sans text-body-md text-fg-muted">
             Próximamente estaremos añadiendo nuestras propiedades destacadas.
@@ -34,13 +35,13 @@ export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
         {/* Section header */}
         <div className="mb-12">
           <span className="font-mono text-[13px] uppercase tracking-[0.18em] text-accent-default relative pl-6 before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[20px] before:h-[2px] before:bg-gradient-to-r before:from-accent-default before:to-transparent">
-            Portafolio
+            Promociones
           </span>
           <h2
             id="portfolio-title"
             className="font-display text-display-md text-fg-default mt-4"
           >
-            Portafolio destacado
+            Promociones destacadas
           </h2>
         </div>
 
@@ -70,7 +71,7 @@ export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
 }
 
 interface PropertyCardProps {
-  promocion: Promocion;
+  promocion: FeaturedPromocion;
   featured?: boolean;
 }
 
@@ -90,7 +91,17 @@ function PropertyCard({ promocion, featured = false }: PropertyCardProps) {
     >
       {/* Image */}
       <div className={`relative w-full ${featured ? 'aspect-[4/3] lg:h-[520px]' : 'aspect-[4/3]'}`}>
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,var(--color-ink-2),var(--color-ink))]" />
+        {promocion.coverUrl ? (
+          <MediaImage
+            src={promocion.coverUrl}
+            alt={name}
+            fill
+            sizes={featured ? "(min-width: 1024px) 40vw, 100vw" : "(min-width: 1024px) 25vw, 100vw"}
+            className="object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,var(--color-ink-2),var(--color-ink))]" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       </div>
 

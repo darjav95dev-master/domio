@@ -11,7 +11,6 @@ const ERR_NOT_FOUND = "Promoción not found";
 const ERR_INTERNAL = "Internal server error";
 const ERR_FORBIDDEN = "Forbidden";
 const ERR_PARSE_BODY = "Invalid JSON body";
-const ERR_UNAUTHENTICATED = "Unauthenticated";
 
 // ---------------------------------------------------------------------------
 // Helpers

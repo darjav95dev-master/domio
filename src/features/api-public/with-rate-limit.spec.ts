@@ -21,12 +21,6 @@ vi.mock("@/infrastructure/rate-limiting/api-key-middleware", () => ({
   checkApiKeyRateLimit: mockCheckApiKeyRateLimit,
 }));
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function createMockRequest(headers: Record<string, string>): Request {
-  return new Request("https://api.example.com/v1/promociones", { headers });
-}
-
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("applyRateLimit", () => {

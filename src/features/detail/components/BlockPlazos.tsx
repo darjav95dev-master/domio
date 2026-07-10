@@ -1,5 +1,16 @@
 import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion-content-blocks";
 
+/** Picks the class for a timeline milestone by its state (done > current > pending). */
+function milestoneClass(
+  isDone: boolean,
+  isCurrent: boolean,
+  classes: { done: string; current: string; pending: string },
+): string {
+  if (isDone) return classes.done;
+  if (isCurrent) return classes.current;
+  return classes.pending;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -74,11 +85,11 @@ export function BlockPlazos({ block }: BlockPlazosProps) {
                 <div
                   className={[
                     "relative z-above mt-1 flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full md:mt-0",
-                    isDone
-                      ? "bg-fg-default"
-                      : isCurrent
-                        ? "bg-accent-default shadow-[0_0_0_4px_var(--accent-subtle)]"
-                        : "border-2 border-border-default bg-bg-canvas",
+                    milestoneClass(isDone, isCurrent, {
+                      done: "bg-fg-default",
+                      current: "bg-accent-default shadow-[0_0_0_4px_var(--accent-subtle)]",
+                      pending: "border-2 border-border-default bg-bg-canvas",
+                    }),
                   ].join(" ")}
                   aria-hidden="true"
                 />
@@ -88,11 +99,11 @@ export function BlockPlazos({ block }: BlockPlazosProps) {
                   <p
                     className={[
                       "font-mono text-[11px] font-medium uppercase tracking-[0.16em]",
-                      isDone
-                        ? "text-fg-default"
-                        : isCurrent
-                          ? "text-accent-default"
-                          : "text-fg-subtle",
+                      milestoneClass(isDone, isCurrent, {
+                        done: "text-fg-default",
+                        current: "text-accent-default",
+                        pending: "text-fg-subtle",
+                      }),
                     ].join(" ")}
                   >
                     {milestone.label}

@@ -79,7 +79,7 @@ describe("FeaturedPortfolio", () => {
   it("renders section title", () => {
     render(<FeaturedPortfolio promociones={mockPromociones} />);
     expect(
-      screen.getByRole("heading", { level: 2, name: "Portafolio destacado" }),
+      screen.getByRole("heading", { level: 2, name: "Promociones destacadas" }),
     ).toBeInTheDocument();
   });
 

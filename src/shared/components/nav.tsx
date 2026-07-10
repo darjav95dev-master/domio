@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { cn } from "@/shared/utils/cn";
+import { useFavorites } from "@/features/favorites/useFavorites";
 
 const NAV_LINKS = [
-  { label: "Portafolio", href: "/portafolio" },
+  { label: "Promociones", href: "/portafolio" },
   { label: "Contacto", href: "/contacto" },
   { label: "Sobre", href: "/sobre" },
 ] as const;
@@ -24,6 +25,7 @@ const SCROLL_THRESHOLD = 40;
 export function Nav() {
   const [isScrolled, setIsScrolled] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const { count: favCount, ready: favReady } = useFavorites();
 
   const handleScroll = useCallback(() => {
     const scrolled = window.scrollY > SCROLL_THRESHOLD;
@@ -105,6 +107,42 @@ export function Nav() {
                 {link.label}
               </Link>
             ))}
+
+            {/* Favorites */}
+            <Link
+              href="/favoritos"
+              aria-label={
+                favReady && favCount > 0
+                  ? `Favoritos (${favCount})`
+                  : "Favoritos"
+              }
+              className={cn(
+                "relative flex items-center gap-1.5 font-sans text-sm font-medium",
+                isScrolled ? "text-fg-default" : "text-white",
+              )}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+              {favReady && favCount > 0 && (
+                <span
+                  data-testid="fav-count"
+                  className="min-w-[18px] rounded-pill bg-accent-default px-1.5 py-0.5 text-center font-mono text-[10px] leading-none text-white"
+                >
+                  {favCount}
+                </span>
+              )}
+            </Link>
 
             {/* CTA pill */}
             <Link
@@ -194,6 +232,16 @@ export function Nav() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link
+                href="/favoritos"
+                onClick={closeDrawer}
+                className="block rounded-[8px] px-[16px] py-[12px] font-sans text-base text-fg-default transition-colors duration-150 hover:bg-accent-subtle"
+              >
+                Favoritos
+                {favReady && favCount > 0 && ` (${favCount})`}
+              </Link>
+            </li>
           </ul>
         </nav>
 

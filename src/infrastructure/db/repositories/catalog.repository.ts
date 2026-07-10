@@ -1,8 +1,9 @@
-import { eq, and, desc, count, or, lt, sql } from "drizzle-orm";
+import { eq, and, desc, count, or, lt, sql, inArray } from "drizzle-orm";
 import {
   promociones,
   tipologias,
   users,
+  mediaAssets,
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
 import type { TenantContext, Transaction } from "@/infrastructure/tenant/TenantContext";
@@ -39,6 +40,14 @@ export interface CatalogCursorResult {
   items: PromocionListRow[];
   nextCursor: string | null;
   total: number;
+}
+
+export interface CatalogCardExtras {
+  coverR2Key: string | null;
+  coverAlt: string | null;
+  priceFrom: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
 }
 
 export interface ApiCursorOptions {
@@ -147,6 +156,63 @@ export class CatalogRepository extends TenantAwareRepository {
   // Public Catalog — cursor pagination
   // -------------------------------------------------------------------------
 
+  /**
+   * Builds the WHERE conditions for the public catalog from filters.
+   * Extracted from findPublicWithCursor to keep that method's complexity low.
+   */
+  private buildPublicConditions(
+    filters: PublicCatalogFilters,
+  ): (ReturnType<typeof eq> | ReturnType<typeof sql>)[] {
+    const conditions: (ReturnType<typeof eq> | ReturnType<typeof sql>)[] = [
+      eq(promociones.tenantId, this.ctx.getTenantId()),
+      eq(promociones.status, "PUBLISHED"),
+    ];
+
+    if (filters.island)
+      conditions.push(eq(promociones.island, filters.island));
+    if (filters.municipality)
+      conditions.push(eq(promociones.municipality, filters.municipality));
+    if (filters.propertyType)
+      conditions.push(eq(promociones.propertyType, filters.propertyType));
+    if (filters.operation)
+      conditions.push(eq(promociones.operation, filters.operation));
+    if (filters.constructionStatus)
+      conditions.push(
+        eq(promociones.constructionStatus, filters.constructionStatus),
+      );
+
+    if (filters.bedrooms) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bedrooms >= ${filters.bedrooms})`,
+      );
+    }
+    if (filters.bathrooms) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bathrooms >= ${filters.bathrooms})`,
+      );
+    }
+    if (filters.priceMin) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale >= ${filters.priceMin})`,
+      );
+    }
+    if (filters.priceMax) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale <= ${filters.priceMax})`,
+      );
+    }
+    if (filters.amenities && filters.amenities.length > 0) {
+      for (const amenity of filters.amenities) {
+        const amenityJson = JSON.stringify([amenity]);
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.amenities @> ${amenityJson}::jsonb)`,
+        );
+      }
+    }
+
+    return conditions;
+  }
+
   async findPublicWithCursor(
     filters: PublicCatalogFilters,
     options?: {
@@ -159,54 +225,7 @@ export class CatalogRepository extends TenantAwareRepository {
       const limit = options?.limit ?? 12;
       const sort = options?.sort ?? "published";
 
-      const conditions: (ReturnType<typeof eq> | ReturnType<typeof sql>)[] = [
-        eq(promociones.tenantId, this.ctx.getTenantId()),
-        eq(promociones.status, "PUBLISHED"),
-      ];
-
-      if (filters.island)
-        conditions.push(eq(promociones.island, filters.island));
-      if (filters.municipality)
-        conditions.push(eq(promociones.municipality, filters.municipality));
-      if (filters.propertyType)
-        conditions.push(eq(promociones.propertyType, filters.propertyType));
-      if (filters.operation)
-        conditions.push(eq(promociones.operation, filters.operation));
-      if (filters.constructionStatus)
-        conditions.push(
-          eq(promociones.constructionStatus, filters.constructionStatus),
-        );
-
-      if (filters.bedrooms) {
-        conditions.push(
-          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bedrooms >= ${filters.bedrooms})`,
-        );
-      }
-      if (filters.bathrooms) {
-        conditions.push(
-          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bathrooms >= ${filters.bathrooms})`,
-        );
-      }
-      if (filters.priceMin) {
-        conditions.push(
-          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale >= ${filters.priceMin})`,
-        );
-      }
-      if (filters.priceMax) {
-        conditions.push(
-          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale <= ${filters.priceMax})`,
-        );
-      }
-      if (filters.amenities && filters.amenities.length > 0) {
-        for (const amenity of filters.amenities) {
-          const amenityJson = JSON.stringify([amenity]);
-          conditions.push(
-            sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.amenities @> ${amenityJson}::jsonb)`,
-          );
-        }
-      }
-
-      const whereClause = and(...conditions);
+      const whereClause = and(...this.buildPublicConditions(filters));
 
       let total = 0;
       if (!options?.cursor) {
@@ -360,4 +379,102 @@ export class CatalogRepository extends TenantAwareRepository {
 
     return { items, nextCursor, total };
   }
+
+  // -------------------------------------------------------------------------
+  // Card enrichment — cover image + price/room aggregates for a set of ids
+  // -------------------------------------------------------------------------
+
+  /**
+   * Given a list of promoción ids, returns per-promoción presentation extras
+   * for catalog/home cards: cover image r2Key, price "desde", and the max
+   * bedrooms/bathrooms across its tipologías. Two small keyed queries — kept
+   * out of the paginated query to avoid disturbing its cursor logic.
+   */
+  async findCardExtras(
+    promocionIds: string[],
+  ): Promise<Map<string, CatalogCardExtras>> {
+    const result = new Map<string, CatalogCardExtras>();
+    if (promocionIds.length === 0) return result;
+
+    return this.ctx.withTransaction(async (tx) => {
+      const tenantId = this.ctx.getTenantId();
+
+      // Cover image: prefer isCover, else lowest sortOrder gallery image.
+      const covers = await tx
+        .select({
+          ownerId: mediaAssets.ownerId,
+          r2Key: mediaAssets.r2Key,
+          altText: mediaAssets.altText,
+          isCover: mediaAssets.isCover,
+          sortOrder: mediaAssets.sortOrder,
+        })
+        .from(mediaAssets)
+        .where(
+          and(
+            eq(mediaAssets.tenantId, tenantId),
+            eq(mediaAssets.ownerType, "PROMOCION"),
+            eq(mediaAssets.kind, "IMAGE_GALLERY"),
+            inArray(mediaAssets.ownerId, promocionIds),
+          ),
+        )
+        .orderBy(desc(mediaAssets.isCover), mediaAssets.sortOrder);
+
+      // Price/room aggregates per promoción.
+      const aggs = await tx
+        .select({
+          promocionId: tipologias.promocionId,
+          minPriceSale: sql<number | null>`MIN(${tipologias.referencePriceSale})`,
+          minPriceRent: sql<number | null>`MIN(${tipologias.referencePriceRent})`,
+          maxBedrooms: sql<number | null>`MAX(${tipologias.bedrooms})`,
+          maxBathrooms: sql<number | null>`MAX(${tipologias.bathrooms})`,
+        })
+        .from(tipologias)
+        .where(
+          and(
+            eq(tipologias.tenantId, tenantId),
+            inArray(tipologias.promocionId, promocionIds),
+          ),
+        )
+        .groupBy(tipologias.promocionId);
+
+      for (const id of promocionIds) {
+        result.set(id, {
+          coverR2Key: null,
+          coverAlt: null,
+          priceFrom: null,
+          bedrooms: null,
+          bathrooms: null,
+        });
+      }
+      // covers is ordered isCover DESC, sortOrder ASC → first per owner wins.
+      for (const c of covers) {
+        const entry = result.get(c.ownerId);
+        if (entry && entry.coverR2Key === null) {
+          entry.coverR2Key = c.r2Key;
+          entry.coverAlt = c.altText;
+        }
+      }
+      for (const a of aggs) {
+        const entry = result.get(a.promocionId);
+        if (!entry) continue;
+        entry.priceFrom = firstNonNull(a.minPriceSale, a.minPriceRent);
+        entry.bedrooms = toNumberOrNull(a.maxBedrooms);
+        entry.bathrooms = toNumberOrNull(a.maxBathrooms);
+      }
+
+      return result;
+    });
+  }
+}
+
+/** Numeric value of the first non-null argument, else null. */
+function firstNonNull(...values: (number | null)[]): number | null {
+  for (const v of values) {
+    if (v != null) return Number(v);
+  }
+  return null;
+}
+
+function toNumberOrNull(value: number | null): number | null {
+  return value != null ? Number(value) : null;
 }

@@ -1,8 +1,11 @@
 import { eq, and } from "drizzle-orm";
 import { contentBlocks, promociones } from "@/infrastructure/db/schema";
 import { PublicContext } from "@/infrastructure/tenant/PublicContext";
+import { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
+import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import type { ContentBlock } from "@/infrastructure/db/schema/content-blocks";
 import type {
+  FeaturedPromocion,
   HeroPayload,
   HowWeWorkPayload,
   AboutDomioPayload,
@@ -27,7 +30,10 @@ const defaultHero: HeroPayload = {
   lead: "Descubre las mejores propiedades en Tenerife. Venta y alquiler de pisos, áticos, chalets y locales comerciales con el respaldo de Domio.",
   ctaPrimary: "Ver propiedades",
   ctaSecondary: "Contactar",
-  backgroundImageId: null,
+  // Fallback hero image (same free Unsplash photo the seed sets on the DB block —
+  // the hero used on the CoviCanarias final design home).
+  backgroundImageId:
+    "https://images.unsplash.com/photo-1641579707460-d4242c635c81?q=80&w=2802&auto=format&fit=crop&ixlib=rb-4.1.0",
   trustStats: [
     { value: "15", unit: "años", label: "de experiencia" },
     { value: "500", unit: "inmuebles", label: "gestionados" },
@@ -115,7 +121,7 @@ export async function getHomePageData(): Promise<HomePageData> {
     blockMap.set(block.blockKey, block);
   }
 
-  const portfolio = await ctx.withTransaction(async (tx) => {
+  const portfolioRows = await ctx.withTransaction(async (tx) => {
     return tx
       .select()
       .from(promociones)
@@ -126,6 +132,14 @@ export async function getHomePageData(): Promise<HomePageData> {
           eq(promociones.status, "PUBLISHED"),
         ),
       );
+  });
+
+  const extras = await new CatalogRepository(ctx).findCardExtras(
+    portfolioRows.map((p) => p.id),
+  );
+  const portfolio: FeaturedPromocion[] = portfolioRows.map((p) => {
+    const coverR2Key = extras.get(p.id)?.coverR2Key ?? null;
+    return { ...p, coverUrl: coverR2Key ? getPublicMediaUrl(coverR2Key) : null };
   });
 
   return {

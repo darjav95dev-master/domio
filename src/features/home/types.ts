@@ -1,5 +1,8 @@
 import type { Promocion } from "@/infrastructure/db/schema/promociones";
 
+/** A portfolio promoción enriched with its resolved cover image URL. */
+export type FeaturedPromocion = Promocion & { coverUrl: string | null };
+
 // ---------------------------------------------------------------------------
 // Home page data — payload shapes from content_blocks + promociones
 // ---------------------------------------------------------------------------
@@ -92,5 +95,5 @@ export interface HomePageData {
   faq: FAQPayload;
   trust: TrustPayload;
   cta: CTAPayload;
-  portfolio: Promocion[];
+  portfolio: FeaturedPromocion[];
 }

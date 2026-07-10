@@ -51,7 +51,7 @@ describe("Hero", () => {
 
   it("renders the eyebrow label", () => {
     render(<Hero data={mockData} />);
-    expect(screen.getByText("Portafolio")).toBeInTheDocument();
+    expect(screen.getByText("Promociones")).toBeInTheDocument();
   });
 
   it("has accessible landmark", () => {

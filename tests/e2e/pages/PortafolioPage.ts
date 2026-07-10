@@ -16,7 +16,7 @@ export class PortafolioPage extends BasePage {
   // ── Heading ──────────────────────────────────────────────────────────
 
   get heading(): Locator {
-    return this.page.getByRole("heading", { name: "Portafolio", level: 1 });
+    return this.page.getByRole("heading", { name: "Promociones", level: 1 });
   }
 
   // ── Filter Bar (role="search") ───────────────────────────────────────

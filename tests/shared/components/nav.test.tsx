@@ -28,10 +28,10 @@ describe("Nav (T006)", () => {
     expect(logo).toHaveAttribute("href", "/");
   });
 
-  it("renders navigation links: Portafolio, Contacto, Sobre", () => {
+  it("renders navigation links: Promociones, Contacto, Sobre", () => {
     render(<Nav />);
     const labels = screen.getAllByRole("link").map((l) => l.textContent?.trim());
-    expect(labels).toContain("Portafolio");
+    expect(labels).toContain("Promociones");
     expect(labels).toContain("Contacto");
     expect(labels).toContain("Sobre");
   });

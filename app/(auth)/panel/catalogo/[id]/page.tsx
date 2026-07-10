@@ -4,10 +4,11 @@ import { eq, and } from "drizzle-orm";
 import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionContentBlockRepository } from "@/infrastructure/db/repositories/promocion-content-block.repository";
 import { db } from "@/infrastructure/db/client";
 import { users } from "@/infrastructure/db/schema/users";
 import { mediaAssets } from "@/infrastructure/db/schema/media-assets";
-import { MediaService } from "@/infrastructure/media/media.service";
+import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import { validateMediaForPublish } from "@/features/promociones/actions/media.actions";
 import {
   PromocionForm,
@@ -87,10 +88,8 @@ async function loadMediaAssets(
         .orderBy(mediaAssets.sortOrder);
     });
 
-    const mediaService = new MediaService(tenantId);
-
     for (const asset of rows) {
-      const previewUrl = mediaService.getPublicUrl(asset.r2Key);
+      const previewUrl = getPublicMediaUrl(asset.r2Key);
       const item: MediaAssetItem = {
         id: asset.id,
         r2Key: asset.r2Key,
@@ -177,6 +176,7 @@ export default async function EditPromocionPage({
     session.role,
   );
   const repository = new PromocionRepository(authCtx);
+  const contentBlockRepository = new PromocionContentBlockRepository(authCtx);
   const raw = await repository.findById(id);
 
   if (!raw) {
@@ -195,7 +195,7 @@ export default async function EditPromocionPage({
 
   let constructionWarning: ConstructionWarning | null = null;
   try {
-    const blockPayload = await repository.findContentBlock(
+    const blockPayload = await contentBlockRepository.findContentBlock(
       id,
       "PLAZOS_GARANTIAS",
     );
@@ -259,7 +259,7 @@ export default async function EditPromocionPage({
   }> = [];
 
   try {
-    const dbBlocks = await repository.findAllContentBlocks(id);
+    const dbBlocks = await contentBlockRepository.findAllContentBlocks(id);
     initialBlocks = dbBlocks.map((b) => ({
       id: b.id,
       blockType: b.blockType as BlockEditorItem["blockType"],
@@ -268,7 +268,7 @@ export default async function EditPromocionPage({
     }));
 
     // Run publish validation server-side
-    const validated = await repository.validateBlocksForPublish(id);
+    const validated = await contentBlockRepository.validateBlocksForPublish(id);
     if (!validated.valid) {
       blockValidationErrors = validated.errors.map((e) => ({
         blockType: e.blockType,

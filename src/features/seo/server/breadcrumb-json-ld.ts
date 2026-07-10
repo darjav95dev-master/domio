@@ -55,7 +55,7 @@ export function buildBreadcrumbJsonLd(
       {
         "@type": "ListItem",
         position: 2,
-        name: "Portafolio",
+        name: "Promociones",
         item: `${siteUrl}/portafolio`,
       },
       {

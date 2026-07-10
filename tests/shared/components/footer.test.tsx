@@ -18,7 +18,7 @@ describe("Footer (T004)", () => {
 
   it("renders the Domio tagline in Fraunces italic", async () => {
     render(await Footer());
-    const em = screen.getByText(/portafolio inmobiliario/i);
+    const em = screen.getByText(/promociones inmobiliarias/i);
     expect(em).toBeInTheDocument();
     // The <em> is inside a <p> with font-display; <em> has not-italic
     const parentP = em.closest("p");
@@ -34,7 +34,7 @@ describe("Footer (T004)", () => {
     expect(hrefs).toContain("/contacto");
   });
 
-  it("renders the 'Portafolio' column with Catálogo, Destacados, Novedades links", async () => {
+  it("renders the 'Promociones' column with Catálogo, Destacados, Novedades links", async () => {
     render(await Footer());
     const links = screen.getAllByRole("link");
     const hrefs = links.map((l) => l.getAttribute("href"));

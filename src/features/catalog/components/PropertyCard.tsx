@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MediaImage } from "@/shared/components/media-image";
 import { cn } from "@/shared/utils/cn";
 import { OPERATION_TYPE_LABELS } from "@/shared/constants/domain-labels";
+import { FavoriteButton } from "@/features/favorites/FavoriteButton";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -148,6 +149,13 @@ export function PropertyCard({ item }: PropertyCardProps) {
           </span>
         )}
       </Link>
+
+      {/* Favorite toggle — sibling of the image link, above the card overlay */}
+      <FavoriteButton
+        id={item.id}
+        name={name}
+        className="absolute bottom-4 right-4"
+      />
 
       {/* -- Body ---------------------------------------------------------- */}
       <div className="flex flex-1 flex-col px-6 pb-6 pt-[22px]">

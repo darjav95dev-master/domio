@@ -33,6 +33,8 @@ vi.mock("next-auth/jwt", () => ({
 // ---------------------------------------------------------------------------
 import { middleware } from "../../middleware";
 
+const CREDENTIALS_URL = "https://domio.com/api/auth/callback/credentials";
+
 describe("login rate limiting in middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,7 +44,7 @@ describe("login rate limiting in middleware", () => {
     mockCheckLoginRateLimit.mockResolvedValue(null);
 
     const request = new NextRequest(
-      new Request("https://domio.com/api/auth/callback/credentials", {
+      new Request(CREDENTIALS_URL, {
         method: "POST",
       }),
     );
@@ -67,7 +69,7 @@ describe("login rate limiting in middleware", () => {
     mockCheckLoginRateLimit.mockResolvedValue(rateLimitResponse);
 
     const request = new NextRequest(
-      new Request("https://domio.com/api/auth/callback/credentials", {
+      new Request(CREDENTIALS_URL, {
         method: "POST",
       }),
     );
@@ -84,7 +86,7 @@ describe("login rate limiting in middleware", () => {
 
   it("does NOT check rate limit on GET requests to login endpoint", async () => {
     const request = new NextRequest(
-      new Request("https://domio.com/api/auth/callback/credentials", {
+      new Request(CREDENTIALS_URL, {
         method: "GET",
       }),
     );
@@ -127,7 +129,7 @@ describe("login rate limiting in middleware", () => {
       }),
     );
 
-    const response = await middleware(request);
+    await middleware(request);
 
     // Auth check should have run (getToken was called), no redirect because
     // the mock returns { sub: "user-1" } — user is authenticated
@@ -140,7 +142,7 @@ describe("login rate limiting in middleware", () => {
 
     for (let i = 0; i < 5; i++) {
       const request = new NextRequest(
-        new Request("https://domio.com/api/auth/callback/credentials", {
+        new Request(CREDENTIALS_URL, {
           method: "POST",
         }),
       );
@@ -165,7 +167,7 @@ describe("login rate limiting in middleware", () => {
     mockCheckLoginRateLimit.mockResolvedValue(rateLimitResponse);
 
     const request = new NextRequest(
-      new Request("https://domio.com/api/auth/callback/credentials", {
+      new Request(CREDENTIALS_URL, {
         method: "POST",
       }),
     );

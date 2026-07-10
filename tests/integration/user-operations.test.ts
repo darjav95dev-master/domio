@@ -131,9 +131,11 @@ describe("UserRepository", () => {
         role: "ADMIN",
       });
       const repo = new UserRepository(ctx);
-      // Use createMockTx directly to capture actual Drizzle calls
+      // Use createMockTx directly to capture actual Drizzle calls.
+      // Fake bcrypt-shaped hash asserted to never reach the client.
+      const nonExposedHash = "$2b$12$shouldnotbeexposed";
       const { tx, calls } = createMockTx([
-        [{ ...baseUserRow, passwordHash: "$2b$12$shouldnotbeexposed" }],
+        [{ ...baseUserRow, passwordHash: nonExposedHash }],
         [{ count: "1" }],
       ]);
       mockWithTx.mockImplementation(

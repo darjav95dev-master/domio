@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import type { NextAuthConfig } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 
 // ─── Module augmentation for custom claims ──────────────────────────────────
 
@@ -27,7 +27,7 @@ declare module "next-auth" {
 // The `auth()` wrapper used in middleware only reads JWT cookies and does
 // NOT invoke authorize — so this config is safe to import from middleware.ts.
 
-export const authConfig: NextAuthConfig = {
+export const authConfig: NextAuthOptions = {
   providers: [
     Credentials({
       name: "credentials",
@@ -113,8 +113,6 @@ export const authConfig: NextAuthConfig = {
   pages: {
     signIn: "/panel/login",
   },
-
-  trustHost: true,
 };
 
 // ─── v5-compatible interface wrapping v4 NextAuth ───────────────────────────

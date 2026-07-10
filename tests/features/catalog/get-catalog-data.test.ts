@@ -3,10 +3,12 @@ import { describe, it, expect, vi } from "vitest";
 
 // Must be before imports — vi.mock hoists to top
 const mockFindPublicWithCursor = vi.fn();
+const mockFindCardExtras = vi.fn();
 
 vi.mock("@/infrastructure/db/repositories/catalog.repository", () => ({
   CatalogRepository: vi.fn().mockImplementation(() => ({
     findPublicWithCursor: mockFindPublicWithCursor,
+    findCardExtras: mockFindCardExtras,
   })),
 }));
 
@@ -24,6 +26,8 @@ import { getCatalogData } from "@/features/catalog/server/get-catalog-data";
 describe("getCatalogData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // getCatalogData enriches items via findCardExtras; default to no extras.
+    mockFindCardExtras.mockResolvedValue(new Map());
   });
 
   it("validates filters with zod schema — rejects invalid property type", async () => {

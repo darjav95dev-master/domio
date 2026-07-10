@@ -52,7 +52,7 @@ describe("PortafolioPage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Portafolio" }),
+      screen.getByRole("heading", { level: 1, name: "Promociones" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/explora nuestra selección de inmuebles/i),
@@ -141,7 +141,7 @@ describe("PortafolioPage", () => {
       screen.getByText(/todavía no hay inmuebles/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /ver todo el portafolio/i }),
+      screen.getByRole("link", { name: /ver todas las promociones/i }),
     ).toBeInTheDocument();
   });
 });

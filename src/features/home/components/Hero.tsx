@@ -50,7 +50,7 @@ export function Hero({ data }: HeroProps) {
       <div className="absolute inset-0 -z-10">
         {backgroundImageId ? (
           <MediaImage
-            alt=""
+            alt="Hogar en Canarias"
             src={backgroundImageId}
             fill
             className="object-cover"
@@ -91,7 +91,7 @@ export function Hero({ data }: HeroProps) {
               className="w-[6px] h-[6px] rounded-full bg-terracota shrink-0"
               aria-hidden="true"
             />
-            Portafolio
+            Promociones
           </div>
 
           <h1 className="font-display text-[clamp(2.5rem,5vw,4.5rem)] font-normal leading-[1.08] tracking-[-0.02em] text-white mb-6 text-balance">

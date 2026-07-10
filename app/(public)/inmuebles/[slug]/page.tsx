@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPromocionBySlug } from "@/features/detail/server/get-detail-data";
-import { mediaEnv } from "@/infrastructure/media/env";
+import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 import { DetailHero } from "@/features/detail/components/DetailHero";
 import { InfoBar } from "@/features/detail/components/InfoBar";
@@ -11,6 +11,7 @@ import { MapPromocion } from "@/features/detail/components/MapPromocion";
 import { ContactForm } from "@/features/engagement/components/ContactForm";
 import { WhatsAppButton } from "@/features/engagement/components/WhatsAppButton";
 import { ShareButton } from "@/features/engagement/components/ShareButton";
+import { FavoriteButton } from "@/features/favorites/FavoriteButton";
 import { RelatedProperties } from "@/features/engagement/components/RelatedProperties";
 import { getContactConfig } from "@/features/engagement/server/get-contact-config";
 import { buildBreadcrumbJsonLd } from "@/features/seo/server/breadcrumb-json-ld";
@@ -45,9 +46,14 @@ export async function generateMetadata({
     (a) => a.kind === "IMAGE_GALLERY" && a.isCover,
   ) ?? promocion.mediaAssets.find((a) => a.kind === "IMAGE_GALLERY");
 
-  const coverUrl = coverAsset
-    ? `${mediaEnv.R2_PUBLIC_URL}/${coverAsset.r2Key.replace(/^\//, "")}`
+  // OG images must be absolute. Local public assets resolve to "/x.jpg" —
+  // prefix the site URL so social crawlers can fetch them.
+  const coverPublicUrl = coverAsset
+    ? getPublicMediaUrl(coverAsset.r2Key)
     : undefined;
+  const coverUrl = coverPublicUrl?.startsWith("/")
+    ? `${(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "")}${coverPublicUrl}`
+    : coverPublicUrl;
 
   return buildPageMetadata({
     title: seo.title,
@@ -187,8 +193,9 @@ export default async function DetailPage({ params }: DetailPageProps) {
                       prefilledMessage={contactConfig.whatsappPrefilledMessage}
                       promocionName={promocion.name}
                     />
-                    <div className="flex justify-start">
+                    <div className="flex items-center gap-3">
                       <ShareButton />
+                      <FavoriteButton id={promocion.id} name={promocion.name} />
                     </div>
                   </div>
                 </div>

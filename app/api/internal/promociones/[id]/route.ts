@@ -316,6 +316,29 @@ export async function GET(
   }
 }
 
+/** Converts a { lng, lat } object (or null) to a PostGIS [lng, lat] tuple. */
+function toLngLatTuple(
+  loc: { lng: number; lat: number } | null,
+): [number, number] | null {
+  return loc === null ? null : [loc.lng, loc.lat];
+}
+
+/**
+ * Rewrites `location` / `locationApprox` on the update payload in place,
+ * converting { lng, lat } objects to PostGIS [lng, lat] tuples. Only touches
+ * fields that are present. Extracted to keep PATCH's complexity low.
+ */
+function convertLocationFields(data: Record<string, unknown>): void {
+  if (data.location !== undefined) {
+    data.location = toLngLatTuple(data.location as { lng: number; lat: number } | null);
+  }
+  if (data.locationApprox !== undefined) {
+    data.locationApprox = toLngLatTuple(
+      data.locationApprox as { lng: number; lat: number } | null,
+    );
+  }
+}
+
 /**
  * PATCH /api/internal/promociones/[id]
  * Updates a promoción. Handles slug generation on first publish,
@@ -361,17 +384,8 @@ export async function PATCH(
       );
     }
 
-    // Convert location from { lng, lat } to PostGIS [lng, lat] tuple
-    if (parsed.data.location !== undefined) {
-      const loc = parsed.data.location;
-      (parsed.data as Record<string, unknown>).location =
-        loc === null ? null : ([loc.lng, loc.lat] as [number, number]);
-    }
-    if (parsed.data.locationApprox !== undefined) {
-      const loc = parsed.data.locationApprox;
-      (parsed.data as Record<string, unknown>).locationApprox =
-        loc === null ? null : ([loc.lng, loc.lat] as [number, number]);
-    }
+    // Convert location fields from { lng, lat } to PostGIS [lng, lat] tuples
+    convertLocationFields(parsed.data as Record<string, unknown>);
 
     const isPublishing =
       parsed.data.status === "PUBLISHED" && current.status !== "PUBLISHED";

@@ -8,7 +8,6 @@ import {
   users,
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
-import { contentBlockSchema } from "@/shared/types/content-block-schema";
 import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion-content-blocks";
 import type { MediaAsset } from "@/infrastructure/db/schema/media-assets";
 import { TipologiaSyncService } from "@/features/promociones/services/tipologia-sync.service";
@@ -19,7 +18,6 @@ import type {
   PromocionStatus,
   PromocionKind,
   ConstructionStatus,
-  ContentBlockType,
 } from "@/shared/constants/db-enums";
 
 // ---------------------------------------------------------------------------
@@ -65,7 +63,7 @@ export interface PromocionFilters {
 }
 
 import { PaginatedResult } from "@/shared/types/pagination";
-import type { TipologiaPayloadFull as TipologiaPayload, UnidadPayload } from "@/shared/types/tipologia-schema";
+import type { TipologiaPayloadFull as TipologiaPayload } from "@/shared/types/tipologia-schema";
 
 /**
  * Full detail for the public detail page.

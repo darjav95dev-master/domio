@@ -52,6 +52,11 @@ export interface CatalogDataResult {
     draftPayload: Record<string, unknown> | null;
     createdAt: Date;
     updatedAt: Date;
+    coverR2Key: string | null;
+    coverAlt: string | null;
+    priceFrom: number | null;
+    bedrooms: number | null;
+    bathrooms: number | null;
   }>;
   nextCursor: string | null;
   total: number;
@@ -90,8 +95,20 @@ export async function getCatalogData(
     sort,
   });
 
+  const extras = await repo.findCardExtras(result.items.map((i) => i.id));
+
   return {
-    items: result.items,
+    items: result.items.map((item) => {
+      const e = extras.get(item.id);
+      return {
+        ...item,
+        coverR2Key: e?.coverR2Key ?? null,
+        coverAlt: e?.coverAlt ?? null,
+        priceFrom: e?.priceFrom ?? null,
+        bedrooms: e?.bedrooms ?? null,
+        bathrooms: e?.bathrooms ?? null,
+      };
+    }),
     nextCursor: result.nextCursor,
     total: result.total,
   };

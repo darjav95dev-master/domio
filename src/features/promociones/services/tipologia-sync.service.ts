@@ -1,4 +1,4 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { tipologias, unidades } from "@/infrastructure/db/schema";
 import type { TenantContext, Transaction } from "@/infrastructure/tenant/TenantContext";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";

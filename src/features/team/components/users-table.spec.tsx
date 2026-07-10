@@ -101,7 +101,7 @@ describe("UsersTable", () => {
 
   it("filters by role when select changes", async () => {
     const user = userEvent.setup();
-    mockSuccess([mockUsers[0]]); // Only admin after filter
+    mockSuccess([mockUsers[0]!]); // Only admin after filter
 
     render(<UsersTable />);
 

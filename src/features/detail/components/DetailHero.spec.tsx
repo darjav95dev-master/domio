@@ -10,6 +10,7 @@ import type { PromocionDetail } from "@/infrastructure/db/repositories/promocion
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) => {
     const { alt, ...rest } = props;
+    // eslint-disable-next-line @next/next/no-img-element -- test mock of next/image
     return <img alt={alt as string} {...rest} />;
   },
 }));
@@ -22,6 +23,7 @@ vi.mock("@/shared/components/media-image", () => ({
   MediaImage: (props: Record<string, unknown>) => {
     const { alt, className, ...rest } = props;
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- test mock of next/image
       <img
         alt={alt as string}
         className={className as string}

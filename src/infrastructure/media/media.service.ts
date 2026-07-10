@@ -13,8 +13,9 @@ import {
   MAX_UPLOAD_SIZE_BYTES,
 } from "./constants";
 import { mediaEnv } from "./env";
+import { getPublicMediaUrl } from "./public-url";
 import { r2Client } from "./r2-client";
-import type { TransformOptions, UploadInput } from "./types";
+import type { UploadInput } from "./types";
 import { UploadValidationError } from "./types";
 
 export class MediaService {
@@ -91,7 +92,6 @@ export class MediaService {
   async signedReadUrl(
     assetId: string,
     ttlSeconds: number = 3600,
-    opts?: TransformOptions,
   ): Promise<string> {
     const tenantId = this.ctx.getTenantId();
 
@@ -119,7 +119,7 @@ export class MediaService {
   }
 
   getPublicUrl(r2Key: string): string {
-    return `${mediaEnv.R2_PUBLIC_URL}/${r2Key}`;
+    return getPublicMediaUrl(r2Key);
   }
 
   async reorderGallery(

@@ -10,6 +10,7 @@ import type { PromocionDetail } from "@/infrastructure/db/repositories/promocion
 vi.mock("@/shared/components/media-image", () => ({
   MediaImage: (props: Record<string, unknown>) => {
     const { alt } = props;
+    // eslint-disable-next-line @next/next/no-img-element -- test mock of next/image
     return <img alt={alt as string} data-testid="media-image" />;
   },
 }));

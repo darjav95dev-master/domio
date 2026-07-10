@@ -1,4 +1,5 @@
 import { MediaImage } from "@/shared/components/media-image";
+import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import type { PromocionDetail } from "@/infrastructure/db/repositories/promocion.repository";
 
 // ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ export function TypologyTable({ promocion }: TypologyTableProps) {
                       <div className="relative mx-auto h-16 w-24 overflow-hidden rounded-control">
                         <MediaImage
                           alt={plan.altText}
-                          src={plan.r2Key}
+                          src={getPublicMediaUrl(plan.r2Key)}
                           fill
                           sizes="96px"
                           className="object-contain"

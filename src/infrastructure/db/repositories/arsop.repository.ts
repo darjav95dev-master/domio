@@ -18,7 +18,7 @@ import type { AuthenticatedContext } from "@/infrastructure/tenant/Authenticated
 export interface ArsopRequestRow {
   id: string;
   tenantId: string;
-  leadId: string;
+  leadId: string | null;
   requestType: string;
   requestedAt: Date;
   processedBy: string | null;

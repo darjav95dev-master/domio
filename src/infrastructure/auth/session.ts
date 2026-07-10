@@ -16,9 +16,11 @@ export interface ServerSession {
  * Returns `null` if no session exists or the session has no user data.
  */
 export async function getServerSession(): Promise<ServerSession | null> {
-  let session: Awaited<ReturnType<typeof auth>>;
+  // auth() spans v4/v5 shapes and an Edge fallback, so its inferred return is
+  // too loose to index. Narrow to the only field we read.
+  let session: { user?: unknown } | null;
   try {
-    session = await auth();
+    session = (await auth()) as { user?: unknown } | null;
   } catch (err) {
     logger.warn("getServerSession failed:", err instanceof Error ? err.message : String(err));
     return null;

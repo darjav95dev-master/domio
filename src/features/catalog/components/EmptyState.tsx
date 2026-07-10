@@ -57,7 +57,7 @@ export function EmptyState({
           "focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3 focus-visible:rounded-[4px]",
         )}
       >
-        Ver todo el portafolio
+        Ver todas las promociones
       </Link>
     </div>
   );

@@ -1,4 +1,5 @@
 import { MediaImage } from "@/shared/components/media-image";
+import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import { PROPERTY_TYPE_LABELS, OPERATION_TYPE_LABELS, CONSTRUCTION_STATUS_LABELS } from "@/shared/constants/domain-labels";
 import type { PromocionDetail } from "@/infrastructure/db/repositories/promocion.repository";
 
@@ -75,7 +76,7 @@ export function DetailHero({ promocion }: DetailHeroProps) {
       {cover ? (
         <MediaImage
           alt={cover.altText}
-          src={cover.r2Key}
+          src={getPublicMediaUrl(cover.r2Key)}
           fill
           sizes="100vw"
           className="contrast-[0.96] saturate-[0.92] brightness-[1.02] object-cover object-[center_35%]"

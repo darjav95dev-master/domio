@@ -128,7 +128,7 @@ describe("HomePage", () => {
 
     // Portfolio
     expect(
-      screen.getByRole("heading", { level: 2, name: "Portafolio destacado" }),
+      screen.getByRole("heading", { level: 2, name: "Promociones destacadas" }),
     ).toBeInTheDocument();
 
     // Trust

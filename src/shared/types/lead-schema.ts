@@ -132,12 +132,6 @@ export const leadReassignSchema = z.object({
 export type LeadReassignInput = z.infer<typeof leadReassignSchema>;
 
 // ---------------------------------------------------------------------------
-// Lead paginated result
-// ---------------------------------------------------------------------------
-
-import { PaginatedResult } from "./pagination";
-
-// ---------------------------------------------------------------------------
 // Public lead form schema (existing, from public form)
 // ---------------------------------------------------------------------------
 

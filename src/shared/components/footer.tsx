@@ -7,7 +7,7 @@ import { getContactPageData } from "@/features/contact/server/get-contact-data";
  * - bg-inverted (#2E2B27) as background
  * - Grid 1.6fr 1fr 1fr 1fr desktop, stacked mobile
  * - Tagline Fraunces italic with warm-amber em
- * - 4 columns: Domio, Portafolio, Legal, Contacto
+ * - 4 columns: Domio, Promociones, Legal, Contacto
  * - Legal row with border-top and copyright
  */
 export async function Footer() {
@@ -26,7 +26,7 @@ export async function Footer() {
           {/* Column 1 — Domio brand + tagline */}
           <div>
             <p className="font-display italic text-[21px] leading-[1.45] tracking-[-0.01em] text-fg-on-inverted/85 max-w-[340px]">
-              Un <em className="text-fg-on-dark-em not-italic">portafolio inmobiliario</em>{" "}
+              Unas <em className="text-fg-on-dark-em not-italic">promociones inmobiliarias</em>{" "}
               con carácter editorial, precios claros y vocación de servicio
               en Canarias.
             </p>
@@ -39,8 +39,8 @@ export async function Footer() {
             <FooterLink href="/contacto">Contacto</FooterLink>
           </FooterColumn>
 
-          {/* Column 3 — Portafolio */}
-          <FooterColumn title="Portafolio">
+          {/* Column 3 — Promociones */}
+          <FooterColumn title="Promociones">
             <FooterLink href="/portafolio">Catálogo</FooterLink>
             <FooterLink href="/portafolio/destacados">Destacados</FooterLink>
             <FooterLink href="/portafolio/novedades">Novedades</FooterLink>

@@ -45,7 +45,7 @@ describe("EmptyState", () => {
 
   it("renders a secondary button that links to /portafolio", () => {
     render(<EmptyState />);
-    const link = screen.getByRole("link", { name: /ver todo el portafolio/i });
+    const link = screen.getByRole("link", { name: /ver todas las promociones/i });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/portafolio");
   });

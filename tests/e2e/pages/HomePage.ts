@@ -46,7 +46,7 @@ export class HomePage extends BasePage {
   // ── Featured Portfolio section ────────────────────────────────────────
 
   get featuredPortfolioSection(): Locator {
-    return this.page.getByRole("region", { name: /portafolio destacado/i });
+    return this.page.getByRole("region", { name: /promociones destacadas/i });
   }
 
   get featuredPortfolioCards(): Locator {
@@ -73,7 +73,7 @@ export class HomePage extends BasePage {
   }
 
   get navPortafolioLink(): Locator {
-    return this.nav.getByRole("link", { name: "Portafolio" });
+    return this.nav.getByRole("link", { name: "Promociones" });
   }
 
   get navContactoLink(): Locator {

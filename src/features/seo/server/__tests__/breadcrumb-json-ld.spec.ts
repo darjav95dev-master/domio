@@ -64,7 +64,7 @@ describe("buildBreadcrumbJsonLd", () => {
 
     expect(portafolio["@type"]).toBe("ListItem");
     expect(portafolio.position).toBe(2);
-    expect(portafolio.name).toBe("Portafolio");
+    expect(portafolio.name).toBe("Promociones");
     expect(portafolio.item).toBe(`${SITE_URL}/portafolio`);
   });
 
@@ -89,7 +89,7 @@ describe("buildBreadcrumbJsonLd", () => {
     expect(result.itemListElement[0]!.position).toBe(1);
     expect(result.itemListElement[0]!.name).toBe("Home");
     expect(result.itemListElement[1]!.position).toBe(2);
-    expect(result.itemListElement[1]!.name).toBe("Portafolio");
+    expect(result.itemListElement[1]!.name).toBe("Promociones");
     expect(result.itemListElement[2]!.position).toBe(3);
     expect(result.itemListElement[2]!.name).toBe("Casa en La Laguna");
   });
