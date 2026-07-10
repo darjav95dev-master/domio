@@ -14,7 +14,7 @@ interface FeaturedPortfolioProps {
 export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
   if (promociones.length === 0) {
     return (
-      <section className="py-section-lg px-gutter" aria-labelledby="portfolio-title">
+      <section className="py-section-lg px-6 md:px-[56px] bg-bg-surface-sunken" aria-labelledby="portfolio-title">
         <div className="max-w-7xl mx-auto text-center">
           <h2 id="portfolio-title" className="font-display text-display-md text-fg-default mb-4">
             Promociones destacadas
@@ -30,7 +30,7 @@ export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
   const cards = promociones.slice(0, 3);
 
   return (
-    <section className="py-section-lg px-gutter" aria-labelledby="portfolio-title">
+    <section className="py-section-lg px-6 md:px-[56px]" aria-labelledby="portfolio-title">
       <div className="max-w-7xl mx-auto">
         {/* Section header */}
         <div className="mb-12">

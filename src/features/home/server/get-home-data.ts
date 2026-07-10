@@ -55,8 +55,9 @@ const defaultComoTrabajamos: HowWeWorkPayload = {
 const defaultAbout: AboutDomioPayload = {
   title: "Quiénes somos",
   subtitle: "Más de 15 años creando hogares en Canarias.",
-  imageId: null,
-  imageAlt: "Equipo Domio en su oficina",
+  imageId:
+    "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=2400&auto=format&fit=crop",
+  imageAlt: "Salón luminoso de una vivienda gestionada por Domio en Tenerife",
   tagText: "Desde 2010",
   rows: [
     { aspect: "Experiencia", agenciaTradicional: "Variable según el agente", domio: "Equipo con 15+ años en Tenerife" },
@@ -87,7 +88,8 @@ const defaultCTA: CTAPayload = {
   body: "Déjanos ayudarte a dar el primer paso hacia tu nueva propiedad en Tenerife.",
   ctaLabel: "Solicitar visita",
   ctaHref: "/contacto",
-  backgroundImageId: null,
+  backgroundImageId:
+    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2400&auto=format&fit=crop",
 };
 
 const defaultFAQ: FAQPayload = {

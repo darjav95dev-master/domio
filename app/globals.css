@@ -374,3 +374,14 @@
     transform: translateX(-50%);
   }
 }
+
+/* Hero eyebrow "live" dot — matches CoviCanarias reference */
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(125, 209, 125, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(125, 209, 125, 0.05);
+  }
+}

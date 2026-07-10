@@ -9,7 +9,7 @@ export function AboutDomio({ data }: AboutDomioProps) {
   const { title, subtitle, imageId, imageAlt, tagText, rows } = data;
 
   return (
-    <section className="py-section-lg px-gutter" aria-labelledby="about-title">
+    <section className="py-section-lg px-6 md:px-[56px]" aria-labelledby="about-title">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1.05fr] gap-12 lg:gap-16 items-start">
         {/* ── Left: architectural photograph ──────────────────────────────── */}
         <div className="relative aspect-[4/5] rounded-[20px] overflow-hidden">

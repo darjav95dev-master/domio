@@ -17,7 +17,7 @@ export function FAQ({ data }: FAQProps) {
   };
 
   return (
-    <section className="py-section-lg px-gutter" aria-labelledby="faq-title">
+    <section className="py-section-lg px-6 md:px-[56px]" aria-labelledby="faq-title">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-12 lg:gap-16">
         {/* ── Left: section header ────────────────────────────────────── */}
         <div>

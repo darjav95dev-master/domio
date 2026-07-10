@@ -1,4 +1,5 @@
 import { getContactPageData } from "@/features/contact/server/get-contact-data";
+import { LogoMark } from "@/shared/components/logo-mark";
 
 /**
  * Footer — slate 4-column institutional footer.
@@ -25,6 +26,15 @@ export async function Footer() {
         <div className="grid gap-x-[80px] gap-y-[48px] md:grid-cols-[1.6fr_1fr_1fr_1fr]">
           {/* Column 1 — Domio brand + tagline */}
           <div>
+            <div className="mb-6 flex items-center gap-[12px]">
+              <LogoMark
+                id="logo-mark-footer"
+                className="h-[30px] w-[42px] shrink-0"
+              />
+              <span className="font-display text-[20px] font-medium tracking-[-0.01em] text-fg-on-inverted">
+                Domio
+              </span>
+            </div>
             <p className="font-display italic text-[21px] leading-[1.45] tracking-[-0.01em] text-fg-on-inverted/85 max-w-[340px]">
               Unas <em className="text-fg-on-dark-em not-italic">promociones inmobiliarias</em>{" "}
               con carácter editorial, precios claros y vocación de servicio

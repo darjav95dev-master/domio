@@ -10,7 +10,7 @@ export function HowWeWork({ data }: HowWeWorkProps) {
   const { steps } = data;
 
   return (
-    <section className="py-section-lg px-gutter" aria-labelledby="how-title">
+    <section className="py-section-lg px-6 md:px-[56px] bg-bg-surface-sunken" aria-labelledby="how-title">
       <div className="max-w-7xl mx-auto">
         {/* ── Section header ─────────────────────────────────────────────── */}
         <div className="mb-16">
@@ -31,7 +31,7 @@ export function HowWeWork({ data }: HowWeWorkProps) {
         </div>
 
         {/* ── 4-col grid with 1px gap (line-soft background creates dividers) ─ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-line-soft rounded-[20px] overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-line rounded-[20px] overflow-hidden border border-line">
           {steps.map((step, i) => (
             <article
               key={i}

@@ -8,7 +8,7 @@ export function Trust({ data }: TrustProps) {
   const { title, subtitle, metrics, testimonios } = data;
 
   return (
-    <section className="py-section-lg px-gutter bg-bg-surface-sunken" aria-labelledby="trust-title">
+    <section className="py-section-lg px-6 md:px-[56px] bg-bg-surface" aria-labelledby="trust-title">
       <div className="max-w-7xl mx-auto">
         {/* ── Section header ─────────────────────────────────────────── */}
         <div className="text-center mb-16">

@@ -16,17 +16,14 @@ function TrustStatCard({
   label: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1 text-center">
-      <span className="font-serif italic text-[26px] leading-none text-bone">
+    <div className="flex items-center gap-4 border-b border-white/[0.08] py-[14px] first:pt-0 last:border-b-0 last:pb-0">
+      <span className="shrink-0 font-serif text-[26px] font-normal leading-none tracking-[-0.025em] text-white">
         {value}
-        <span className="font-mono text-[16px] font-medium align-top text-bone/60">
-          {" "}
-          {unit}
-        </span>
+        {unit && (
+          <em className="font-serif italic text-fg-on-dark-em"> {unit}</em>
+        )}
       </span>
-      <span className="text-[13px] leading-tight text-bone/70 max-w-[100px]">
-        {label}
-      </span>
+      <span className="text-[12px] leading-[1.4] text-white/70">{label}</span>
     </div>
   );
 }
@@ -86,19 +83,19 @@ export function Hero({ data }: HeroProps) {
         {/* ── Copy block ──────────────────────────────────────────────────── */}
         <div className="max-w-[620px]">
           {/* Eyebrow glass-pill */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-pill bg-white/10 backdrop-blur-[8px] border border-white/15 text-white/80 text-[13px] font-mono uppercase tracking-[0.12em]">
+          <div className="inline-flex items-center gap-[10px] px-[18px] py-[10px] mb-9 rounded-pill bg-white/10 backdrop-blur-[14px] border border-white/[0.18] text-white text-[11px] font-mono font-medium uppercase tracking-[0.18em] shadow-[0_4px_24px_rgba(0,0,0,0.18)]">
             <span
-              className="w-[6px] h-[6px] rounded-full bg-terracota shrink-0"
+              className="w-[7px] h-[7px] rounded-full bg-[#7DD17D] shrink-0 [animation:pulse_2s_infinite]"
               aria-hidden="true"
             />
             Promociones
           </div>
 
-          <h1 className="font-display text-[clamp(2.5rem,5vw,4.5rem)] font-normal leading-[1.08] tracking-[-0.02em] text-white mb-6 text-balance">
+          <h1 className="font-display text-[clamp(52px,7vw,96px)] font-normal leading-[0.95] tracking-[-0.045em] text-white mb-9 max-w-[15ch] text-balance [text-shadow:0_2px_24px_rgba(0,0,0,0.35)]">
             {claim}
           </h1>
 
-          <p className="font-sans text-[17px] leading-relaxed text-white/70 max-w-[52ch] mb-10">
+          <p className="font-sans text-[19px] leading-[1.6] text-white/[0.86] max-w-[52ch] mb-11 [text-shadow:0_1px_12px_rgba(0,0,0,0.35)]">
             {lead}
           </p>
 
@@ -106,9 +103,21 @@ export function Hero({ data }: HeroProps) {
           <div className="flex flex-wrap gap-4">
             <Link
               href="/portafolio"
-              className="inline-flex items-center justify-center px-[30px] py-4 rounded-pill font-sans text-base font-medium tracking-[-0.005em] text-fg-on-inverted bg-gradient-to-b from-ink-soft to-fg-default shadow-[inset_0_1px_0_var(--border-on-ink),0_1px_2px_rgba(var(--shadow-tint),0.10),0_8px_24px_rgba(var(--shadow-tint),0.20)] transition-all duration-deliberate ease-standard hover:-translate-y-px hover:bg-gradient-to-b hover:from-terracota hover:to-terracota-deep hover:shadow-[0_0_0_1px_var(--accent-subtle),0_12px_32px_var(--accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3"
+              className="group inline-flex items-center justify-center gap-[10px] px-[30px] py-4 rounded-pill font-sans text-base font-medium tracking-[-0.005em] text-fg-default bg-white shadow-[0_8px_32px_rgba(0,0,0,0.28),0_2px_8px_rgba(0,0,0,0.18)] transition-all duration-deliberate ease-standard hover:-translate-y-px hover:bg-terracota hover:text-white hover:shadow-[0_12px_40px_rgba(199,93,63,0.45)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3"
             >
               {ctaPrimary}
+              <svg
+                className="w-4 h-4 transition-transform duration-250 group-hover:translate-x-[3px]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12h14" />
+                <path d="M13 6l6 6-6 6" />
+              </svg>
             </Link>
             <Link
               href="/contacto"
@@ -119,8 +128,11 @@ export function Hero({ data }: HeroProps) {
           </div>
         </div>
 
-        {/* ── TrustCard (3 numerals) ──────────────────────────────────────── */}
-        <div className="hidden lg:grid grid-cols-3 gap-6 p-8 rounded-[16px] bg-white/10 backdrop-blur-[12px] border border-white/12">
+        {/* ── TrustCard (vertical list) ───────────────────────────────────── */}
+        <div className="hidden lg:block p-[32px] rounded-[20px] bg-[rgba(20,15,10,0.38)] backdrop-blur-[28px] border border-white/[0.14] shadow-[0_12px_48px_rgba(0,0,0,0.28)]">
+          <p className="mb-[22px] font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-white/55">
+            En cifras
+          </p>
           {trustStats.map((stat, i) => (
             <TrustStatCard key={i} {...stat} />
           ))}
@@ -141,7 +153,7 @@ export function Hero({ data }: HeroProps) {
           <div
             className="flex items-center gap-8 whitespace-nowrap"
             style={{
-              animation: "marquee 30s linear infinite",
+              animation: "marquee 38s linear infinite",
             }}
           >
             {[...trustStats, ...trustStats].map((stat, i) => (
@@ -150,12 +162,14 @@ export function Hero({ data }: HeroProps) {
                 className="inline-flex items-center gap-2 text-[14px] text-white/70 font-sans"
               >
                 <svg
-                  className="w-4 h-4 text-terracota shrink-0"
-                  fill="currentColor"
+                  className="w-[13px] h-[13px] shrink-0 text-warm-amber/70"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
                   viewBox="0 0 24 24"
                   aria-hidden="true"
                 >
-                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
                 <span className="font-serif italic">{stat.value}</span>
                 <span>{stat.unit}</span>

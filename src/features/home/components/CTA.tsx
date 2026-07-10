@@ -15,7 +15,7 @@ export function CTA({ data }: CTAProps) {
       <div className="absolute inset-0 -z-10">
         {backgroundImageId ? (
           <MediaImage
-            alt=""
+            alt="Vivienda en Canarias"
             src={backgroundImageId}
             fill
             className="object-cover"
@@ -41,12 +41,20 @@ export function CTA({ data }: CTAProps) {
             </p>
           )}
 
-          <Link
-            href={ctaHref}
-            className="inline-flex items-center justify-center px-[34px] py-[16px] rounded-pill font-sans text-base font-medium tracking-[-0.005em] bg-bone text-fg-default transition-all duration-deliberate ease-standard hover:bg-accent-default hover:text-bone hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3"
-          >
-            {ctaLabel}
-          </Link>
+          <div className="flex flex-wrap gap-[14px]">
+            <Link
+              href={ctaHref}
+              className="inline-flex items-center justify-center px-[34px] py-[16px] rounded-pill font-sans text-base font-medium tracking-[-0.005em] bg-bone text-fg-default transition-all duration-deliberate ease-standard hover:bg-accent-default hover:text-bone hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3"
+            >
+              {ctaLabel}
+            </Link>
+            <Link
+              href="/contacto"
+              className="inline-flex items-center justify-center px-[30px] py-[14px] rounded-pill font-sans text-base font-medium tracking-[-0.005em] border-[1.5px] border-white/40 bg-white/[0.08] text-white backdrop-blur-[12px] transition-all duration-deliberate ease-standard hover:bg-white/[0.18] hover:border-white focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3"
+            >
+              Contactar
+            </Link>
+          </div>
         </div>
       </div>
     </section>

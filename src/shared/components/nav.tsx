@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { cn } from "@/shared/utils/cn";
 import { useFavorites } from "@/features/favorites/useFavorites";
+import { LogoMark } from "@/shared/components/logo-mark";
 
 const NAV_LINKS = [
   { label: "Promociones", href: "/portafolio" },
@@ -77,26 +78,27 @@ export function Nav() {
         role="navigation"
         aria-label="Navegación principal"
       >
-        <div className="mx-auto flex max-w-[1280px] items-center justify-between">
+        <div className="flex items-center justify-between">
           {/* Logo */}
           <Link
             href="/"
-            className="font-display text-[20px] font-medium"
+            className="flex items-center gap-[12px]"
             aria-label="Domio — Ir a inicio"
           >
-            <em className="font-display text-[20px] font-medium not-italic">
+            <LogoMark id="logo-mark-nav" className="h-[30px] w-[42px] shrink-0" />
+            <em className="font-display text-[20px] font-medium not-italic tracking-[-0.01em]">
               Domio
             </em>
           </Link>
 
           {/* Desktop links */}
-          <div className="hidden items-center gap-[32px] md:flex">
+          <div className="hidden items-center gap-[40px] md:flex">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "relative font-sans text-sm font-medium",
+                  "relative font-sans text-[13.5px] font-medium",
                   // Underline hover animation (0→100% width)
                   "after:absolute after:bottom-[-2px] after:left-1/2 after:h-[1px] after:w-0",
                   "after:bg-current after:transition-all after:duration-250 after:ease-standard",
