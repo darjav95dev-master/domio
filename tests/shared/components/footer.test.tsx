@@ -43,8 +43,8 @@ describe("Footer (T004)", () => {
     const links = screen.getAllByRole("link");
     const hrefs = links.map((l) => l.getAttribute("href"));
     expect(hrefs).toContain("/portafolio");
-    expect(hrefs).toContain("/portafolio?island=Tenerife");
     expect(hrefs).toContain("/portafolio?island=Gran+Canaria");
+    expect(hrefs).toContain("/portafolio?island=Lanzarote");
   });
 
   it("links the legal pages under /legal", async () => {
@@ -59,7 +59,7 @@ describe("Footer (T004)", () => {
   it("renders the contact info with email and address placeholder", async () => {
     render(await Footer());
     expect(screen.getAllByText(/info@domio\.es/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/tenerife/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/gran canaria/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders a legal row with copyright text", async () => {
