@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 // ---------------------------------------------------------------------------
@@ -78,6 +78,14 @@ export function useFilters() {
     [],
   );
 
+  // Sync filter state to URL — runs after render, never during
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const qs = filtersToParams(filters);
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [filters, router, pathname, filtersToParams]);
+
   /**
    * Updates a single filter and pushes the new URL.
    */
@@ -86,7 +94,6 @@ export function useFilters() {
       setFilters((prev) => {
         const next = { ...prev };
         if (value === undefined || value === null || value === "") {
-          // For amenities, setting to undefined clears them
           if (key === "amenities") {
             next.amenities = [];
           } else {
@@ -95,12 +102,10 @@ export function useFilters() {
         } else {
           (next as Record<string, unknown>)[key] = value;
         }
-        const qs = filtersToParams(next);
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
         return next;
       });
     },
-    [router, pathname, filtersToParams],
+    [],
   );
 
   /**
@@ -109,23 +114,13 @@ export function useFilters() {
   const toggleAmenity = useCallback(
     (amenity: string) => {
       setFilters((prev) => {
-        const next = { ...prev };
         const list = [...prev.amenities];
         const index = list.indexOf(amenity);
-
-        if (index === -1) {
-          list.push(amenity);
-        } else {
-          list.splice(index, 1);
-        }
-
-        next.amenities = list;
-        const qs = filtersToParams(next);
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-        return next;
+        if (index === -1) { list.push(amenity); } else { list.splice(index, 1); }
+        return { ...prev, amenities: list };
       });
     },
-    [router, pathname, filtersToParams],
+    [],
   );
 
   /**
@@ -144,8 +139,7 @@ export function useFilters() {
       amenities: [],
       constructionStatus: undefined,
     });
-    router.replace(pathname, { scroll: false });
-  }, [router, pathname]);
+  }, []);
 
   /**
    * Count of active (set) filters.

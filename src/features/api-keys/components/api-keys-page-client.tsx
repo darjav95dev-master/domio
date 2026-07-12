@@ -24,12 +24,8 @@ export function ApiKeysPageClient() {
 
   const handleCreated = useCallback(() => {
     setRefreshKey((k) => k + 1);
-    setShowCreateDialog(false);
-    setToast({
-      variant: "success",
-      title: "API key creada",
-      message: "La clave se ha creado correctamente. Cópiala ahora, no podrás verla de nuevo.",
-    });
+    // Keep dialog open so the user can see and copy the generated key.
+    // The dialog's own close button dismisses it after the user copies the key.
   }, []);
 
   const handleRevoked = useCallback(async (key: ApiKeyResponse) => {

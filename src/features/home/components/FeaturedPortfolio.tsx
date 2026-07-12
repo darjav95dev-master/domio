@@ -14,6 +14,7 @@ import type { FeaturedPromocion } from "@/features/home/types";
 
 interface FeaturedPortfolioProps {
   promociones: FeaturedPromocion[];
+  totalCatalogCount: number;
 }
 
 /**
@@ -21,7 +22,7 @@ interface FeaturedPortfolioProps {
  * (1.3fr 1fr 1fr), first card featured spanning 2 rows. Ported from the
  * CoviCanarias `.promo-grid` / `.promo-card` reference.
  */
-export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
+export function FeaturedPortfolio({ promociones, totalCatalogCount }: FeaturedPortfolioProps) {
   if (promociones.length === 0) {
     return (
       <section
@@ -70,7 +71,7 @@ export function FeaturedPortfolio({ promociones }: FeaturedPortfolioProps) {
             href="/portafolio"
             className="group inline-flex items-center gap-[10px] rounded-pill border-[1.5px] border-fg-default px-[26.5px] py-[13.5px] font-sans text-[15px] font-medium tracking-[-0.005em] text-fg-default transition-all duration-deliberate ease-standard hover:bg-fg-default hover:text-bg-canvas"
           >
-            Ver las {promociones.length} promociones
+            Ver las {totalCatalogCount} promociones
             <span className="transition-transform duration-250 group-hover:translate-x-[3px]">
               →
             </span>

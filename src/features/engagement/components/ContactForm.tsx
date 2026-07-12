@@ -282,7 +282,7 @@ export function ContactForm({ promocionId, tipologias }: ContactFormProps) {
           <span className="font-sans text-sm leading-[1.5] text-fg-muted">
             He leído y acepto la{" "}
             <a
-              href="/privacidad"
+              href="/legal/privacidad"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-2 hover:text-accent-default focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3"

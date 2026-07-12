@@ -9,30 +9,31 @@ import { LogoMark } from "@/shared/components/logo-mark";
  */
 export async function Footer() {
   const { contactConfig } = await getContactPageData();
-  const phone = contactConfig?.phone ?? "+34 922 000 000";
+  const phone = contactConfig?.phone ?? "+34 928 000 000";
   const email = contactConfig?.email ?? "info@domio.es";
+  const hours = contactConfig?.hours ?? "Lun–Vie · 9:00–18:00";
 
   return (
     <footer role="contentinfo" className="bg-bg-inverted text-fg-on-inverted/70">
-      <div className="mx-auto max-w-[1200px] px-[24px] pb-[40px] pt-[56px] md:px-[56px] md:pt-[72px]">
+      <div className="mx-auto max-w-[1200px] px-[24px] pb-[28px] pt-[40px] md:px-[56px] md:pt-[48px]">
         {/* ── Grid: brand + 3 link columns ───────────────────────────────── */}
-        <div className="grid gap-x-[80px] gap-y-[48px] border-b border-white/[0.08] pb-[80px] md:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <div className="grid gap-x-[48px] gap-y-[32px] border-b border-white/[0.08] pb-[40px] md:grid-cols-[1.6fr_1fr_1fr_1fr]">
           {/* Column 1 — brand + tagline + address */}
           <div>
-            <div className="mb-[28px] flex items-center gap-[12px]">
+            <div className="mb-[16px] flex items-center gap-[12px]">
               <LogoMark id="logo-mark-footer" className="h-[30px] w-[42px] shrink-0" />
               <span className="font-display text-[20px] font-medium tracking-[-0.01em] text-fg-on-inverted">
                 Domio
               </span>
             </div>
-            <p className="mb-8 max-w-[340px] font-display text-[20px] italic leading-[1.4] tracking-[-0.01em] text-fg-on-inverted/85">
+            <p className="mb-4 max-w-[340px] font-display text-[18px] italic leading-[1.4] tracking-[-0.01em] text-fg-on-inverted/85">
               &ldquo;Te ayudamos a encontrar casa donde otros solo ven un
               negocio.&rdquo;
             </p>
             <address className="text-[12.5px] not-italic leading-[1.6] text-fg-on-inverted/50">
-              Av. de la Constitución, 1 · Planta 5
+              C/ León y Castillo, 43 · Planta 2
               <br />
-              38001 Santa Cruz de Tenerife
+              35003 Las Palmas de Gran Canaria
               <br />
               {phone} · {email}
             </address>
@@ -49,8 +50,8 @@ export async function Footer() {
           {/* Column 3 — Promociones */}
           <FooterColumn title="Promociones">
             <FooterLink href="/portafolio">Ver todas</FooterLink>
-            <FooterLink href="/portafolio?island=Tenerife">En Tenerife</FooterLink>
             <FooterLink href="/portafolio?island=Gran+Canaria">En Gran Canaria</FooterLink>
+            <FooterLink href="/portafolio?island=Lanzarote">En Lanzarote</FooterLink>
             <FooterLink href="/portafolio?island=Fuerteventura">En Fuerteventura</FooterLink>
           </FooterColumn>
 
@@ -64,7 +65,7 @@ export async function Footer() {
         </div>
 
         {/* ── Bottom bar ─────────────────────────────────────────────────── */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-y-4 pt-[24px] text-[12px] lg:flex-nowrap">
+        <div className="mt-0 flex flex-wrap items-center justify-between gap-y-4 pt-[20px] text-[12px] lg:flex-nowrap">
           {/* Left: copyright + inline contact chips */}
           <div className="flex flex-wrap items-center gap-y-2 text-fg-on-inverted/50 lg:min-w-0 lg:flex-nowrap lg:overflow-hidden">
             <span className="text-fg-on-inverted/55">
@@ -102,7 +103,7 @@ export async function Footer() {
                 </>
               }
             >
-              S/C de Tenerife
+              Las Palmas
             </ContactChip>
             <ContactChip
               last
@@ -113,7 +114,7 @@ export async function Footer() {
                 </>
               }
             >
-              Lun–Vie · 9:00–17:00
+              {hours}
             </ContactChip>
           </div>
 
@@ -171,7 +172,7 @@ function FooterColumn({
         {title}
       </h3>
       <nav aria-label={title}>
-        <ul className="mt-6 space-y-[14px]">{children}</ul>
+        <ul className="mt-4 space-y-[10px]">{children}</ul>
       </nav>
     </div>
   );

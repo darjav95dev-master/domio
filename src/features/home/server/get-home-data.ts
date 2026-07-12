@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { contentBlocks, promociones } from "@/infrastructure/db/schema";
 import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { CatalogRepository } from "@/infrastructure/db/repositories/catalog.repository";
@@ -27,7 +27,7 @@ function extractPayload<T>(block: ContentBlock | undefined, fallback: T): T {
 
 const defaultHero: HeroPayload = {
   claim: "Tu hogar en Canarias, sin *complicaciones*. Sin sorpresas.",
-  lead: "Descubre las mejores propiedades en Tenerife. Venta y alquiler de pisos, áticos, chalets y locales comerciales con el respaldo de Domio.",
+  lead: "Descubre las mejores propiedades en Gran Canaria. Venta y alquiler de pisos, áticos, chalets y locales comerciales con el respaldo de Domio.",
   ctaPrimary: "Ver propiedades",
   ctaSecondary: "Contactar",
   // Fallback hero image (same free Unsplash photo the seed sets on the DB block —
@@ -37,7 +37,7 @@ const defaultHero: HeroPayload = {
   trustStats: [
     { value: "15", unit: "años", label: "de experiencia" },
     { value: "500", unit: "inmuebles", label: "gestionados" },
-    { value: "10", unit: "ciudades", label: "en Tenerife" },
+    { value: "10", unit: "ciudades", label: "en Gran Canaria" },
   ],
 };
 
@@ -60,10 +60,10 @@ const defaultAbout: AboutDomioPayload = {
     "En una agencia al uso pagas de más y te enteras de poco. Con Domio, cada dato está sobre la mesa desde el primer día.",
   imageId:
     "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=2400&auto=format&fit=crop",
-  imageAlt: "Salón luminoso de una vivienda gestionada por Domio en Tenerife",
+  imageAlt: "Salón luminoso de una vivienda gestionada por Domio en Gran Canaria",
   tagText: "El método Domio",
   rows: [
-    { aspect: "Experiencia", agenciaTradicional: "Variable según el agente", domio: "Equipo con 15+ años en Tenerife" },
+    { aspect: "Experiencia", agenciaTradicional: "Variable según el agente", domio: "Equipo con 15+ años en Gran Canaria" },
     { aspect: "Visibilidad", agenciaTradicional: "Escaparate local limitado", domio: "Catálogo online completo con precios" },
     { aspect: "Honorarios", agenciaTradicional: "Entre 5-8% + IVA", domio: "Transparencia total desde el primer día" },
     { aspect: "Tecnología", agenciaTradicional: "Gestión manual", domio: "Plataforma digital con tours virtuales" },
@@ -77,13 +77,13 @@ const defaultTrust: TrustPayload = {
   metrics: [
     { value: "15", unit: "años", label: "de experiencia en el sector inmobiliario canario" },
     { value: "500", unit: "+", label: "inmuebles gestionados con éxito" },
-    { value: "10", unit: "ciudades", label: "presentes en toda Tenerife" },
+    { value: "10", unit: "ciudades", label: "presentes en toda Gran Canaria" },
     { value: "98", unit: "%", label: "de clientes satisfechos" },
   ],
   testimonios: [
     { quote: "Domio hizo que comprar nuestra primera casa fuera sencillo y sin estrés. Su equipo nos guió en cada paso.", author: "María y Carlos", role: "Compradores, Residencial Las Américas" },
-    { quote: "Profesionales, cercanos y eficientes. Vendimos nuestro piso en tiempo récord gracias a su asesoramiento.", author: "Ana García", role: "Vendedora, Santa Cruz" },
-    { quote: "Buscábamos un local comercial y Domio nos encontró opciones que ni siquiera habíamos considerado. Muy recomendables.", author: "Roberto Díaz", role: "Emprendedor, La Laguna" },
+    { quote: "Profesionales, cercanos y eficientes. Vendimos nuestro piso en tiempo récord gracias a su asesoramiento.", author: "Ana García", role: "Vendedora, Las Palmas de Gran Canaria" },
+    { quote: "Buscábamos un local comercial y Domio nos encontró opciones que ni siquiera habíamos considerado. Muy recomendables.", author: "Roberto Díaz", role: "Emprendedor, Telde" },
   ],
 };
 
@@ -141,6 +141,14 @@ export async function getHomePageData(): Promise<HomePageData> {
       );
   });
 
+  const countResult = await ctx.withTransaction(async (tx) => {
+    return tx
+      .select({ totalCatalogCount: count() })
+      .from(promociones)
+      .where(and(eq(promociones.tenantId, tenantId), eq(promociones.status, "PUBLISHED")));
+  });
+  const totalCatalogCount = countResult[0]?.totalCatalogCount ?? 0;
+
   const extras = await new CatalogRepository(ctx).findCardExtras(
     portfolioRows.map((p) => p.id),
   );
@@ -157,5 +165,6 @@ export async function getHomePageData(): Promise<HomePageData> {
     cta: extractPayload<CTAPayload>(blockMap.get("cta-final"), defaultCTA),
     faq: extractPayload<FAQPayload>(blockMap.get("faq"), defaultFAQ),
     portfolio,
+    totalCatalogCount,
   };
 }

@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildPageMetadata({
     title: "Contacto | Domio",
     description:
-      "Contacta con Domio para recibir información sobre nuestras promociones inmobiliarias en Tenerife.",
+      "Contacta con Domio para recibir información sobre nuestras promociones inmobiliarias en Gran Canaria.",
     path: "/contacto",
   });
 }
@@ -96,7 +96,7 @@ export default async function ContactoPage() {
                     Dirección
                   </dt>
                   <dd className="font-sans text-sm text-fg-muted">
-                    {data.contactConfig?.address ?? "Santa Cruz de Tenerife"}
+                    {data.contactConfig?.address ?? "Las Palmas de Gran Canaria"}
                   </dd>
                 </div>
                 <div>

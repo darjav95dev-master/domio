@@ -39,6 +39,11 @@ const pages: PageEntry[] = [
     label: 'Cookies',
     description: 'Política de cookies',
   },
+  {
+    key: 'contacto',
+    label: 'Contacto',
+    description: 'Teléfono, email, dirección, horario y WhatsApp',
+  },
 ];
 
 export function ContenidosPageClient() {

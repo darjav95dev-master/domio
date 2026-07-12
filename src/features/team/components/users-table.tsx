@@ -9,7 +9,8 @@ import { USER_ROLES, type UserRole } from "@/shared/constants/db-enums";
 import { USER_ROLE_LABELS } from "@/shared/constants/domain-labels";
 import { ICON_SIZES } from "@/shared/constants/iconography";
 import { cn } from "@/shared/utils/cn";
-import type { UserResponse, PaginatedUsers } from "@/shared/types/user-schema";
+import type { PaginatedUsers } from "@/shared/types/user-schema";
+import { UserActions } from "@/features/team/components/user-actions";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -27,16 +28,11 @@ const STATUS_OPTIONS = [
 // Types
 // ---------------------------------------------------------------------------
 
-interface UsersTableProps {
-  /** Optional callback when edit is clicked */
-  onEditUser?: (user: UserResponse) => void;
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function UsersTable({ onEditUser }: UsersTableProps) {
+export function UsersTable() {
   // ── State ──────────────────────────────────────────────────────────────
   const [data, setData] = useState<PaginatedUsers | null>(null);
   const [loading, setLoading] = useState(true);
@@ -335,14 +331,7 @@ export function UsersTable({ onEditUser }: UsersTableProps) {
                   <td className="px-4 py-3">{renderRoleBadge(user.role)}</td>
                   <td className="px-4 py-3">{renderStatusBadge(user.isActive)}</td>
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="link"
-                      className="text-sm"
-                      onClick={() => onEditUser?.(user)}
-                      aria-label={`Editar ${user.name ?? user.email}`}
-                    >
-                      Editar
-                    </Button>
+                    <UserActions user={user} onUpdated={fetchUsers} />
                   </td>
                 </tr>
               ))}

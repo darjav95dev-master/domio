@@ -87,7 +87,7 @@ export function PromocionSectionLocation({
             type="text"
             value={values.island ?? ""}
             onChange={(e) => handleChange("island", e.target.value || null)}
-            placeholder="Ej. Tenerife"
+            placeholder="Ej. Gran Canaria"
             className={INPUT_BASE}
           />
         </div>
@@ -104,7 +104,7 @@ export function PromocionSectionLocation({
             onChange={(e) =>
               handleChange("municipality", e.target.value || null)
             }
-            placeholder="Ej. Santa Cruz"
+            placeholder="Ej. Las Palmas"
             aria-invalid={Boolean(errors.municipality)}
             aria-describedby={
               errors.municipality ? "promocion-municipality-error" : undefined

@@ -64,16 +64,16 @@ const ISLAND_OPTS: Option[] = [
 ].map((i) => ({ value: i, label: i }));
 
 const MUNICIPALITY_OPTS: Option[] = [
-  "Santa Cruz de Tenerife",
-  "San Cristóbal de La Laguna",
-  "Adeje",
-  "Arona",
-  "La Orotava",
-  "Puerto de la Cruz",
-  "Los Cristianos",
-  "Candelaria",
-  "Tacoronte",
-  "Güímar",
+  "Las Palmas de Gran Canaria",
+  "Telde",
+  "Santa Lucía de Tirajana",
+  "San Bartolomé de Tirajana",
+  "Arucas",
+  "Gáldar",
+  "Ingenio",
+  "Agüimes",
+  "Mogán",
+  "La Aldea de San Nicolás",
 ].map((m) => ({ value: m, label: m }));
 
 const STATUS_OPTS: Option[] = CONSTRUCTION_STATUSES.map((s) => ({

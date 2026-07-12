@@ -111,6 +111,7 @@ function SortableMediaCard({
         <button
           type="button"
           aria-label="Arrastrar para reordenar"
+          suppressHydrationWarning
           className={cn(
             "absolute left-2 top-2 z-20",
             "cursor-grab touch-none rounded-pill bg-ink/50 p-1 text-white backdrop-blur-sm",
@@ -215,6 +216,7 @@ function MediaSection({
         </div>
       ) : (
         <DndContext
+          id="media-gallery-dnd"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={onReorderEnd}

@@ -62,7 +62,7 @@ export default async function HomePage() {
         <AboutDomio data={data.about} />
       </div>
       <div data-reveal>
-        <FeaturedPortfolio promociones={data.portfolio} />
+        <FeaturedPortfolio promociones={data.portfolio} totalCatalogCount={data.totalCatalogCount} />
       </div>
       <div data-reveal>
         <Trust data={data.trust} />

@@ -151,6 +151,7 @@ function SortableBlock({
           <button
             type="button"
             aria-label="Arrastrar para reordenar"
+            suppressHydrationWarning
             className={cn(
               "cursor-grab touch-none text-fg-subtle transition-colors duration-standard ease-standard",
               "hover:text-fg-default",
@@ -694,6 +695,7 @@ export function BlocksEditor({
       {/* Block list with drag & drop */}
       {blocks.length > 0 && (
         <DndContext
+          id="blocks-editor-dnd"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}

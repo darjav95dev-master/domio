@@ -181,7 +181,7 @@ export function CatalogFilters() {
             name="island"
             type="text"
             defaultValue={currentIsland}
-            placeholder="Ej. Tenerife"
+            placeholder="Ej. Gran Canaria"
             className={inputBase}
           />
         </div>
@@ -199,7 +199,7 @@ export function CatalogFilters() {
             name="municipality"
             type="text"
             defaultValue={currentMunicipality}
-            placeholder="Ej. Santa Cruz"
+            placeholder="Ej. Las Palmas"
             className={inputBase}
           />
         </div>

@@ -14,17 +14,17 @@ import { PROPERTY_TYPES, OPERATION_TYPES, CONSTRUCTION_STATUSES, AMENITIES } fro
 const catalogInputSchema = z.object({
   island: z.string().min(1).optional(),
   municipality: z.string().min(1).optional(),
-  propertyType: z.enum(PROPERTY_TYPES).optional(),
-  operation: z.enum(OPERATION_TYPES).optional(),
+  propertyType: z.enum(PROPERTY_TYPES).optional().catch(undefined),
+  operation: z.enum(OPERATION_TYPES).optional().catch(undefined),
   priceMin: z.number().min(0).optional(),
   priceMax: z.number().min(0).optional(),
   bedrooms: z.number().int().min(0).optional(),
   bathrooms: z.number().int().min(0).optional(),
-  amenities: z.array(z.enum(AMENITIES)).optional(),
-  constructionStatus: z.enum(CONSTRUCTION_STATUSES).optional(),
+  amenities: z.array(z.enum(AMENITIES)).optional().catch(undefined),
+  constructionStatus: z.enum(CONSTRUCTION_STATUSES).optional().catch(undefined),
   cursor: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(100).optional(),
-  sort: z.enum(["price_asc", "price_desc", "published"]).optional(),
+  sort: z.enum(["price_asc", "price_desc", "published"]).optional().catch(undefined),
 });
 
 export type CatalogInput = z.infer<typeof catalogInputSchema>;

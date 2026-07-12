@@ -5,11 +5,11 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 // ---------------------------------------------------------------------------
-// Default coordinates (Santa Cruz de Tenerife center)
+// Default coordinates (Las Palmas de Gran Canaria center)
 // Used as fallback when contact_config lacks office coordinates.
 // ---------------------------------------------------------------------------
 
-const DEFAULT_COORDS: [number, number] = [-16.2518, 28.468];
+const DEFAULT_COORDS: [number, number] = [-15.4136, 28.1248];
 
 // ---------------------------------------------------------------------------
 // Props

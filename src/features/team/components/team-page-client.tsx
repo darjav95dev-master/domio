@@ -33,10 +33,6 @@ export function TeamPageClient() {
     });
   }, []);
 
-  const handleUpdated = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-  }, []);
-
   return (
     <div className="flex flex-col gap-6">
       {/* Toast notification */}
@@ -74,7 +70,7 @@ export function TeamPageClient() {
       </div>
 
       {/* Users table */}
-      <UsersTable key={refreshKey} onEditUser={handleUpdated} />
+      <UsersTable key={refreshKey} />
 
       {/* Create user dialog */}
       <CreateUserDialog

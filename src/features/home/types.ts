@@ -96,4 +96,5 @@ export interface HomePageData {
   trust: TrustPayload;
   cta: CTAPayload;
   portfolio: FeaturedPromocion[];
+  totalCatalogCount: number;
 }

@@ -97,7 +97,7 @@ export default async function SobrePage() {
                   En Domio, cada propiedad cuenta una historia.
                 </p>
                 <p className="mt-4 font-mono text-[11px] tracking-[0.04em] text-fg-subtle tabular-nums">
-                  Domio · Santa Cruz de Tenerife ·{" "}
+                  Domio · Las Palmas de Gran Canaria ·{" "}
                   {new Date().getFullYear()}
                 </p>
               </div>
