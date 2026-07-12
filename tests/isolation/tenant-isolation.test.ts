@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { promociones, leads } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
-import { hasDatabaseUrl } from "./db";
+import { hasDatabaseUrl, withTenant } from "./db";
 import {
   seedTenantFixtures,
   cleanupFixtures,
   createTenantAContext,
   createTenantBContext,
   TENANT_A_ID,
+  TENANT_B_ID,
 } from "./setup";
+import { createLeadService } from "@/features/engagement/server/create-lead-action";
 
 class TestRepository extends TenantAwareRepository {
   async findPromociones() {
@@ -185,5 +187,35 @@ describe.skipIf(!hasDatabaseUrl())("Tenant isolation", () => {
     }
 
     expect(violations).toEqual([]);
+  });
+
+  it("T026: createLeadService rejects promocionId from another tenant", async () => {
+    const ctxA = await createTenantAContext();
+    const pool = (await import("./setup")).getTestPool();
+
+    // Get promocion ID from tenant B
+    const promoBId = await withTenant(pool, TENANT_B_ID, async (client) => {
+      const result = await client.query<{ id: string }>(
+        "SELECT id FROM promociones WHERE slug = 'promo-b-1' LIMIT 1",
+      );
+      return result.rows[0]?.id;
+    });
+
+    expect(promoBId).toBeDefined();
+
+    const result = await createLeadService(
+      ctxA,
+      {
+        name: "Test User",
+        email: "test@example.com",
+        message: "Test message for isolation.",
+        consent: true,
+      },
+      promoBId,
+      "203.0.113.1",
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Promoción no encontrada");
   });
 });

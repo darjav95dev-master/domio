@@ -29,7 +29,7 @@ describe("contactFormSchema", () => {
     const result = contactFormSchema.safeParse({
       name: "María García",
       email: "maria.garcia+test@domio.es",
-      message: SHORT_MSG,
+      message: "Quiero información sobre sus servicios.",
     });
     expect(result.success).toBe(true);
   });

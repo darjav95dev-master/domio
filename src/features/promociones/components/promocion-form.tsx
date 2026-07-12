@@ -3,9 +3,9 @@
 import { useReducer, useState, useCallback, useRef } from "react";
 import { cn } from "@/shared/utils/cn";
 import { Button } from "@/shared/components/button";
-import { PromocionUpdateSchema } from "@/shared/schemas/promocion.schema";
 import { useAutosave } from "../hooks/use-autosave";
 import { useDraftRestore } from "../hooks/use-draft-restore";
+import { usePublishValidation, buildPublishPayload } from "../hooks/use-publish-validation";
 import { DraftIndicator } from "./draft-indicator";
 import { PromocionSectionIdentity } from "./promocion-section-identity";
 import type { IdentitySectionValues, IdentitySectionErrors } from "./promocion-section-identity";
@@ -192,7 +192,11 @@ export function PromocionForm({
     error: autosaveError,
   } = useAutosave(formState as unknown as Record<string, unknown>, promocionId, autosaveIntervalMs);
 
-  // ── Field-to-section mapping ──────────────────────────────────────────
+  // ── Publish validation hook (extracted for SRP) ───────────────────────
+
+  const { validatePublish } = usePublishValidation({ formState, publishBlocked });
+
+  // ── Field-to-section mapping (used by sendPatch error handler) ────────
 
   const identityFields = ["name", "propertyType", "operation", "kind"];
   const commercialFields = ["status", "constructionStatus"];
@@ -363,59 +367,28 @@ export function PromocionForm({
   // ── Publish ───────────────────────────────────────────────────────────
 
   const handlePublish = useCallback(async () => {
-    // Check block validation before publishing (T030-T031)
-    if (publishBlocked) {
-      setSubmitState({
-        status: "error",
-        message: publishBlocked.message,
-      });
-      return;
-    }
-
     // If there is a draft, apply it over the current form data
     const mergedData = hasDraft
       ? ({ ...formState, ...applyDraft() } as PromocionFormData)
       : formState;
 
-    const payload = {
-      name: mergedData.name,
-      kind: mergedData.kind,
-      propertyType: mergedData.propertyType || null,
-      operation: mergedData.operation || null,
-      constructionStatus: mergedData.constructionStatus || null,
-      island: mergedData.island || null,
-      municipality: mergedData.municipality || null,
-      address: mergedData.address || null,
-      mapPrivacyMode: mergedData.mapPrivacyMode,
-      seoTitle: mergedData.seoTitle || null,
-      seoDescription: mergedData.seoDescription || null,
-      assignedAgentId: mergedData.assignedAgentId || null,
-      tipologias: mergedData.tipologias,
+    const { payload, sectionErrors, message } = validatePublish({
       status: "PUBLISHED",
-    };
+    });
 
-    // Client-side validation
-    const validation = PromocionUpdateSchema.safeParse(payload);
-    if (!validation.success) {
-      const newSectionErrors: SectionErrors = {};
-      for (const issue of validation.error.issues) {
-        const field = issue.path[0] as string;
-        const section = fieldToSection(field);
-        newSectionErrors[section] = {
-          ...newSectionErrors[section],
-          [field]: issue.message,
-        } as never;
-      }
-      setSectionErrors(newSectionErrors);
-      setSubmitState({
-        status: "error",
-        message: "Corrige los errores antes de publicar",
-      });
+    if (!payload) {
+      setSectionErrors(sectionErrors);
+      setSubmitState({ status: "error", message: message ?? "Error al publicar" });
       return;
     }
 
-    await sendPatch(payload);
-  }, [formState, hasDraft, applyDraft, sendPatch, publishBlocked]);
+    // Override with merged draft data if applicable
+    const finalPayload = hasDraft
+      ? buildPublishPayload(mergedData, { status: "PUBLISHED" })
+      : payload;
+
+    await sendPatch(finalPayload);
+  }, [formState, hasDraft, applyDraft, sendPatch, validatePublish]);
 
   // ── Discard draft ─────────────────────────────────────────────────────
 

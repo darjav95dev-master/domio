@@ -1,16 +1,12 @@
 import { z } from "zod";
+import { contactBaseSchema } from "@/shared/schemas/contact-base.schema";
 
 /**
- * Shared Zod schema for the contact form.
+ * Shared Zod schema for the commercial contact form (engagement with a promotion).
+ * Extends the base contact schema with promotion-specific fields.
  * Validates on both client and server (same schema).
  */
-export const contactFormSchema = z.object({
-  name: z
-    .string()
-    .min(2, "El nombre debe tener al menos 2 caracteres"),
-  email: z
-    .string()
-    .email("Introduce un email válido"),
+export const contactFormSchema = contactBaseSchema.extend({
   phone: z
     .string()
     .regex(
@@ -19,9 +15,6 @@ export const contactFormSchema = z.object({
     )
     .optional()
     .or(z.literal("")),
-  message: z
-    .string()
-    .min(10, "El mensaje debe tener al menos 10 caracteres"),
   tipologiaId: z
     .string()
     .uuid("Identificador de tipología no válido")

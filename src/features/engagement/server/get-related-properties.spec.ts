@@ -38,6 +38,13 @@ const mockRelatedRow2 = {
   coverUrl: null,
 };
 
+/** Mock result for the tipologiaAgg subquery (GROUP BY promocion_id). */
+const mockTipologiaAgg = {
+  promocionId: PROMOCION_ID,
+  minPrice: "200000",
+  minArea: "85",
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -118,7 +125,9 @@ describe("getRelatedPropertiesService", () => {
         // Include min price from tipologia
         minPrice: 200000,
       }],
-      // Second query: related properties
+      // tipologiaAgg subquery (GROUP BY)
+      [mockTipologiaAgg],
+      // Main query: related properties
       [mockRelatedRow, mockRelatedRow2],
     ]);
 
@@ -141,6 +150,7 @@ describe("getRelatedPropertiesService", () => {
 
     const ctx = createMockCtx([
       [{ ...mockCurrentPromocion, minPrice: 200000 }],
+      [mockTipologiaAgg],
       fourRelated,
     ]);
 
@@ -159,6 +169,7 @@ describe("getRelatedPropertiesService", () => {
   it("returns empty array when no related properties found", async () => {
     const ctx = createMockCtx([
       [{ ...mockCurrentPromocion, minPrice: 200000 }],
+      [mockTipologiaAgg],
       [],
     ]);
 
@@ -174,6 +185,7 @@ describe("getRelatedPropertiesService", () => {
   it("includes slug, name, propertyType, price, area, and imageUrl in results", async () => {
     const ctx = createMockCtx([
       [{ ...mockCurrentPromocion, minPrice: 200000 }],
+      [mockTipologiaAgg],
       [mockRelatedRow],
     ]);
 

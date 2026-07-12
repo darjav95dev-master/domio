@@ -10,6 +10,7 @@ import { users } from "@/infrastructure/db/schema/users";
 import { mediaAssets } from "@/infrastructure/db/schema/media-assets";
 import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import { validateMediaForPublish } from "@/features/promociones/actions/media.actions";
+import { logger } from "@/shared/utils/logger";
 import {
   PromocionForm,
   type PromocionFormData,
@@ -106,8 +107,9 @@ async function loadMediaAssets(
         plans.push(item);
       }
     }
-  } catch {
-    // Non-blocking
+  } catch (error) {
+    logger.warn("loadMediaAssets failed", error instanceof Error ? error.message : String(error));
+    // Non-blocking, continue with empty gallery
   }
 
   return { gallery, plans };

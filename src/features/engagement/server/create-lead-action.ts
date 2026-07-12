@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   promociones,
   users,
@@ -15,6 +15,7 @@ import { contactFormSchema } from "../schemas/contact-form.schema";
 import { checkIpRateLimit } from "@/infrastructure/rate-limiting/ip-rate-limit";
 import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
 import { BACKOFFICE_LEADS_URL } from "@/shared/constants/tenant-hosts";
+import { verifyTurnstileToken } from "@/shared/utils/turnstile";
 import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
 import type { ContactFormInput } from "../schemas/contact-form.schema";
 
@@ -32,6 +33,8 @@ export interface ActionResult {
 /** Input required by the action: form fields + contextual promocionId */
 export interface CreateLeadInput extends ContactFormInput {
   promocionId: string;
+  /** Cloudflare Turnstile token for bot protection. */
+  turnstileToken?: string;
 }
 
 const promocionIdSchema = z.string().uuid("Identificador de promoción no válido");
@@ -45,7 +48,16 @@ const promocionIdSchema = z.string().uuid("Identificador de promoción no válid
 export async function createLeadAction(
   input: CreateLeadInput,
 ): Promise<ActionResult> {
-  // 1. Validate form fields with shared Zod schema
+  // 1. Verify Turnstile CAPTCHA
+  const turnstileResult = await verifyTurnstileToken(input.turnstileToken);
+  if (!turnstileResult.success) {
+    return {
+      success: false,
+      error: turnstileResult.error ?? "Error de verificación de seguridad.",
+    };
+  }
+
+  // 2. Validate form fields with shared Zod schema
   const parsed = contactFormSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -54,7 +66,7 @@ export async function createLeadAction(
     };
   }
 
-  // 2. Validate promocionId separately (contextual, not a user field)
+  // 3. Validate promocionId separately (contextual, not a user field)
   const promocionIdResult = promocionIdSchema.safeParse(input.promocionId);
   if (!promocionIdResult.success) {
     return {
@@ -63,7 +75,7 @@ export async function createLeadAction(
     };
   }
 
-  // 3. Rate limiting by IP
+  // 4. Rate limiting by IP
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim()
     ?? headersList.get("x-real-ip")
@@ -77,9 +89,12 @@ export async function createLeadAction(
     };
   }
 
-  // 4. Execute business logic
+  // 5. Extract user-agent for RGPD consent traceability
+  const userAgent = headersList.get("user-agent") ?? null;
+
+  // 6. Execute business logic
   const ctx = new PublicContext();
-  return createLeadService(ctx, parsed.data, promocionIdResult.data, ip);
+  return createLeadService(ctx, parsed.data, promocionIdResult.data, ip, userAgent);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +106,7 @@ export async function createLeadService(
   data: ContactFormInput,
   promocionId: string,
   ip: string,
+  userAgent: string | null = null,
 ): Promise<ActionResult> {
   return ctx.withTransaction(async (tx) => {
     // 1. Fetch promocion to get name and assigned agent
@@ -101,7 +117,12 @@ export async function createLeadService(
         assignedAgentId: promociones.assignedAgentId,
       })
       .from(promociones)
-      .where(eq(promociones.id, promocionId))
+      .where(
+        and(
+          eq(promociones.id, promocionId),
+          eq(promociones.tenantId, ctx.getTenantId()),
+        ),
+      )
       .limit(1);
 
     if (!promocion) {
@@ -160,6 +181,7 @@ export async function createLeadService(
       textAccepted:
         "He leído y acepto la política de privacidad y el tratamiento de mis datos para recibir información comercial.",
       ip,
+      userAgent,
     });
 
     // 5. Enqueue confirmation email to the lead

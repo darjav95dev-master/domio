@@ -1,20 +1,11 @@
 import { z } from "zod";
+import { contactBaseSchema } from "@/shared/schemas/contact-base.schema";
 
 /**
  * Schema for the generic contact form submission.
+ * Extends the base contact schema — no additional fields needed.
  */
-export const contactFormSchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio").max(100),
-  email: z
-    .string()
-    .min(1, "El email es obligatorio")
-    .email("Email no válido")
-    .max(255),
-  message: z
-    .string()
-    .min(1, "El mensaje es obligatorio")
-    .max(2000, "El mensaje no puede exceder 2000 caracteres"),
-});
+export const contactFormSchema = contactBaseSchema;
 
 export type ContactFormInput = z.infer<typeof contactFormSchema>;
 

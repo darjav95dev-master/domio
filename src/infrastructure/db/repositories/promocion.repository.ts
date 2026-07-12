@@ -10,7 +10,7 @@ import {
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
 import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion-content-blocks";
 import type { MediaAsset } from "@/infrastructure/db/schema/media-assets";
-import { TipologiaSyncService } from "@/features/promociones/services/tipologia-sync.service";
+import { TipologiaSyncService } from "@/infrastructure/db/services/tipologia-sync.service";
 import { PromocionHistoryRepository } from "@/infrastructure/db/repositories/promocion-history.repository";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import type { TenantContext, Transaction } from "@/infrastructure/tenant/TenantContext";

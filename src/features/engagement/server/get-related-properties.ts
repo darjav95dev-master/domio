@@ -84,7 +84,18 @@ export async function getRelatedPropertiesService(
     const priceMax = Math.round(minPrice * 1.2);
     const [lng, lat] = location;
 
-    // 2. Find related properties using Drizzle query builder
+    // 2. Aggregate subquery for tipologia stats (replaces correlated subqueries)
+    const tipologiaAgg = tx
+      .select({
+        promocionId: tipologias.promocionId,
+        minPrice: sql<number>`MIN(${tipologias.referencePriceSale})`.as("min_price"),
+        minArea: sql<number>`MIN(${tipologias.usefulArea})`.as("min_area"),
+      })
+      .from(tipologias)
+      .groupBy(tipologias.promocionId)
+      .as("tipologia_agg");
+
+    // 3. Find related properties using Drizzle query builder
     const rows = await tx
       .select({
         id: promociones.id,
@@ -93,25 +104,15 @@ export async function getRelatedPropertiesService(
         propertyType: promociones.propertyType,
         operation: promociones.operation,
         municipality: promociones.municipality,
-        minPrice: sql<number>`
-          COALESCE((
-            SELECT MIN(${tipologias.referencePriceSale})
-            FROM ${tipologias}
-            WHERE ${tipologias.promocionId} = ${promociones.id}
-              AND ${tipologias.tenantId} = ${promociones.tenantId}
-          ), 0)
-        `.as("min_price"),
-        usefulArea: sql<number>`
-          COALESCE((
-            SELECT MIN(${tipologias.usefulArea})
-            FROM ${tipologias}
-            WHERE ${tipologias.promocionId} = ${promociones.id}
-              AND ${tipologias.tenantId} = ${promociones.tenantId}
-          ), 0)
-        `.as("useful_area"),
+        minPrice: sql<number>`COALESCE(${tipologiaAgg.minPrice}, 0)`.as("min_price"),
+        usefulArea: sql<number>`COALESCE(${tipologiaAgg.minArea}, 0)`.as("useful_area"),
         coverUrl: mediaAssets.r2Key,
       })
       .from(promociones)
+      .leftJoin(
+        tipologiaAgg,
+        eq(tipologiaAgg.promocionId, promociones.id),
+      )
       .leftJoin(
         mediaAssets,
         and(
@@ -143,7 +144,7 @@ export async function getRelatedPropertiesService(
           )`,
         ),
       )
-      .orderBy(sql`min_price ASC NULLS LAST`)
+      .orderBy(sql`COALESCE(${tipologiaAgg.minPrice}, 0) ASC NULLS LAST`)
       .limit(4);
 
     return rows.map((row) => ({

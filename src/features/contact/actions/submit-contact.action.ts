@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { contactFormSchema, type ContactFormResult } from "./submit-contact.schema";
 import { checkContactRateLimit } from "./contact-form-action";
 import { getContactPageData } from "@/features/contact/server/get-contact-data";
+import { verifyTurnstileToken } from "@/shared/utils/turnstile";
 import { EmailService } from "@/infrastructure/email/email.service";
 import { EmailRepository } from "@/infrastructure/email/email.repository";
 import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
@@ -20,7 +21,17 @@ export async function submitContactForm(
   prevState: ContactFormResult | null,
   formData: FormData,
 ): Promise<ContactFormResult> {
-  // 1. Rate limit check
+  // 1. Verify Turnstile CAPTCHA
+  const turnstileToken = formData.get("turnstileToken") as string | null;
+  const turnstileResult = await verifyTurnstileToken(turnstileToken);
+  if (!turnstileResult.success) {
+    return {
+      success: false,
+      error: turnstileResult.error ?? "Error de verificación de seguridad.",
+    };
+  }
+
+  // 2. Rate limit check
   const rateLimit = await checkContactRateLimit(await headers());
   if (!rateLimit.allowed) {
     return {

@@ -6,6 +6,7 @@ import { Input } from "@/shared/components/input";
 import {
   submitContactForm,
 } from "@/features/contact/actions/submit-contact.action";
+import { TurnstileWidget } from "@/shared/components/TurnstileWidget";
 import type { ContactFormResult } from "@/features/contact/actions/submit-contact.schema";
 
 /**
@@ -23,6 +24,7 @@ export function ContactFormGeneric() {
     FormData
   >(submitContactForm, null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const fieldErrors = state?.fieldErrors ?? {};
 
@@ -117,6 +119,10 @@ export function ContactFormGeneric() {
           </p>
         )}
       </div>
+
+      {/* Turnstile CAPTCHA */}
+      <TurnstileWidget onToken={setTurnstileToken} />
+      <input type="hidden" name="turnstileToken" value={turnstileToken ?? ""} />
 
       {/* Global error */}
       {state?.error && !state.fieldErrors && (

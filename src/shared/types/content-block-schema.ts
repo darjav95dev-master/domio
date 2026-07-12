@@ -14,6 +14,73 @@ const REQ_FIELD_MSG = "Este campo no puede estar vacío";
 const MIN_ITEMS_MSG = "Debe incluir al menos un elemento";
 
 /**
+ * Allowed attributes per HTML tag for DESCRIPCION_GENERAL content.
+ */
+const ALLOWED_ATTRS: Record<string, Set<string>> = {
+  a: new Set(["href", "title", "target", "rel"]),
+};
+
+const EVENT_ATTR_RE = /^on\w+$/i;
+
+/**
+ * Checks if an attribute name is a disallowed event handler (onclick, etc.).
+ */
+function isEventAttr(name: string): boolean {
+  return EVENT_ATTR_RE.test(name);
+}
+
+/**
+ * Checks if a URL value uses a dangerous protocol (javascript:, data:, vbscript:).
+ */
+function isDangerousUrl(value: string): boolean {
+  const dangerous = /^\s*(javascript|data|vbscript):/i;
+  return dangerous.test(value);
+}
+
+/**
+ * Strips disallowed and dangerous attributes from HTML tags.
+ * This is applied as a Zod transform BEFORE the allowed-tags validation,
+ * so operators never see an error — the content is silently cleaned.
+ */
+function sanitizeHtmlAttrs(html: string): string {
+  return html.replace(/<([a-z][a-z0-9]*)\b([^>]*)>/gi, (full, tagName: string, attrs: string) => {
+    if (!attrs.trim()) return `<${tagName}>`;
+
+    const allowedAttrSet = ALLOWED_ATTRS[tagName.toLowerCase()];
+    const kept = attrs
+      .split(/(?:\s+)/)
+      .filter((attr) => {
+        // Skip empty parts
+        if (!attr.trim()) return false;
+
+        // Strip event handlers
+        const attrNameMatch = attr.match(/^([\w-]+)/);
+        if (!attrNameMatch) return false;
+        const attrName = attrNameMatch[1]!;
+
+        if (isEventAttr(attrName)) return false;
+
+        // If the attribute has a value, check for dangerous URLs
+        const valueMatch = attr.match(/^[\w-]+\s*=\s*(['"])(.*?)\1$/);
+        if (valueMatch && (attrName === "href" || attrName === "src")) {
+          if (isDangerousUrl(valueMatch[2]!)) return false;
+        }
+
+        // If the tag has an allowlist, only keep listed attributes
+        if (allowedAttrSet) {
+          return allowedAttrSet.has(attrName);
+        }
+
+        // Tags without explicit allowlist: only keep style and class attributes
+        return attrName === "style" || attrName === "class";
+      })
+      .join(" ");
+
+    return kept ? `<${tagName} ${kept}>` : `<${tagName}>`;
+  });
+}
+
+/**
  * Extracts all HTML tag names from a string and verifies they are in the
  * allowed set. Returns true if all tags are allowed.
  */
@@ -35,6 +102,7 @@ const htmlSafeString = () =>
   z
     .string()
     .min(1, REQ_FIELD_MSG)
+    .transform(sanitizeHtmlAttrs)
     .refine(validateAllowedHtml, {
       message: "El texto contiene etiquetas HTML no permitidas",
     });

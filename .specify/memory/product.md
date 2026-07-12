@@ -265,7 +265,7 @@ Reglas que la cadena trata como invariantes del sistema y protege con tests. Si 
 Lo que Domio **no es** en el alcance del TFM, declarado explícitamente para que la cadena no invente:
 
 - **No es un CRM completo.** No hay pipeline visual, no hay automations complejas, no hay integraciones con calendarios ni telefonía. La bandeja de leads es funcional, sencilla y suficiente para el equipo comercial.
-- **No es un portal inmobiliario tipo Idealista.** No hay comparador, no hay favoritos persistentes de visitante (sin auth pública), no hay alertas por email de nuevos inmuebles, no hay valoración automática.
+- **No es un portal inmobiliario tipo Idealista.** No hay comparador, no hay alertas por email de nuevos inmuebles, no hay valoración automática. Los favoritos de visitante **sí están en alcance** (guardado en localStorage, sin auth pública); la implementación actual carga hasta 100 promociones en cliente — optimización pendiente para cuando el catálogo crezca.
 - **No hay vista lista en el catálogo público.** Solo vista grid. Es una decisión de posicionamiento editorial coherente con `design.md`. La vista lista se descarta como no-objetivo del MVP.
 - **No hay editor markdown libre.** El contenido editorial de una promoción se compone de bloques estructurados con schema Zod. El editor libre queda fuera de alcance por consistencia visual y por generación fiable de datos estructurados.
 - **No hay dashboard de estadísticas / analítica en el backoffice.** Ni visitas, ni conversión, ni ranking de inmuebles vistos. Si el equipo necesita métricas, se apoya en Google Analytics o similar en la web pública. El backoffice del MVP no las expone.
@@ -281,7 +281,7 @@ Lo que Domio **no es** en el alcance del TFM, declarado explícitamente para que
 - **No tiene webhooks salientes.** La integración con consumidores externos es pull-based (ellos hacen GET) más un push transaccional acotado (ellos hacen POST del lead). No hay eventos de Domio empujados a terceros.
 - **No tiene sistema de comisiones o de contabilidad interna.** El seguimiento comercial vive en el CRM externo del equipo o en su ERP, no en Domio.
 
-> ⚠️ **Test de fragilidad de la cadena:** si algún subagente propone añadir "chat en vivo porque mejoraría la conversión", "favoritos porque los usuarios lo esperan", "un endpoint público de leads porque simplificaría integraciones futuras", "una vista lista alternativa al grid porque Idealista la tiene", "un editor markdown porque es más flexible", o cualquier otra sugerencia razonable, debe rechazarse. La cadena **no inventa valor**. Ejecuta el spec. Cualquier ampliación pasa por revisión de este documento.
+> ⚠️ **Test de fragilidad de la cadena:** si algún subagente propone añadir "chat en vivo porque mejoraría la conversión", "un endpoint público de leads porque simplificaría integraciones futuras", "una vista lista alternativa al grid porque Idealista la tiene", "un editor markdown porque es más flexible", o cualquier otra sugerencia razonable, debe rechazarse. La cadena **no inventa valor**. Ejecuta el spec. Cualquier ampliación pasa por revisión de este documento.
 
 ---
 

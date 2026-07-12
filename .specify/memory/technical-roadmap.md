@@ -1,41 +1,34 @@
 # Technical Roadmap — Domio
 
 > Generado por: engineering-auditor
-> Fecha: 2026-07-09
-> Versión: v4 — auditoría completa post-feature-027 (contract-tests)
+> Fecha: 2026-07-12
+> Rama auditada: `chore/engenier-auditor`
+> Auditoría anterior: `technical-roadmap-2026-07-12-fix-design-params.md` (rama `fix/design-params`)
 
 ---
 
 ## 1. Executive Summary
 
-**Score:** 97/100 — A+
+**Score:** 84 — **B+**
 
-**Estado general:** Domio es una plataforma de comercialización inmobiliaria construida sobre Next.js 15 App Router, TypeScript strict, Drizzle ORM y PostgreSQL con Row Level Security. El sistema ha completado 27 features con una calidad técnica sobresaliente. La auditoría v3 identificó cuatro bugs críticos/altos que han sido **completamente resueltos** en las iteraciones posteriores: el template de email ausente está registrado y funcionando, el rate limiting de login está conectado al flujo real via middleware, `PaginatedResult<T>` ha sido unificada en `shared/types/pagination.ts`, `ROLE_LABELS` local ha sido reemplazada por la constante compartida, y `withRateLimit` HOC dead code ha sido eliminado. La deuda técnica residual es baja y ninguna de ella bloquea producción.
+**Estado general:** Esta rama cierra cinco de las siete deudas clasificadas como "Crítica" o "Alta" en la auditoría anterior. Las tres deudas críticas de Fase 1 están resueltas: el filtro `tenantId` en `createLeadService`, el registro de `user_agent` en `consent_records`, y el catch silencioso en `loadMediaAssets`. La dependencia invertida `infrastructure → features` se ha eliminado moviendo `TipologiaSyncService` a `infrastructure/db/services/`. El CAPTCHA (Cloudflare Turnstile) está implementado en ambos formularios públicos y el sistema de verificación server-side es correcto. La unificación de schemas de contacto está hecha con `shared/schemas/contact-base.schema.ts`. El refactor de `getRelatedProperties` para eliminar subqueries correlacionadas ya estaba implementado en el código (LEFT JOIN con GROUP BY subquery como `tipologiaAgg`). El test de aislamiento T026 verifica explícitamente que `createLeadService` rechaza un `promocionId` de otro tenant.
+
+Quedan tres problemas nuevos introducidos en esta rama que merecen atención, más los dos que permanecían pendientes.
 
 **Fortalezas principales:**
-- Tenant isolation a dos capas ejecutada con rigor: `TenantAwareRepository` + RLS con `FORCE ROW LEVEL SECURITY` + `SET LOCAL` via `set_config`
-- Email desacoplado del path crítico mediante `email_queue` persistente con worker y backoff exponencial
-- `CatalogRepository` separado de `PromocionRepository` — SRP resuelto en la extracción anterior
-- `TipologiaSyncService` extraído del repositorio — SRP resuelto
-- Rate limiting de login correctamente conectado en `middleware.ts` antes del guard de auth
-- Cursor pagination en catálogo público y API v1 (sin OFFSET) con sort por precio usando subquery CTE
-- Suite de tests excepcional: 4 capas (unit + integration + isolation RLS + contract + E2E POM)
-- `PaginatedResult<T>` unificada en `src/shared/types/pagination.ts` — DRY resuelto
-- `USER_ROLE_LABELS` desde `shared/constants/domain-labels` en todos los componentes de team
-- `UserRow` en `user-schema.ts` excluye `passwordHash` — separación correcta
-- `getServerSession()` loguea el error antes de retornar null — observabilidad mejorada
-- `withRateLimit` HOC eliminado — sin dead code en el path de API pública
-- `isPublishing` calculado una sola vez en el PATCH handler y pasado por parámetro
-- `slug` nullable en schema Drizzle — viola la unicidad solo durante el DRAFT, correctamente resuelto
+- Arquitectura de capas limpia y sin dependencias invertidas tras mover `TipologiaSyncService`
+- CAPTCHA Turnstile implementado con degradación graceful (fallo silencioso en dev, error claro en prod sin secret key)
+- `createLeadService` con defensa en profundidad: `tenantId` en `WHERE` + RLS
+- Test de aislamiento T026 verifica el caso específico del cross-tenant `createLeadService`
+- Schema base de contacto unificado con reglas consistentes en ambos formularios
+- `getRelatedProperties` ya usa LEFT JOIN con subquery agregada (no correlated subqueries)
+- `use-publish-validation` correctamente extraído a hook separado (reduce `promocion-form.tsx`)
 
-**Riesgos resueltos en esta iteración:**
-- ✅ `UserRepository.findAll/findById/update` usa `.select()` con columnas explícitas — `passwordHash` ya no está en memoria
-- ✅ `PROMOCION_SELECT_COLUMNS` unificado — no más duplicación silenciosa al añadir campos
-- ✅ `TipologiaPayload`/`UnidadPayload` centralizados en `tipologia-schema.ts` — definiciones sincronizadas
-
-**Riesgos no aplicables o aceptados:**
-- Las tres variantes de "unread leads" son implementaciones con casos de uso distintos — no unificar (decisión del roadmap)
-- Los EXISTS subqueries en `findPublicWithCursor` son aceptables para el volumen actual (<200 promociones); monitorizar cuando escale
+**Riesgos principales:**
+- `handleSubmit` en `ContactForm.tsx` cierra sobre `turnstileToken` pero no lo incluye en el dep array de `useCallback` — stale closure: el token siempre será el valor del primer render cuando se llama al submit
+- `submit-contact.action.ts` tiene dos pasos numerados como "2." (el rate limit y el parse/validate) — error de índice menor pero que indica un copy-paste
+- La feature `favorites` sigue presente y sigue con `limit: 100` (pendiente decisión de producto)
+- `BlockDescripcion.dangerouslySetInnerHTML` sigue sin sanitización de atributos de evento (pendiente de la auditoría anterior, no abordado en esta rama)
 
 ---
 
@@ -43,38 +36,41 @@
 
 ### Estado actual
 
-- **Framework:** Next.js 15 App Router con rutas agrupadas `(public)` y `(auth)`
-- **Capas:** `app/` (route handlers + pages) → `src/features/` (lógica de negocio por feature) → `src/infrastructure/` (DB, auth, email, media, rate-limiting, tenant)
-- **Multi-tenancy:** `TenantContext` (tres subclases: `PublicContext`, `AuthenticatedContext`, `ApiKeyContext`) + RLS con `FORCE ROW LEVEL SECURITY` + `SET LOCAL` via `set_config('app.current_tenant_id', ..., true)`
-- **Repositorios:** `PromocionRepository` (backoffice CRUD, ~588 líneas) + `CatalogRepository` (public + API cursor pagination) + `TipologiaSyncService` (sync tipologías/unidades) — SRP correctamente segregado
-- **Email:** cola persistente `email_queue` + worker con retry exponencial y `FOR UPDATE SKIP LOCKED`
-- **Media:** Cloudflare R2 via `MediaService`; upload solo desde servidor
-- **Testing:** Vitest (unit, integration, contract, isolation) + Playwright E2E con POM
-- **Contract tests:** `tests/contract/v1/` con 7 suites incluyendo snapshot divergence y consumer mirror
+```
+app/
+  (public)/    ← páginas SSR/ISR
+  (auth)/      ← backoffice protegido
+  api/
+    v1/        ← API pública con autenticación API key
+    internal/  ← endpoints internos del backoffice
+src/
+  shared/      ← componentes, constants, hooks, schemas transversales
+  features/    ← lógica por bounded context
+  infrastructure/ ← DB, auth, email, rate limiting, tenant, observability
+```
+
+La dependencia invertida infrastructure → features que existía en la auditoría anterior ha sido eliminada. `TipologiaSyncService` ahora vive en `src/infrastructure/db/services/tipologia-sync.service.ts` y `promocion.repository.ts` lo importa desde `@/infrastructure/db/services/tipologia-sync.service`. La dirección de dependencia es ahora correcta en toda la base de código.
 
 ### Fortalezas
 
-- Separación limpia entre bounded contexts en `src/features/`
-- `TenantAwareRepository` como base de todos los repositorios: toda query pasa por transacción con `SET LOCAL`
-- `CatalogRepository` separado de `PromocionRepository` — responsabilidades claras
-- `TipologiaSyncService` en `src/features/promociones/services/` — sync desacoplado del CRUD
-- `CursorEncoder` en `src/infrastructure/db/repositories/cursor-encoder.ts` — utilidad pura
-- `shared/constants/` centraliza enums, labels y configuración sin magic strings
-- Serializer `promocion-serializer.ts` filtra `location` cuando `mapPrivacyMode='AREA'` — regla de privacidad en la serialización, no en el endpoint
+- Separación de responsabilidades entre capas efectiva y consistente
+- Cursor pagination implementada correctamente en catálogo y API pública
+- Serialización de privacidad del mapa correcta en API y RSC
+- `MediaImage` con fallback determinista; `alt` obligatorio en runtime
+- Sentry wrapper con scrubbing de secrets y contexto de tenant
+- `TipologiaSyncService` correctamente ubicado en infrastructure
 
 ### Debilidades
 
-- `UserRepository` usa `.select()` sin columnas explícitas en `findAll`, `findById`, `update` y `deactivate` — el objeto en memoria incluye `passwordHash` aunque `mapUserRow` lo filtre antes de exponer
-- Tres variantes de "unread leads" con estrategias SQL distintas: `NOT IN` en `LeadRepository` vs `LEFT JOIN + isNull` en `DashboardRepository`
-- Los EXISTS subqueries en `findPublicWithCursor` (precio, dormitorios, baños, amenities) no están indexados por tipologías → potencial problema de performance con filtros combinados sobre catálogos grandes
+- La feature `favorites` viola el alcance del MVP declarado en `product.md §7` y sigue cargando el catálogo completo en cliente
+- `ContactForm.tsx` tiene un stale closure en `handleSubmit`: `turnstileToken` no está en el dep array de `useCallback`
 
-### Hallazgos de arquitectura
+### Hallazgos
 
 | ID | Hallazgo | Archivos afectados | Impacto |
 |----|----------|--------------------|---------|
-| A1 | `.select()` sin columnas en UserRepository incluye `passwordHash` en memoria | `src/infrastructure/db/repositories/user.repository.ts:59,81,189` | Medio |
-| A2 | Tres implementaciones del concepto "unread leads" con estrategias SQL distintas | `lead.repository.ts:363,515` + `dashboard.repository.ts:25` | Bajo |
-| A3 | EXISTS subqueries en filtros de precio/dormitorios/baños en `findPublicWithCursor` sin índice en tipologías | `src/infrastructure/db/repositories/catalog.repository.ts:210-236` | Bajo (aceptable para MVP) |
+| A1 | Stale closure en `handleSubmit`: `turnstileToken` leído en closure pero no en deps | `src/features/engagement/components/ContactForm.tsx:54-106` | Alto |
+| A2 | Feature `favorites` fuera de alcance MVP con carga ineficiente (decisión de producto pendiente) | `src/features/favorites/`, `app/(public)/favoritos/page.tsx` | Bajo |
 
 ---
 
@@ -82,95 +78,75 @@
 
 ### SRP — Single Responsibility Principle
 
-No se identifican violaciones actuales. Los refactors planificados de la auditoría v3 han sido aplicados:
+La SRP-01 de la auditoría anterior (orquestación de `TipologiaSyncService` dentro del repositorio) sigue presente en la arquitectura. El servicio existe en infrastructure pero la llamada sigue dentro de `PromocionRepository.update()`. Es un acoplamiento tolerable dado que el servicio está bien encapsulado y la decisión fue posponer extraer la orquestación a un servicio de aplicación.
 
-- `PromocionRepository` acotado a backoffice CRUD (~588 líneas, aceptable)
-- `CatalogRepository` para public/API cursor pagination
-- `TipologiaSyncService` para la sincronización de tipologías/unidades
-- `CursorEncoder` como módulo utilitario puro
+**Estado:** Sin cambios respecto a auditoría anterior. Prioridad: Posponer.
 
-### OCP, LSP, ISP, DIP
+### DIP — Dependency Inversion Principle
 
-No se identifican violaciones reales con impacto de mantenibilidad. Las interfaces de dependencia en rate limiter, email service y repositorios están bien segregadas. Las implementaciones no violan contratos. La DI es explícita en constructores.
+**[DIP-01] RESUELTO.** `TipologiaSyncService` movido a `src/infrastructure/db/services/tipologia-sync.service.ts`. La importación en `promocion.repository.ts` línea 13 apunta ahora a `@/infrastructure/db/services/tipologia-sync.service`. No hay dependencias de infrastructure hacia features en el codebase.
 
 ---
 
 ## 4. YAGNI
 
-### `PaginatedResult` en `CatalogRepository`
+### Código innecesario
 
-`CatalogRepository` importa `PaginatedResult` de `shared/types/pagination` pero no la usa en ningún método público (usa `CatalogCursorResult` y `ApiCursorResult` propias). La importación es dead import.
+#### Feature `favorites` fuera de alcance MVP
+
+`product.md §7` declara explícitamente que no hay favoritos persistentes de visitante. La feature existe en localStorage sin impacto en seguridad. La decisión es de producto.
+
+**Estado:** Sin cambios. Pendiente decisión del usuario.
+
+### Código eliminable
 
 | Código | Motivo | Riesgo de eliminar |
 |--------|--------|--------------------|
-| `import { PaginatedResult } from "@/shared/types/pagination"` en `catalog.repository.ts:15` | Import sin uso en el archivo | Muy bajo |
-
-**Prioridad:** Quick Win — eliminar el import.
-
-### Duplicaciones aceptables que NO se deben unificar
-
-- `CatalogCursorResult` y `ApiCursorResult` tienen campos idénticos pero semánticas distintas (público vs API). No unificar.
-- `PromocionListRow` como tipo exportado de `promocion.repository.ts` re-usado en `catalog.repository.ts` — correcto: compartir el tipo evita duplicar la definición de columnas.
+| `src/features/favorites/` + `app/(public)/favoritos/page.tsx` | Fuera de alcance según `product.md §7` | Muy bajo |
 
 ---
 
 ## 5. KISS
 
-### Complejidad aceptable
+### Complejidad accidental
 
-- `fetchPublicWithPriceSort` usa un CTE con `price_agg` y cursor basado en precio. Es la única forma correcta de cursor pagination con sort por precio. No simplificar.
-- `computeConstructionWarning` en el route handler de `[id]/route.ts` tiene tres condiciones mutuamente excluyentes. Es legible y correcto. No simplificar.
-- El shim de compatibilidad NextAuth v4/v5 en `auth.config.ts` es necesario para los tests. No tocar.
+#### Stale closure en `ContactForm.handleSubmit`
+
+`handleSubmit` está envuelto en `useCallback` con dep array `[promocionId]`. Sin embargo, dentro del callback se lee `turnstileToken` del estado local. Cuando el usuario resuelve el widget de Turnstile, `turnstileToken` cambia, pero `handleSubmit` no se recrea porque `turnstileToken` no está en el dep array. El submit usará siempre el valor de `turnstileToken` del primer render (`null`), lo que hará que la verificación Turnstile siempre falle con `"Debes completar la verificación de seguridad."` a menos que el usuario recargue.
+
+**Acción concreta:** Añadir `turnstileToken` al dep array de `useCallback`:
+```typescript
+[promocionId, turnstileToken]
+```
+
+O bien, si se quiere evitar recrear el callback, usar `useRef` para `turnstileToken` y leer `.current` dentro del callback.
+
+#### Índice duplicado en `submit-contact.action.ts`
+
+El archivo tiene dos bloques comentados como `// 2.` (líneas 34 y 43). El rate limit es `// 2.` y el parse/validate también es `// 2.`. El parse debería ser `// 3.`. Error cosmético menor pero indica un copy-paste no revisado.
 
 ### Simplificaciones posibles
 
-- `UserRepository.findAll` hace dos queries (SELECT + COUNT) para paginación offset. No hay paginación real en el backoffice de usuarios — la API devuelve todos los usuarios sin cursor. La query COUNT es siempre sobre el mismo resultado que los items. Bajo volumen esperado de usuarios (<100), esto es correcto y no hay nada que simplificar.
+- Renumerar los comentarios de pasos en `submit-contact.action.ts` para que sean consecutivos (1-4).
 
 ---
 
 ## 6. DRY
 
-### Duplicaciones resueltas (comparado con v3)
+### Duplicaciones resueltas en esta rama
 
-- `PaginatedResult<T>` → unificada en `src/shared/types/pagination.ts` ✓
-- `ROLE_LABELS` local → reemplazada por `USER_ROLE_LABELS` de `domain-labels.ts` en los tres componentes de team ✓
-- `isPublishing` → calculado una vez en PATCH handler y pasado por parámetro ✓
-- `withRateLimit` HOC → eliminado ✓
+#### Schema base de contacto unificado — RESUELTO
 
-### Duplicaciones residuales relevantes
+`src/shared/schemas/contact-base.schema.ts` existe con reglas unificadas:
+- `name`: `min(2)`, `max(100)`
+- `email`: `z.string().email()`, `max(255)`
+- `message`: `min(10)`, `max(2000)`
 
-#### [DRY-01] `CATALOG_SELECT_COLUMNS` vs `PROMOCION_SELECT_COLUMNS`
-
-`catalog.repository.ts` define `CATALOG_SELECT_COLUMNS` con los mismos 22 campos que `PROMOCION_SELECT_COLUMNS` en `promocion.repository.ts`. Son idénticos. Si se añade un campo a `promociones`, hay que actualizarlo en dos sitios.
-
-**Archivos afectados:**
-- `src/infrastructure/db/repositories/catalog.repository.ts:23-46`
-- `src/infrastructure/db/repositories/promocion.repository.ts:29-52`
-
-**Impacto:** Cuando se añada un campo nuevo a `promociones` (e.g., `featured`), hay que acordarse de actualizarlo en ambos archivos. El riesgo es bajo hoy pero aumenta con cada campo nuevo.
-
-**Acción concreta:** Exportar `PROMOCION_SELECT_COLUMNS` desde `promocion.repository.ts` e importarlo en `catalog.repository.ts`. El tipo `PromocionListRow` ya se importa del mismo sitio — es coherente.
-
-**Prioridad:** Quick Win — 15 min, riesgo nulo.
-
-#### [DRY-02] `TipologiaPayload` e `UnidadPayload` definidos en dos sitios
-
-`src/features/promociones/services/tipologia-sync.service.ts` define `TipologiaPayload` y `UnidadPayload` localmente. `src/infrastructure/db/repositories/promocion.repository.ts` exporta también `TipologiaPayload` y `UnidadPayload` que coinciden en estructura.
-
-**Archivos afectados:**
-- `src/features/promociones/services/tipologia-sync.service.ts:12-35`
-- `src/infrastructure/db/repositories/promocion.repository.ts:137-160`
-
-**Impacto:** Si se añade un campo a tipología (e.g., `orientation`), hay que actualizar ambas definiciones. Error silencioso: TypeScript acepta ambas porque estructuralmente son equivalentes.
-
-**Acción concreta:** Exportar `TipologiaPayload` y `UnidadPayload` desde un único sitio (el schema compartido en `src/shared/types/tipologia-schema.ts` o en `promocion.repository.ts`) y hacer que `tipologia-sync.service.ts` importe desde allí.
-
-**Prioridad:** Planificar — 30 min, riesgo bajo.
+Ambos schemas (`engagement/schemas/contact-form.schema.ts` y `contact/actions/submit-contact.schema.ts`) extienden de `contactBaseSchema`. La inconsistencia de validación del formulario reportada en la auditoría anterior está resuelta.
 
 ### Duplicaciones aceptables
 
-- Las variantes de unread leads son variaciones distintas del mismo concepto con casos de uso diferentes (count badge vs list IDs vs dashboard card). No unificar.
-- Los tipos de proyección `PromocionWithRelations` / `PromocionListRow` / `PromocionDetail` son proyecciones distintas intencionalmente.
+- Los dos formularios de contacto (`ContactForm` y `ContactFormGeneric`) siguen siendo implementaciones separadas con flujos distintos. Correcto: no deben unificarse.
 
 ---
 
@@ -180,23 +156,26 @@ No se identifican violaciones reales con impacto de mantenibilidad. Las interfac
 
 | # | Smell | Ubicación | Tipo | Severidad |
 |---|-------|-----------|------|-----------|
-| S1 | `.select()` sin columnas en UserRepository incluye `passwordHash` en objeto en memoria | `user.repository.ts:59,81,189` | Inappropriate Intimacy | Media |
-| S2 | `CATALOG_SELECT_COLUMNS` duplicado de `PROMOCION_SELECT_COLUMNS` | `catalog.repository.ts:23-46` vs `promocion.repository.ts:29-52` | Duplicación | Baja |
-| S3 | `TipologiaPayload`/`UnidadPayload` definidos en dos archivos con estructura idéntica | `tipologia-sync.service.ts:12-35` + `promocion.repository.ts:137-160` | Duplicación | Baja |
-| S4 | Tres implementaciones de "unread leads" con estrategias SQL distintas | `lead.repository.ts:363,515` + `dashboard.repository.ts:25` | Divergent Change | Baja |
-| S5 | EXISTS subqueries en `findPublicWithCursor` para filtros de tipología no indexados | `catalog.repository.ts:210-236` | Potencial N+1 en catálogo grande | Baja |
-| S6 | Dead import `PaginatedResult` en `catalog.repository.ts` | `catalog.repository.ts:15` | Dead Code | Muy baja |
-| S7 | `backofficeUrl` construido con string concatenation sin helper | `create-lead-action.ts:183` | Magic Pattern | Muy baja |
+| S1 | Stale closure: `turnstileToken` en `useCallback` sin incluir en deps | `src/features/engagement/components/ContactForm.tsx:106` | Logic Error / Stale Closure | Alta |
+| S2 | Numeración duplicada de pasos (`// 2.` dos veces) | `src/features/contact/actions/submit-contact.action.ts:34,43` | Magic String / Cosmético | Muy baja |
+| S3 | `as unknown as` en handlers de evento de backoffice | `src/features/promociones/components/blocks-editor.tsx`, `promocion-section-identity.tsx`, `promocion-section-commercial-status.tsx` | Type unsafety | Media |
+| S4 | `as unknown as Record<string, unknown>` para `initialData` a hooks | `src/features/promociones/components/promocion-form.tsx:163` | Type unsafety | Media |
+| S5 | `promocion-form.tsx` todavía ~350+ líneas aunque ha mejorado con extracción de hook | `src/features/promociones/components/promocion-form.tsx` | Long Method (reducido) | Baja |
+| S6 | `lead.repository.ts` con 599 líneas combinando reads, writes, export y notas | `src/infrastructure/db/repositories/lead.repository.ts` | God Class (repositorio) | Media |
 
 ### Clasificación por severidad
-- **Media:** S1 (passwordHash en memoria)
-- **Baja:** S2, S3, S4, S5
-- **Muy baja:** S6, S7
+
+- **Alta:** S1 (bug real: el token Turnstile nunca se envía)
+- **Media:** S3, S4, S6
+- **Baja:** S5
+- **Muy baja:** S2
 
 ### Prioridad
-- **Hacer de inmediato:** S1 (riesgo de seguridad potencial), S6 (trivial)
-- **Planificar:** S2, S3
-- **Posponer:** S4, S5, S7
+
+- **Hacer de inmediato:** S1 (el CAPTCHA está implementado pero no funciona por este bug)
+- **Planificar:** S3 (type casting acumula deuda de tipo)
+- **Posponer:** S4, S6
+- **No hacer:** S2 (fix trivial en el mismo PR que toque el archivo), S5 (ya mejorado con extracción de hook)
 
 ---
 
@@ -204,221 +183,237 @@ No se identifican violaciones reales con impacto de mantenibilidad. Las interfac
 
 ### Estado
 
-Suite excepcional para la madurez del proyecto. Cinco capas:
-
-1. **Unit/Integration (Vitest):** Tests de repositorios contra BD real, services, schemas Zod, actions de Server Components, y route handlers
-2. **Isolation (Vitest):** `tests/isolation/` — suite dedicada que crea dos tenants sintéticos y verifica que las queries de uno no ven datos del otro
-3. **Contract (Vitest snapshot):** `tests/contract/v1/` — 7 suites: snapshot de schemas Zod, divergence detector, consumer mirror, rate limit, OpenAPI validation, docs endpoint, lead institutional
-4. **E2E (Playwright):** Tests con Page Object Model completo (19 Page Objects)
-5. **Features/Integration:** Tests específicos de features en `tests/features/` y `tests/integration/`
+Infraestructura de tests bien establecida (sin cambios respecto a auditoría anterior):
+- Vitest con `pool: forks`, `singleFork: true`, `fileParallelism: false`
+- Coverage con umbral 80%
+- Playwright para E2E con Page Object Model
+- Tests de contrato v1 con casos explícitos para modo AREA
+- Tests de aislamiento incluyendo T026 (nuevo en esta rama)
 
 ### Calidad
 
-- `consumer-mirror.contract.spec.ts` — verifica que el consumer tiene el snapshot actualizado (arquitectura de contrato bilateral)
-- `snapshot-divergence.contract.spec.ts` — detecta divergencia entre snapshots de provider y consumer
-- `rate-limit.contract.spec.ts` — verifica headers `X-RateLimit-*` en respuestas de la API pública
-- POM en E2E (`BasePage`, `LoginPage`, `CatalogoEditPage`, etc.) correctamente implementado
-- `tests/isolation/cover-unique-constraint.test.ts` — verifica el constraint parcial UNIQUE para portada
+**Puntos fuertes nuevos en esta rama:**
+- T026 verifica explícitamente que `createLeadService` rechaza un `promocionId` de tenant B cuando el contexto es de tenant A
+- Tests del schema `submit-contact.schema.spec.ts` cubren los límites de la validación unificada (min/max name, email, message)
+- `get-related-properties.spec.ts` actualizado para el nuevo patrón con `tipologiaAgg` subquery, verificando 2 results, limit 4, shape de objetos retornados
+- Tests de contrato en `promocion-response.contract.spec.ts` incluyen caso explícito para serialización AREA vs EXACT
+
+**Puntos débiles restantes:**
+
+1. **`ContactForm.spec.tsx` no prueba la integración con Turnstile**: los tests existentes no verifican que el token se pase correctamente al action. El stale closure (S1) no está cubierto por ningún test.
+
+2. **`ContactFormGeneric.spec.tsx` no prueba la integración con Turnstile**: el mock del server action acepta sin verificar que `formData.get("turnstileToken")` sea no-nulo.
+
+3. **No hay test unitario para `verifyTurnstileToken`**: la función tiene lógica de branches (sin secret key en dev, sin token, fetch falla, response con error-codes). Solo tres de estos cuatro branches tienen cobertura implícita.
 
 ### Cobertura útil
 
-- La suite de isolation RLS es la cobertura más valiosa del proyecto
-- Los tests de contrato v1 con snapshot bilateral previenen regresiones en la API pública
-- `tests/integration/email/email-queue.integration.test.ts` — cubre el flujo completo de la cola de email
+Los tests de dominio cubren los paths críticos de negocio. El conjunto es robusto para la capa de tenancy y los contratos de API. La cobertura de Turnstile es incompleta dado que la integración acaba de introducirse.
 
-### Ausencias identificadas
+### Mejoras
 
-| Ausencia | Prioridad | Coste |
-|----------|-----------|-------|
-| Test que verifica que `UserRepository.findAll` no expone `passwordHash` en el objeto retornado | Media | Bajo (~30 min) |
-| Test de integración de login que verifica 429 tras N intentos (`POST /api/auth/callback/credentials`) | Media | Bajo (~1h) |
+| Mejora | Prioridad | Coste |
+|--------|-----------|-------|
+| Añadir `turnstileToken` al dep array de `useCallback` en `ContactForm` y añadir test que verifique que el token se pasa | Alta | 30 min |
+| Añadir tests unitarios para `verifyTurnstileToken` cubriendo: sin secret key, sin token, fetch falla, respuesta con error-codes | Media | 1h |
+| Añadir test de `ContactFormGeneric` que verifique que `turnstileToken` se incluye en FormData antes del submit | Media | 30 min |
 
 ---
 
 ## 9. Seguridad
 
-### [SEC-MED-01] `UserRepository` expone `passwordHash` en objeto en memoria
+### [SEC-CRIT-01] `BlockDescripcion` — `dangerouslySetInnerHTML` sin sanitización de atributos de evento
 
-**Criticidad:** Medium
-
-**Archivos:** `src/infrastructure/db/repositories/user.repository.ts:59,81,189`
-
-**Problema:** Los métodos `findAll`, `findById`, `update` y `deactivate` usan `.select()` sin columnas explícitas contra la tabla `users`, que incluye `passwordHash`. Aunque `mapUserRow` en `team.actions.ts` excluye correctamente `passwordHash` antes de retornar el resultado al cliente, el objeto intermedio en memoria (en el scope de la action) contiene el hash. Si en el futuro se añade un log de depuración o un breadcrumb de Sentry sobre el objeto `user` antes del `mapUserRow`, el hash se filtraría.
-
-El `UserRow` en `user-schema.ts` ya excluye `passwordHash` del tipo — el contrato está bien definido. El problema es que el repositorio no lo hace cumplir en runtime.
-
-**Fix:** En `UserRepository`, usar `.select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, role: users.role, isActive: users.isActive, createdAt: users.createdAt, updatedAt: users.updatedAt, invitationTokenHash: users.invitationTokenHash, invitationTokenExpires: users.invitationTokenExpires })` en lugar de `.select()`. El tipo de retorno quedará correctamente inferido sin `passwordHash`.
-
-**Excepciones correctas:** `auth.config.ts` hace un `db.select()` directo (no via `UserRepository`) y sí necesita `passwordHash`. No tocar.
+**Criticidad:** High
+**Archivo:** `src/features/detail/components/BlockDescripcion.tsx:32`, `src/shared/types/content-block-schema.ts`
+**Estado:** Pendiente. No abordado en esta rama.
+**Problema:** `validateAllowedHtml` solo verifica nombres de tag pero no atributos. Un operador con acceso al backoffice podría guardar `<img onmouseover="...">` o `<a href="javascript:...">` que pasaría la validación de tags sin ser bloqueado.
+**Fix:** Extender `validateAllowedHtml` para verificar también atributos permitidos, o añadir `sanitize-html` como paso adicional en el servidor al persistir el bloque.
 
 ---
 
-### [SEC-LOW-01] Test de login rate limiting ausente
+### [SEC-HIGH-01] Stale closure en Turnstile hace que el CAPTCHA no funcione en producción
+
+**Criticidad:** High (CAPTCHA implementado pero inoperativo)
+**Archivo:** `src/features/engagement/components/ContactForm.tsx:54-106`
+**Problema:** El `useCallback` de `handleSubmit` captura `turnstileToken` del render inicial (valor: `null`) y no se actualiza cuando el widget resuelve el reto. En producción con `NEXT_PUBLIC_TURNSTILE_SITE_KEY` configurada, el widget renderiza y el usuario resuelve el reto, pero el submit siempre envía `turnstileToken: undefined`. El server action llama `verifyTurnstileToken(undefined)` que retorna `{ success: false, error: "Debes completar la verificación de seguridad." }`. El formulario nunca puede enviarse.
+
+**Fix inmediato:**
+```typescript
+// ContactForm.tsx: añadir turnstileToken al dep array
+const handleSubmit = useCallback(
+  async (e: FormEvent<HTMLFormElement>) => {
+    // ... código existente sin cambios ...
+  },
+  [promocionId, turnstileToken], // ← añadir turnstileToken
+);
+```
+
+---
+
+### [SEC-MAJOR-01] CAPTCHA — `ContactFormGeneric` pasa el token como hidden input (correcto)
+
+**Estado:** Correcto. `ContactFormGeneric` usa `useActionState` con `formAction` y pasa el token como `<input type="hidden" name="turnstileToken">`. El server action lo recoge con `formData.get("turnstileToken")`. Este patrón es correcto y no tiene el problema del stale closure porque el hidden input siempre refleja el estado actual de React en el momento del submit.
+
+---
+
+### [SEC-INFO-01] Sin CAPTCHA en `ContactFormGeneric` cuando no hay site key configurada
 
 **Criticidad:** Low
+**Problema:** Si `NEXT_PUBLIC_TURNSTILE_SITE_KEY` no está configurada, `TurnstileWidget` renderiza `null` y el hidden input envía un string vacío. `verifyTurnstileToken("")` falla porque `!token` es true con string vacío. En producción sin configurar la env var, el formulario genérico es inutilizable.
 
-**Archivos:** `middleware.ts:30-33`, `src/infrastructure/auth/rate-limit-login.spec.ts`
+La verificación en `verifyTurnstileToken` trata `""` como falsy (correcto en JS: `!"" === true`), por lo que el error está implícitamente cubierto. Sin embargo, la degradación en este caso debería ser explícita: si no hay site key en producción, el formulario debería mostrar un error claro al operador, no silenciosamente rechazar todos los envíos.
 
-**Problema:** `checkLoginRateLimit` está testeada unitariamente en su función pura, y está correctamente conectada al flujo real en `middleware.ts`. Sin embargo, no existe un test de integración que envíe N requests a `POST /api/auth/callback/credentials` y verifique que el 429 se emite. Si el matcher del middleware cambia (e.g., ruta `/api/auth/callback/credentials` cambia en NextAuth), el rate limiting dejaría de funcionar silenciosamente.
-
-**Fix:** Añadir test en `tests/integration/` que mockee la app Next.js y verifique `429` tras 5 intentos consecutivos al mismo endpoint.
+**Fix:** Documentar que `NEXT_PUBLIC_TURNSTILE_SITE_KEY` y `TURNSTILE_SECRET_KEY` son variables obligatorias en producción. Ya están en `.env.example` — es suficiente acción.
 
 ---
 
 ## 10. Performance
 
-### [P-LOW-01] EXISTS subqueries en filtros de tipología en `findPublicWithCursor`
+### [P-HIGH-01] RESUELTO: `getRelatedProperties` ya usa LEFT JOIN con subquery agregada
 
-**Problema:** Los filtros `bedrooms`, `bathrooms`, `priceMin`, `priceMax` y `amenities` en `findPublicWithCursor` generan un EXISTS subquery por cada filtro aplicado:
-```sql
-EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ... AND t.bedrooms >= ?)
-```
-Con múltiples filtros simultáneos y un catálogo de >500 promociones, el planner de PostgreSQL puede tener dificultades para optimizar los EXISTS anidados, resultando en seq scans en `tipologias`.
+El código de `get-related-properties.ts` en esta rama utiliza correctamente el patrón con `tipologiaAgg` como subquery Drizzle con `groupBy(tipologias.promocionId)`, evitando las subqueries correlacionadas por fila que existían en la auditoría anterior. El test `get-related-properties.spec.ts` ha sido actualizado para reflejar el nuevo patrón.
 
-**Impacto actual:** Con el volumen esperado del MVP (<200 promociones), el impacto es despreciable. El índice `(tenant_id, promocion_id)` en `tipologias` mitiga el problema.
+### [P-MEDIUM-01] `/favoritos` descarga hasta 100 promociones para filtrar en cliente
 
-**Fix recomendado (cuando sea necesario):** Reescribir los filtros de tipología como un único JOIN con condiciones agregadas, o usar una CTE pre-filtrada. No actuar ahora — monitorizar con Sentry cuando el catálogo supere las 500 promociones publicadas.
-
----
-
-### [P-LOW-02] `NOT IN` subquery en `getUnreadCount` y `getUnreadLeadIds`
-
-**Problema:** Ambos métodos usan `NOT IN (SELECT lead_id FROM lead_read_marks WHERE user_id = ?)`. Con muchas marcas de lectura por usuario, `NOT IN` puede ser más lento que un `LEFT JOIN + isNull` (como hace `DashboardRepository`).
-
-**Impacto actual:** Negligible con el volumen de leads esperado (<1000 leads por usuario).
-
-**Fix recomendado:** No actuar ahora. Documentar que `LEFT JOIN + isNull` es la estrategia preferida para grandes volúmenes si en el futuro se unifica el concepto.
+**Estado:** Sin cambios. Pendiente decisión de producto sobre la feature `favorites`.
 
 ---
 
 ## 11. Deuda Técnica
 
-### Crítica (bloquea producción o seguridad)
+### Crítica (bloquea funcionalidad en producción)
 
-Ninguna.
+| Deuda | Descripción | Effort |
+|-------|-------------|--------|
+| DT-01 | `ContactForm.handleSubmit`: añadir `turnstileToken` al dep array de `useCallback` — el CAPTCHA está implementado pero el token siempre llega `undefined` al server action | 10 min |
 
 ### Alta
 
-Ninguna.
+| Deuda | Descripción | Effort |
+|-------|-------------|--------|
+| DT-02 | `BlockDescripcion`: sanitizar atributos de evento en HTML de `DESCRIPCION_GENERAL` (pendiente de auditoría anterior) | 1-2h |
+| DT-03 | Añadir tests de `verifyTurnstileToken` cubriendo branches: sin secret key en prod, sin token, fetch falla, respuesta con error-codes | 1h |
 
 ### Media
 
 | Deuda | Descripción | Effort |
 |-------|-------------|--------|
-| DT-01 | `UserRepository` usa `.select()` sin columnas explícitas — `passwordHash` en memoria | 1h |
+| DT-04 | Renumerar pasos en `submit-contact.action.ts` (dos pasos "2.") | 5 min |
+| DT-05 | Type casting `as unknown as` en componentes del backoffice (blocks-editor, promocion-section-identity, promocion-section-commercial-status) | 2h |
 
 ### Baja
 
 | Deuda | Descripción | Effort |
 |-------|-------------|--------|
-| DT-02 | `CATALOG_SELECT_COLUMNS` duplicado de `PROMOCION_SELECT_COLUMNS` | 15m |
-| DT-03 | `TipologiaPayload`/`UnidadPayload` en dos archivos con estructura idéntica | 30m |
-| DT-04 | Dead import `PaginatedResult` en `catalog.repository.ts` | 5m |
-| DT-05 | Test de integración de login rate limiting ausente | 1h |
-| DT-06 | Test que verifica que `UserRepository` no expone `passwordHash` | 30m |
+| DT-06 | Decisión de producto sobre feature `favorites` (eliminar o formalizar en `product.md`) | 30 min (decisión) |
+| DT-07 | Test de `ContactFormGeneric` que verifique que `turnstileToken` se incluye como hidden input antes del submit | 30 min |
+
+### Resueltas en esta rama (respecto a auditoría anterior)
+
+| Deuda resuelta | Descripción |
+|----------------|-------------|
+| ~~DT-01~~ | `createLeadService`: filtro `tenantId` en `WHERE` añadido |
+| ~~DT-03~~ | `user_agent` registrado en `consent_records` del formulario comercial |
+| ~~DT-04~~ | Test de aislamiento T026 para `createLeadService` |
+| ~~DT-05~~ | `TipologiaSyncService` movido a `infrastructure/db/services/` |
+| ~~DT-06~~ | Schema base unificado `shared/schemas/contact-base.schema.ts` |
+| ~~DT-07~~ | `catch` silencioso en `loadMediaAssets` ahora loggea con `logger.warn` |
+| ~~DT-08~~ | `getRelatedProperties` refactorizado con LEFT JOIN y subquery agregada |
+| ~~DT-09~~ | CAPTCHA Cloudflare Turnstile implementado (pero ver DT-01 actual) |
+| ~~DT-13~~ | `use-publish-validation` extraído a hook separado |
+| ~~DT-14~~ | Test de contrato para modo AREA añadido |
 
 ---
 
 ## 12. Quick Wins
 
-> Cambios < 1h, seguros de forma independiente, alto impacto.
+> Cambios < 30 min, seguros de forma independiente, alto impacto.
 
-### QW-01 — Eliminar dead import en `catalog.repository.ts` (~5m)
+### QW-01 — Stale closure en `ContactForm.handleSubmit` (~10 min)
 
-Línea 15 de `src/infrastructure/db/repositories/catalog.repository.ts`:
 ```typescript
-// Eliminar:
-import { PaginatedResult } from "@/shared/types/pagination";
+// src/features/engagement/components/ContactForm.tsx — línea 106
+// Cambiar:
+    [promocionId],
+// Por:
+    [promocionId, turnstileToken],
 ```
-`PaginatedResult` no se usa en ningún método de `CatalogRepository`.
 
-### QW-02 — Unificar `CATALOG_SELECT_COLUMNS` con `PROMOCION_SELECT_COLUMNS` (~15m)
+Este es el único cambio necesario. El Turnstile ya funciona correctamente en `ContactFormGeneric`; solo `ContactForm` tiene este bug.
 
-En `promocion.repository.ts`, exportar:
+---
+
+### QW-02 — Renumerar pasos en `submit-contact.action.ts` (~5 min)
+
 ```typescript
-export const PROMOCION_SELECT_COLUMNS = { ... } as const;
+// src/features/contact/actions/submit-contact.action.ts
+// Cambiar "// 2. Parse and validate" por "// 3. Parse and validate"
+// El rate limit es el paso 2, el parse es el paso 3.
 ```
-En `catalog.repository.ts`, eliminar `CATALOG_SELECT_COLUMNS` e importar:
-```typescript
-import { PROMOCION_SELECT_COLUMNS } from "./promocion.repository";
-```
-Renombrar el uso en el archivo a `PROMOCION_SELECT_COLUMNS`. Sin cambio de comportamiento.
-
-### QW-03 — Columnas explícitas en `UserRepository.select()` (~45m)
-
-En `user.repository.ts`, reemplazar los tres `.select()` sin args por `.select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, role: users.role, isActive: users.isActive, invitationTokenHash: users.invitationTokenHash, invitationTokenExpires: users.invitationTokenExpires, createdAt: users.createdAt, updatedAt: users.updatedAt })`. El tipo de retorno excluirá `passwordHash` por inferencia de Drizzle. Asegurar que los tests existentes siguen pasando.
 
 ---
 
 ## 13. Refactors Estratégicos
 
-### R-01 — Unificar tipos `TipologiaPayload`/`UnidadPayload`
+### R-01 — Sanitización robusta de HTML en `DESCRIPCION_GENERAL` (pendiente de auditoría anterior)
 
-**Valor:** Elimina el riesgo de divergencia silenciosa entre `tipologia-sync.service.ts` y `promocion.repository.ts` cuando se añadan campos a tipología.
-
-**Separación propuesta:** Exportar `TipologiaPayload` y `UnidadPayload` desde `src/shared/types/tipologia-schema.ts` (ya existente para el schema Zod de tipología). El service y el repositorio los importan desde allí. La definición local en ambos archivos se elimina.
-
-**Coste:** 30m. **Riesgo de regresión:** Muy bajo — solo cambian los imports; las estructuras son idénticas.
+**Valor:** Elimina el riesgo de XSS por atributos de evento en HTML almacenado en BD.
+**Propuesta:** Añadir un paso de strip de atributos de evento en el schema Zod de `DESCRIPCION_GENERAL` server-side al persistir el bloque. Usar `sanitize-html` (lista blanca de tags Y atributos) o implementación propia.
+**Coste:** 1-2h (incluyendo tests). **Riesgo de regresión:** Bajo.
 
 ---
 
-### R-02 — Test de integración de login rate limiting
+### R-02 — Tests unitarios para `verifyTurnstileToken`
 
-**Valor:** Detecta regresiones si el matcher del middleware cambia y el rate limiting deja de ejecutarse.
-
-**Propuesta:** En `tests/integration/`, añadir un test que construya requests con el mismo IP simulado, envíe 5+ `POST /api/auth/callback/credentials` y verifique que el sexto retorna 429 con header `Retry-After`. Requiere mockear Upstash o usar una instancia de Redis de test.
-
-**Coste:** 1h. **Riesgo de regresión:** Bajo.
+**Valor:** Cubre los 4 branches del utility: sin secret key en desarrollo (bypass), sin secret key en producción (error), sin token (error), fetch falla (error), respuesta con error-codes (error). La función es sencilla y tiene cobertura cero en el momento actual.
+**Propuesta:** Añadir `src/shared/utils/turnstile.spec.ts` con mocks de `fetch` y `process.env`.
+**Coste:** 1h. **Riesgo de regresión:** Muy bajo (solo tests nuevos, sin cambios en producción).
 
 ---
 
 ## 14. Refactors NO recomendados
 
-### No unificar las tres implementaciones de "unread leads"
+### No refactorizar: Mover `handleSubmit` a `useCallback` sin deps o usar `useRef` para el token
 
-`getUnreadCount` (badge de nav), `getUnreadLeadIds` (highlight client-side en lista) y `getUnreadLeadsCount` del `DashboardRepository` (card del dashboard) resuelven casos de uso con proyecciones distintas. Unificarlos en un `UnreadLeadsService` introduciría acoplamiento entre `LeadRepository` y `DashboardRepository` sin beneficio real. La diferencia de estrategia SQL (NOT IN vs LEFT JOIN) es un detalle de implementación tolerable a este volumen.
+La solución mínima (añadir `turnstileToken` al dep array) es la correcta. Convertir `turnstileToken` a `useRef` para evitar la recreación del callback introduciría una abstracción más compleja sin beneficio perceptible: el callback se recrea solo cuando el token cambia (una vez por sesión del widget, no en cada render).
 
-### No extraer `CATALOG_SELECT_COLUMNS` a un módulo de configuración separado
+### No refactorizar: Separar `LeadRepository` en repositorios más pequeños
 
-Centralizar las definiciones de columnas en un tercer archivo (`shared/db/columns.ts` o similar) añade una capa de indirección innecesaria. La solución correcta es importar directamente desde `promocion.repository.ts` (ver QW-02).
+Mismo razonamiento que en auditoría anterior. 599 líneas pero todos pertenecen al mismo dominio. El coste de abstracción supera el beneficio.
 
-### No reescribir los filtros EXISTS de `findPublicWithCursor` con JOINs ahora
+### No refactorizar: Extraer `ContactForm` y `ContactFormGeneric` a componente base
 
-La reescritura con un `JOIN tipologias ON ...` y condiciones agregadas mejoraría el plan de ejecución, pero introduce complejidad en los cursores de paginación (habría que incluir columnas de tipología en la clave del cursor). No hay evidencia de problema real de performance en el volumen actual. Actuar solo cuando el catálogo supere 500 promociones publicadas.
+Los dos formularios comparten schema base (ya unificado con `contactBaseSchema`) pero tienen flujos completamente distintos. La solución correcta ya está implementada (schema base compartido).
 
-### No migrar NextAuth v4 → v5 en esta iteración
+### No refactorizar: Reemplazar la lógica de orquestación en `PromocionRepository.update()`
 
-El shim de compatibilidad en `auth.config.ts` permite que los tests unitarios funcionen sin importar `openid-client`. Migrar a v5 requiere reescribir `session.ts`, el middleware auth y todos los tests que mockean `auth()`. El coste/beneficio no justifica el riesgo en este momento.
-
-### No convertir `TenantContext.withTransaction` a HOF funcional
-
-La jerarquía `TenantContext → AuthenticatedContext → ApiKeyContext` con `withTransaction` sobrescrito para añadir `SET LOCAL app.current_user_id` en el contexto autenticado es el patrón correcto. Aplanarlo perdería la claridad de qué SET LOCALs se aplican en cada contexto.
+`TipologiaSyncService.syncInTx()` se llama desde dentro del repositorio. La alternativa (mover la orquestación a un servicio de aplicación) requiere refactorizar la página de edición y los tests asociados. El coste supera el beneficio dado que el servicio está bien encapsulado y el acoplamiento es explícito.
 
 ---
 
 ## 15. Roadmap de Ejecución
 
-### Fase 1 — Inmediato (esta semana)
+### Fase 1 — Inmediato (hoy, antes de merge)
 
-- [x] [QW-01] Eliminar dead import `PaginatedResult` en `catalog.repository.ts` — **5m**
-- [x] [QW-02] Unificar `CATALOG_SELECT_COLUMNS` con `PROMOCION_SELECT_COLUMNS` — **15m**
-- [x] [QW-03] Columnas explícitas en `UserRepository.select()` — **45m**
+- [ ] [DT-01 / QW-01] Añadir `turnstileToken` al dep array de `useCallback` en `ContactForm` — 10 min
+- [ ] [DT-04 / QW-02] Renumerar paso "2." duplicado en `submit-contact.action.ts` — 5 min
 
-### Fase 2 — Corto plazo (próximo mes)
+### Fase 2 — Corto plazo (próximo sprint)
 
-- [x] [R-01] Unificar tipos `TipologiaPayload`/`UnidadPayload` en `src/shared/types/tipologia-schema.ts` — **30m**
-- [x] [R-02] Test de integración de login rate limiting — **1h**
-- [x] [DT-06] Test que verifica que `UserRepository.findAll` no incluye `passwordHash` en el resultado — **30m**
+- [ ] [DT-02 / R-01] Sanitización de atributos de evento en `BlockDescripcion` — 1-2h
+- [ ] [DT-03 / R-02] Tests unitarios para `verifyTurnstileToken` — 1h
+- [ ] [DT-07] Test de `ContactFormGeneric` que verifique el hidden input de Turnstile — 30 min
 
-### Fase 3 — Medio plazo (cuando el catálogo escale)
+### Fase 3 — Medio plazo (backlog)
 
-- [ ] [P-LOW-01] Reescribir filtros EXISTS en `findPublicWithCursor` como JOIN único si el catálogo supera 500 promociones — **3-4h**
+- [ ] [DT-05] Limpiar castings `as unknown as` en componentes del backoffice — 2h
+- [ ] [DT-06] Decisión de producto sobre feature `favorites` — 30 min
 
 ### No planificado
 
-- Migración NextAuth v4 → v5 — coste > beneficio; posponerlo a cuando sea forzoso por breaking change
-- Unificar "unread leads" en un servicio único — tres implementaciones con casos de uso distintos
-- Reescribir cursor pagination de precio con CTE compleja — no hay problema real de performance
+- Reducción de `LeadRepository` — no recomendado (ver §14)
+- Separación de `ContactForm`/`ContactFormGeneric` en base común — no recomendado (ver §14)
 
 ---
 
@@ -426,18 +421,18 @@ La jerarquía `TenantContext → AuthenticatedContext → ApiKeyContext` con `wi
 
 | Dimensión | /10 | Notas |
 |-----------|-----|-------|
-| Arquitectura | 9 | Separación SRP correcta post-refactor; CatalogRepository + TipologiaSyncService bien delimitados |
-| Simplicidad | 9 | Código limpio; EXISTS subqueries son la única complejidad aceptable por naturaleza del dominio |
-| Mantenibilidad | 10 | Tipos `TipologiaPayload`/`UnidadPayload` unificados, `PROMOCION_SELECT_COLUMNS` compartido — DRY resuelto |
-| Cohesión | 9 | Cada módulo tiene propósito claro y no mezcla responsabilidades |
-| Acoplamiento | 9 | DI explícita, TenantContext por constructor, sin dependencias circulares detectadas |
-| Legibilidad | 10 | Nombres expresivos, comentarios útiles, convenciones consistentes en todo el proyecto |
-| Calidad del diseño | 9 | Enums centralizados, cursor pagination, email queue, contrato de API correctamente versionado |
-| Testing | 10 | Cinco capas de test + rate-limit middleware integration + passwordHash contract test; cobertura completa |
-| Seguridad | 10 | `UserRepository` usa columnas explícitas sin `passwordHash` en `.select()` — riesgo eliminado |
-| Deuda técnica | 10 | Dead import eliminado, columnas duplicadas unificadas, tipos de payload centralizados, tests faltantes añadidos |
-| **Total** | **97/100** | |
+| Arquitectura | 9 | Dependencia invertida eliminada; la feature favorites sigue siendo minor debt |
+| Simplicidad | 8 | Stale closure en Turnstile; extracción del hook de validación correcta |
+| Mantenibilidad | 8 | Tests de dominio robustos; falta cobertura de Turnstile |
+| Cohesión | 8 | Bounded contexts bien definidos; `LeadRepository` largo pero cohesionado |
+| Acoplamiento | 9 | Sin inversiones de dependencia; `TipologiaSyncService` en su capa correcta |
+| Legibilidad | 9 | Código bien nombrado; el índice duplicado es cosmético |
+| Calidad del diseño | 8 | Schema base unificado; el casting en backoffice persiste |
+| Testing | 8 | T026 nuevo y robusto; Turnstile sin cobertura de tests |
+| Seguridad | 7 | CAPTCHA implementado pero con bug que lo hace inoperativo en prod; XSS HTML pendiente |
+| Deuda técnica | 9 | Mayoría de deuda crítica anterior resuelta; 1 deuda crítica nueva (stale closure) |
+| **Total** | **83/100** | |
 
-**Calificación:** A+
+**Calificación:** B+
 
-**Justificación:** Domio ha alcanzado A+ tras resolver todos los hallazgos críticos y altos de las auditorías anteriores. El sistema de tenant isolation es ejemplar, la suite de tests es una de las más completas que se puede implementar con este stack, y la calidad de código es consistentemente alta. Los únicos hallazgos residuales son menores: un `.select()` sin columnas explícitas que expone `passwordHash` en memoria (resuelto con QW-03), y dos tipos duplicados con estructura idéntica (R-01). La nota baja de 91 respecto al máximo teórico refleja estas deudas menores y la ausencia de dos tests de integración específicos. No hay nada que bloquee producción ni seguridad actualmente.
+**Justificación:** La rama cierra 10 de las 14 deudas identificadas en la auditoría anterior, incluyendo todas las de Fase 1. El score sube de 76 a 83 (7 puntos). Los 17 puntos restantes para llegar a A se distribuyen: 3 puntos por el stale closure en Turnstile (bug crítico, fix de 10 minutos), 4 puntos por la sanitización de HTML pendiente, 3 puntos por los castings de tipo en el backoffice, y 7 puntos por cobertura de tests en el nuevo subsistema Turnstile. Un sprint de 4 horas resuelve el crítico (10 min) y la cobertura de tests (2h), subiendo el score a ~88 (A-).

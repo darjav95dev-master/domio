@@ -10,6 +10,7 @@ import {
 import { contactFormSchema } from "../schemas/contact-form.schema";
 import { createLeadAction } from "../server/create-lead-action";
 import { setConsentCookie } from "../server/consent-actions";
+import { TurnstileWidget } from "@/shared/components/TurnstileWidget";
 import type { TipologiaWithUnidades } from "@/infrastructure/db/repositories/promocion.repository";
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,7 @@ export function ContactForm({ promocionId, tipologias }: ContactFormProps) {
   });
   const formRef = useRef<HTMLFormElement>(null);
   const liveRef = useRef<HTMLDivElement>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Scroll feedback into view on state change
   useEffect(() => {
@@ -78,6 +80,7 @@ export function ContactForm({ promocionId, tipologias }: ContactFormProps) {
       const result = await createLeadAction({
         ...parsed.data,
         promocionId,
+        turnstileToken: turnstileToken ?? undefined,
       });
 
       if (result.success) {
@@ -303,6 +306,9 @@ export function ContactForm({ promocionId, tipologias }: ContactFormProps) {
           </p>
         )}
       </div>
+
+      {/* Turnstile CAPTCHA */}
+      <TurnstileWidget onToken={setTurnstileToken} />
 
       {/* Submit */}
       <button

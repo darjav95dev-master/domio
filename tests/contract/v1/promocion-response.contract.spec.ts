@@ -137,6 +137,22 @@ describe("Promocion Response Contract (v1)", () => {
       const result = promocionResponseSchema.safeParse(serialized);
       expect(result.success).toBe(true);
     });
+
+    it("AREA serialized response contains locationApprox but NOT exact location", () => {
+      const row = { ...baseRow, mapPrivacyMode: "AREA" as const };
+      const serialized = serializePromocion(row);
+      // Exact location must NOT be present in AREA mode
+      expect(serialized.location).toBeUndefined();
+      // locationApprox must always be present
+      expect(serialized.locationApprox).toEqual({ lat: 28.468, lng: -16.254 });
+      // Full schema validation
+      const validated = promocionResponseSchema.safeParse(serialized);
+      expect(validated.success).toBe(true);
+      if (validated.success) {
+        expect(validated.data.location).toBeUndefined();
+        expect(validated.data.locationApprox).toBeDefined();
+      }
+    });
   });
 
   describe("Cursor pagination format", () => {
