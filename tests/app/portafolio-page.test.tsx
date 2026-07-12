@@ -52,10 +52,10 @@ describe("PortafolioPage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Promociones" }),
+      screen.getByRole("heading", { level: 1, name: /tu próxima casa te espera aquí/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/explora nuestra selección de inmuebles/i),
+      screen.getByText(/venta y alquiler de inmuebles en toda canarias/i),
     ).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe("PortafolioPage", () => {
     );
 
     expect(
-      screen.getByRole("search", { name: /filtrar propiedades/i }),
+      screen.getByRole("search", { name: /filtrar promociones/i }),
     ).toBeInTheDocument();
   });
 

@@ -85,11 +85,11 @@ describe("TypologyTable", () => {
     render(<TypologyTable promocion={promocion} />);
 
     // Check headers
-    expect(screen.getByText("Nombre")).toBeInTheDocument();
+    expect(screen.getByText("Tipología")).toBeInTheDocument();
     expect(screen.getByText("Superficie")).toBeInTheDocument();
     expect(screen.getByText("Dorm.")).toBeInTheDocument();
     expect(screen.getByText("Baños")).toBeInTheDocument();
-    expect(screen.getByText("Precio")).toBeInTheDocument();
+    expect(screen.getByText("Desde")).toBeInTheDocument();
     expect(screen.getByText("Estado")).toBeInTheDocument();
     expect(screen.getByText("Plano")).toBeInTheDocument();
   });

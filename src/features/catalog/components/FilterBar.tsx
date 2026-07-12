@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFilters } from "@/features/catalog/hooks/useFilters";
 import { cn } from "@/shared/utils/cn";
 import {
@@ -21,7 +21,6 @@ import {
 // ---------------------------------------------------------------------------
 
 export interface FilterBarProps {
-  /** Initial filter values passed from the server. */
   initialFilters?: {
     island?: string;
     municipality?: string;
@@ -36,36 +35,25 @@ export interface FilterBarProps {
   };
 }
 
+interface Option {
+  value: string;
+  label: string;
+}
+
 // ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
 
-const BEDROOM_OPTIONS = [
-  { value: "1", label: "1+" },
-  { value: "2", label: "2+" },
-  { value: "3", label: "3+" },
-  { value: "4", label: "4+" },
-  { value: "5", label: "5+" },
-];
+const OPERATION_OPTS: Option[] = OPERATION_TYPES.filter(
+  (o) => o !== "SALE_AND_RENT",
+).map((o) => ({ value: o, label: OPERATION_TYPE_LABELS[o] }));
 
-const BATHROOM_OPTIONS = [
-  { value: "1", label: "1+" },
-  { value: "2", label: "2+" },
-  { value: "3", label: "3+" },
-];
+const TYPE_OPTS: Option[] = PROPERTY_TYPES.map((t) => ({
+  value: t,
+  label: PROPERTY_TYPE_LABELS[t],
+}));
 
-const PRICE_OPTIONS = [
-  { value: "50000", label: "50.000 €" },
-  { value: "100000", label: "100.000 €" },
-  { value: "150000", label: "150.000 €" },
-  { value: "200000", label: "200.000 €" },
-  { value: "300000", label: "300.000 €" },
-  { value: "500000", label: "500.000 €" },
-  { value: "750000", label: "750.000 €" },
-  { value: "1000000", label: "1.000.000 €" },
-];
-
-const ISLAND_OPTIONS = [
+const ISLAND_OPTS: Option[] = [
   "Tenerife",
   "Gran Canaria",
   "Lanzarote",
@@ -73,9 +61,9 @@ const ISLAND_OPTIONS = [
   "La Palma",
   "La Gomera",
   "El Hierro",
-];
+].map((i) => ({ value: i, label: i }));
 
-const MUNICIPALITY_OPTIONS = [
+const MUNICIPALITY_OPTS: Option[] = [
   "Santa Cruz de Tenerife",
   "San Cristóbal de La Laguna",
   "Adeje",
@@ -86,34 +74,51 @@ const MUNICIPALITY_OPTIONS = [
   "Candelaria",
   "Tacoronte",
   "Güímar",
+].map((m) => ({ value: m, label: m }));
+
+const STATUS_OPTS: Option[] = CONSTRUCTION_STATUSES.map((s) => ({
+  value: s,
+  label: CONSTRUCTION_STATUS_LABELS[s],
+}));
+
+const BEDROOM_OPTS: Option[] = [1, 2, 3, 4].map((n) => ({
+  value: String(n),
+  label: `${n}+`,
+}));
+
+const BATHROOM_OPTS: Option[] = [1, 2, 3].map((n) => ({
+  value: String(n),
+  label: `${n}+`,
+}));
+
+const PRICE_OPTS: Option[] = [
+  { value: "50000", label: "50.000 €" },
+  { value: "100000", label: "100.000 €" },
+  { value: "150000", label: "150.000 €" },
+  { value: "200000", label: "200.000 €" },
+  { value: "300000", label: "300.000 €" },
+  { value: "500000", label: "500.000 €" },
+  { value: "750000", label: "750.000 €" },
+  { value: "1000000", label: "1.000.000 €" },
 ];
 
-// ---------------------------------------------------------------------------
-// Label helpers
-// ---------------------------------------------------------------------------
-
-function propertyTypeLabel(value: string): string {
-  return (
-    PROPERTY_TYPE_LABELS[value as keyof typeof PROPERTY_TYPE_LABELS] ?? value
-  );
+function priceShort(v: number): string {
+  return v >= 1000000 ? `${v / 1000000}M` : `${v / 1000}k`;
 }
 
-function operationLabel(value: string): string {
-  return (
-    OPERATION_TYPE_LABELS[value as keyof typeof OPERATION_TYPE_LABELS] ?? value
-  );
+/** Counts how many of the given values are truthy (active filters). */
+function countTruthy(...values: unknown[]): number {
+  return values.reduce<number>((n, v) => n + (v ? 1 : 0), 0);
 }
 
-function statusLabel(value: string): string {
-  return (
-    CONSTRUCTION_STATUS_LABELS[
-      value as keyof typeof CONSTRUCTION_STATUS_LABELS
-    ] ?? value
-  );
-}
-
-function amenityLabel(value: string): string {
-  return AMENITY_LABELS[value as keyof typeof AMENITY_LABELS] ?? value;
+/** Builds the price pill label from the min/max bounds. */
+function getPriceLabel(priceMin?: number, priceMax?: number): string {
+  if (priceMin && priceMax) {
+    return `${priceShort(priceMin)}–${priceShort(priceMax)} €`;
+  }
+  if (priceMin) return `Desde ${priceShort(priceMin)} €`;
+  if (priceMax) return `Hasta ${priceShort(priceMax)} €`;
+  return "Precio";
 }
 
 // ---------------------------------------------------------------------------
@@ -121,331 +126,413 @@ function amenityLabel(value: string): string {
 // ---------------------------------------------------------------------------
 
 export function FilterBar({ initialFilters }: FilterBarProps) {
-  const { filters, setFilter, toggleAmenity, clearFilters } =
-    useFilters();
+  const { filters, setFilter, toggleAmenity, clearFilters } = useFilters();
 
-  // Merge URL-derived filters with optional initialFilters (server-side)
-  const currentIsland = filters.island ?? initialFilters?.island;
-  const currentMunicipality = filters.municipality ?? initialFilters?.municipality;
-  const currentPropertyType = filters.propertyType ?? initialFilters?.propertyType;
-  const currentOperation = filters.operation ?? initialFilters?.operation;
-  const currentPriceMin = filters.priceMin ?? initialFilters?.priceMin;
-  const currentPriceMax = filters.priceMax ?? initialFilters?.priceMax;
-  const currentBedrooms = filters.bedrooms ?? initialFilters?.bedrooms;
-  const currentBathrooms = filters.bathrooms ?? initialFilters?.bathrooms;
-  const currentAmenities = filters.amenities.length > 0
-    ? filters.amenities
-    : (initialFilters?.amenities ?? []);
-  const currentStatus =
-    filters.constructionStatus ?? initialFilters?.constructionStatus;
+  const island = filters.island ?? initialFilters?.island;
+  const municipality = filters.municipality ?? initialFilters?.municipality;
+  const propertyType = filters.propertyType ?? initialFilters?.propertyType;
+  const operation = filters.operation ?? initialFilters?.operation;
+  const priceMin = filters.priceMin ?? initialFilters?.priceMin;
+  const priceMax = filters.priceMax ?? initialFilters?.priceMax;
+  const bedrooms = filters.bedrooms ?? initialFilters?.bedrooms;
+  const bathrooms = filters.bathrooms ?? initialFilters?.bathrooms;
+  const amenities =
+    filters.amenities.length > 0 ? filters.amenities : (initialFilters?.amenities ?? []);
+  const status = filters.constructionStatus ?? initialFilters?.constructionStatus;
 
-  // -- Handlers ---------------------------------------------------------------
-
-  const handleSelect = (key: string) => (e: ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setFilter(key as Parameters<typeof setFilter>[0], val || undefined);
-  };
-
-  const handlePrice = (key: "priceMin" | "priceMax") =>
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      const val = e.target.value;
-      setFilter(key, val ? Number(val) : undefined);
-    };
-
-  const handleAmenityToggle = (amenity: string) => () => {
-    toggleAmenity(amenity);
-  };
-
-  // -- Compute active count from merged values --------------------------------
-  const localActiveCount = [
-    currentIsland,
-    currentMunicipality,
-    currentPropertyType,
-    currentOperation,
-    currentPriceMin,
-    currentPriceMax,
-    currentBedrooms,
-    currentBathrooms,
-    currentStatus,
-    currentAmenities.length > 0 ? "amenities" : undefined,
-  ].filter(Boolean).length;
-
-  // -- Build active chips -----------------------------------------------------
-
-  const activeChips: Array<{ key: string; label: string }> = [];
-  if (currentIsland) activeChips.push({ key: "island", label: currentIsland });
-  if (currentMunicipality)
-    activeChips.push({ key: "municipality", label: currentMunicipality });
-  if (currentPropertyType)
-    activeChips.push({
-      key: "propertyType",
-      label: propertyTypeLabel(currentPropertyType),
-    });
-  if (currentOperation)
-    activeChips.push({
-      key: "operation",
-      label: operationLabel(currentOperation),
-    });
-  if (currentStatus)
-    activeChips.push({
-      key: "constructionStatus",
-      label: statusLabel(currentStatus),
-    });
-
-  // -- Shared select field class ---------------------------------------------
-
-  const selectClass = cn(
-    "w-full min-w-[140px] rounded-control border bg-bg-surface px-4 py-3",
-    "font-sans text-base text-fg-default",
-    "transition-colors duration-standard ease-standard",
-    "hover:border-border-strong focus:border-accent-default",
-    "focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3",
+  const moreCount = countTruthy(
+    municipality,
+    bathrooms,
+    status,
+    amenities.length > 0,
   );
 
-  // -- Render ---------------------------------------------------------------
+  const totalActive =
+    countTruthy(island, propertyType, operation, priceMin, priceMax, bedrooms) +
+    moreCount;
+
+  const priceLabel = getPriceLabel(priceMin, priceMax);
 
   return (
-    <form
+    <section
       role="search"
-      aria-label="Filtrar propiedades"
-      onSubmit={(e) => e.preventDefault()}
-      className={cn(
-        "sticky top-0 z-sticky rounded-surface bg-bg-surface",
-        "border border-border-subtle p-inline-md pb-stack-sm",
-        "shadow-[0_1px_2px_rgba(var(--shadow-tint),0.04)]",
-      )}
+      aria-label="Filtrar promociones"
+      className="mx-auto flex max-w-[960px] flex-wrap items-center justify-center gap-2.5"
     >
-      {/* Filter row */}
-      <div className="flex flex-wrap items-end gap-4">
-        {/* Island */}
-        <FieldWrapper label="Isla">
-          <select
-            aria-label="Isla"
-            value={currentIsland ?? ""}
-            onChange={handleSelect("island")}
-            className={selectClass}
-          >
-            <option value="">Todas las islas</option>
-            {ISLAND_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
+      <SingleSelect
+        placeholder="Operación"
+        allLabel="Todas las operaciones"
+        value={operation}
+        options={OPERATION_OPTS}
+        onChange={(v) => setFilter("operation", v)}
+      />
+      <SingleSelect
+        placeholder="Tipo"
+        allLabel="Todos los tipos"
+        value={propertyType}
+        options={TYPE_OPTS}
+        onChange={(v) => setFilter("propertyType", v)}
+      />
+      <SingleSelect
+        placeholder="Isla"
+        allLabel="Todas las islas"
+        value={island}
+        options={ISLAND_OPTS}
+        onChange={(v) => setFilter("island", v)}
+      />
+      <SingleSelect
+        placeholder="Dormitorios"
+        allLabel="Cualquiera"
+        value={bedrooms != null ? String(bedrooms) : undefined}
+        options={BEDROOM_OPTS}
+        onChange={(v) => setFilter("bedrooms", v ? Number(v) : undefined)}
+      />
 
-        {/* Municipality */}
-        <FieldWrapper label="Municipio">
-          <select
-            aria-label="Municipio"
-            value={currentMunicipality ?? ""}
-            onChange={handleSelect("municipality")}
-            className={selectClass}
-          >
-            <option value="">Todos los municipios</option>
-            {MUNICIPALITY_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-
-        {/* Property type */}
-        <FieldWrapper label="Tipo">
-          <select
-            aria-label="Tipo"
-            value={currentPropertyType ?? ""}
-            onChange={handleSelect("propertyType")}
-            className={selectClass}
-          >
-            <option value="">Todos los tipos</option>
-            {PROPERTY_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {propertyTypeLabel(t)}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-
-        {/* Operation */}
-        <FieldWrapper label="Operación">
-          <select
-            aria-label="Operación"
-            value={currentOperation ?? ""}
-            onChange={handleSelect("operation")}
-            className={selectClass}
-          >
-            <option value="">Todas</option>
-            {OPERATION_TYPES.map((o) => (
-              <option key={o} value={o}>
-                {operationLabel(o)}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-
-        {/* Price range */}
-        <FieldWrapper label="Precio mín.">
-          <select
-            aria-label="Precio mín."
-            value={currentPriceMin ?? ""}
-            onChange={handlePrice("priceMin")}
-            className={selectClass}
-          >
-            <option value="">Mínimo</option>
-            {PRICE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-
-        <FieldWrapper label="Precio máx.">
-          <select
-            aria-label="Precio máx."
-            value={currentPriceMax ?? ""}
-            onChange={handlePrice("priceMax")}
-            className={selectClass}
-          >
-            <option value="">Máximo</option>
-            {PRICE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-
-        {/* Bedrooms */}
-        <FieldWrapper label="Dormitorios">
-          <select
-            aria-label="Dormitorios"
-            value={currentBedrooms ?? ""}
-            onChange={handleSelect("bedrooms")}
-            className={selectClass}
-          >
-            <option value="">Cualquiera</option>
-            {BEDROOM_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-
-        {/* Bathrooms */}
-        <FieldWrapper label="Baños">
-          <select
-            aria-label="Baños"
-            value={currentBathrooms ?? ""}
-            onChange={handleSelect("bathrooms")}
-            className={selectClass}
-          >
-            <option value="">Cualquiera</option>
-            {BATHROOM_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-
-        {/* Construction status */}
-        <FieldWrapper label="Estado de obra">
-          <select
-            aria-label="Estado de obra"
-            value={currentStatus ?? ""}
-            onChange={handleSelect("constructionStatus")}
-            className={selectClass}
-          >
-            <option value="">Cualquiera</option>
-            {CONSTRUCTION_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {statusLabel(s)}
-              </option>
-            ))}
-          </select>
-        </FieldWrapper>
-      </div>
-
-      {/* Control row ---------------------------------------------------------- */}
-      <div className="mt-6 flex flex-wrap items-center gap-4">
-        {/* Amenities checkboxes */}
-        <fieldset className="flex flex-wrap items-center gap-3">
-          <legend className="mb-1 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
-            Servicios
-          </legend>
-          <div className="flex flex-wrap gap-3">
-            {AMENITIES.slice(0, 3).map((amenity) => (
-              <label
-                key={amenity}
-                className="flex cursor-pointer items-center gap-2 font-sans text-sm text-fg-muted"
-              >
-                <input
-                  type="checkbox"
-                  checked={currentAmenities.includes(amenity)}
-                  onChange={handleAmenityToggle(amenity)}
-                  className="h-4 w-4 accent-accent-default"
-                />
-                {amenityLabel(amenity)}
-              </label>
-            ))}
+      {/* Precio — custom range dropdown */}
+      <Dropdown triggerLabel={priceLabel} active={!!(priceMin || priceMax)}>
+        {() => (
+          <div className="flex gap-3">
+            <PriceColumn
+              heading="Desde"
+              value={priceMin}
+              onSelect={(v) => setFilter("priceMin", v)}
+            />
+            <PriceColumn
+              heading="Hasta"
+              value={priceMax}
+              onSelect={(v) => setFilter("priceMax", v)}
+            />
           </div>
-        </fieldset>
-
-        {/* Active filters count or clear button */}
-        {localActiveCount > 0 && (
-          <button
-            type="button"
-            onClick={clearFilters}
-            className={cn(
-              "ml-auto font-sans text-sm text-accent-default",
-              "underline decoration-accent-default/30 decoration-1 underline-offset-2",
-              "transition-colors duration-standard ease-standard",
-              "hover:decoration-accent-default",
-            )}
-          >
-            Limpiar filtros ({localActiveCount})
-          </button>
         )}
-      </div>
+      </Dropdown>
 
-      {/* Active chips --------------------------------------------------------- */}
-      {activeChips.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2" aria-live="polite">
-          {activeChips.map((chip) => (
-            <span
-              key={chip.key}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-pill px-3 py-1",
-                "border border-accent-default bg-accent-subtle",
-                "font-sans text-sm text-accent-default",
-              )}
-            >
-              {chip.label}
+      {/* Más filtros — municipio, baños, estado, servicios */}
+      <Dropdown triggerLabel="Más filtros" active={moreCount > 0} badge={moreCount} panelWidth="w-[300px]">
+        {(close) => (
+          <div className="flex flex-col gap-4 p-1">
+            <PanelField label="Municipio">
+              <div className="flex max-h-[150px] flex-col overflow-auto">
+                <OptionRow selected={!municipality} onClick={() => setFilter("municipality", undefined)}>
+                  Todos los municipios
+                </OptionRow>
+                {MUNICIPALITY_OPTS.map((o) => (
+                  <OptionRow
+                    key={o.value}
+                    selected={municipality === o.value}
+                    onClick={() => setFilter("municipality", o.value)}
+                  >
+                    {o.label}
+                  </OptionRow>
+                ))}
+              </div>
+            </PanelField>
+
+            <PanelField label="Baños">
+              <ChipRow
+                options={BATHROOM_OPTS}
+                value={bathrooms != null ? String(bathrooms) : undefined}
+                allLabel="Cualquiera"
+                onSelect={(v) => setFilter("bathrooms", v ? Number(v) : undefined)}
+              />
+            </PanelField>
+
+            <PanelField label="Estado de obra">
+              <ChipRow
+                options={STATUS_OPTS}
+                value={status}
+                allLabel="Cualquiera"
+                onSelect={(v) => setFilter("constructionStatus", v)}
+              />
+            </PanelField>
+
+            <PanelField label="Servicios">
+              <ul className="flex flex-col gap-0.5">
+                {AMENITIES.map((a) => (
+                  <li key={a}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 font-sans text-sm text-fg-muted transition-colors hover:bg-bg-surface-sunken">
+                      <input
+                        type="checkbox"
+                        checked={amenities.includes(a)}
+                        onChange={() => toggleAmenity(a)}
+                        className="h-4 w-4 accent-accent-default"
+                      />
+                      {AMENITY_LABELS[a as keyof typeof AMENITY_LABELS] ?? a}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </PanelField>
+
+            {moreCount > 0 && (
               <button
                 type="button"
-                onClick={() => setFilter(chip.key as Parameters<typeof setFilter>[0], undefined)}
-                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] leading-none transition-colors hover:bg-accent-default/20"
-                aria-label={`Quitar filtro ${chip.label}`}
+                onClick={() => {
+                  clearFilters();
+                  close();
+                }}
+                className="self-start font-sans text-[13px] text-accent-default underline decoration-accent-default/30 underline-offset-2 transition-colors hover:decoration-accent-default"
               >
-                ×
+                Limpiar estos filtros
               </button>
-            </span>
-          ))}
-        </div>
+            )}
+          </div>
+        )}
+      </Dropdown>
+
+      {totalActive > 0 && (
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="ml-1 font-sans text-[13px] text-accent-default underline decoration-accent-default/30 underline-offset-2 transition-colors hover:decoration-accent-default"
+        >
+          Limpiar ({totalActive})
+        </button>
       )}
-    </form>
+    </section>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Field wrapper
+// Custom dropdown primitives — styled with the site's own typography/tokens
 // ---------------------------------------------------------------------------
 
-function FieldWrapper({
+function useOutsideClose(open: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+  return ref;
+}
+
+function Dropdown({
+  triggerLabel,
+  active,
+  badge,
+  panelWidth = "min-w-[200px]",
+  children,
+}: {
+  triggerLabel: string;
+  active: boolean;
+  badge?: number;
+  panelWidth?: string;
+  children: (close: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const ref = useOutsideClose(open, close);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={triggerLabel}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "inline-flex items-center gap-2 whitespace-nowrap rounded-pill border px-4 py-[9px]",
+          "font-sans text-[13.5px] font-medium transition-colors duration-standard ease-standard",
+          "focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-2",
+          active || open
+            ? "border-fg-default bg-bg-surface text-fg-default"
+            : "border-border-default bg-bg-surface text-fg-muted hover:border-fg-default hover:text-fg-default",
+        )}
+      >
+        <span>{triggerLabel}</span>
+        {badge ? (
+          <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent-default px-1 font-mono text-[10px] leading-none text-white">
+            {badge}
+          </span>
+        ) : null}
+        <Chevron open={open} />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className={cn(
+            "absolute left-1/2 top-full z-dropdown mt-2 -translate-x-1/2 rounded-surface border border-border-default bg-bg-surface p-1.5",
+            "shadow-[0_12px_32px_rgba(var(--shadow-tint),0.16)]",
+            panelWidth,
+          )}
+        >
+          {children(close)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SingleSelect({
+  placeholder,
+  allLabel,
+  value,
+  options,
+  onChange,
+}: {
+  placeholder: string;
+  allLabel: string;
+  value: string | undefined;
+  options: Option[];
+  onChange: (value: string | undefined) => void;
+}) {
+  const current = options.find((o) => o.value === value);
+  return (
+    <Dropdown triggerLabel={current ? current.label : placeholder} active={!!value}>
+      {(close) => (
+        <div className="flex max-h-[300px] min-w-[190px] flex-col overflow-auto">
+          <OptionRow
+            selected={!value}
+            onClick={() => {
+              onChange(undefined);
+              close();
+            }}
+          >
+            {allLabel}
+          </OptionRow>
+          {options.map((o) => (
+            <OptionRow
+              key={o.value}
+              selected={value === o.value}
+              onClick={() => {
+                onChange(o.value);
+                close();
+              }}
+            >
+              {o.label}
+            </OptionRow>
+          ))}
+        </div>
+      )}
+    </Dropdown>
+  );
+}
+
+function OptionRow({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left",
+        "font-sans text-sm transition-colors duration-quick ease-standard",
+        selected
+          ? "bg-accent-subtle font-medium text-accent-default"
+          : "text-fg-muted hover:bg-bg-surface-sunken hover:text-fg-default",
+      )}
+    >
+      <span>{children}</span>
+      {selected && <Check />}
+    </button>
+  );
+}
+
+function PriceColumn({
+  heading,
+  value,
+  onSelect,
+}: {
+  heading: string;
+  value: number | undefined;
+  onSelect: (value: number | undefined) => void;
+}) {
+  return (
+    <div className="min-w-[130px]">
+      <p className="mb-1.5 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-fg-subtle">
+        {heading}
+      </p>
+      <div className="flex max-h-[240px] flex-col overflow-auto">
+        <OptionRow selected={!value} onClick={() => onSelect(undefined)}>
+          Sin límite
+        </OptionRow>
+        {PRICE_OPTS.map((o) => (
+          <OptionRow
+            key={o.value}
+            selected={value === Number(o.value)}
+            onClick={() => onSelect(Number(o.value))}
+          >
+            {o.label}
+          </OptionRow>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChipRow({
+  options,
+  value,
+  allLabel,
+  onSelect,
+}: {
+  options: Option[];
+  value: string | undefined;
+  allLabel: string;
+  onSelect: (value: string | undefined) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <MiniChip active={!value} onClick={() => onSelect(undefined)}>
+        {allLabel}
+      </MiniChip>
+      {options.map((o) => (
+        <MiniChip key={o.value} active={value === o.value} onClick={() => onSelect(o.value)}>
+          {o.label}
+        </MiniChip>
+      ))}
+    </div>
+  );
+}
+
+function MiniChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "rounded-pill px-3 py-1 font-sans text-[12.5px] font-medium transition-colors duration-quick ease-standard",
+        active
+          ? "bg-fg-default text-bg-canvas"
+          : "border border-border-default text-fg-muted hover:border-fg-default hover:text-fg-default",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PanelField({
   label,
   children,
 }: {
@@ -453,11 +540,44 @@ function FieldWrapper({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-stack-xs">
-      <span className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
+    <div>
+      <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-fg-subtle">
         {label}
-      </span>
+      </p>
       {children}
     </div>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={cn(
+        "h-3 w-3 shrink-0 text-fg-subtle transition-transform duration-standard",
+        open && "rotate-180",
+      )}
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      aria-hidden="true"
+    >
+      <path d="M2.5 4.5 6 8l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Check() {
+  return (
+    <svg
+      className="h-3.5 w-3.5 shrink-0 text-accent-default"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d="m3 8 3.5 3.5L13 5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

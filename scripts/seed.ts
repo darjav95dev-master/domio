@@ -799,7 +799,7 @@ const GLOBAL_CONTENT_BLOCKS_SEED = [
     pageKey: "home" as const,
     blockKey: "hero" as const,
     payload: {
-      claim: "Tu hogar en Canarias empieza aquí",
+      claim: "Tu hogar en Canarias, sin *complicaciones*. Sin sorpresas.",
       lead: "Descubre las mejores propiedades en Tenerife. Venta y alquiler de pisos, áticos, chalets y locales comerciales con el respaldo de Domio.",
       ctaPrimary: "Ver propiedades",
       ctaSecondary: "Contactar",
@@ -847,6 +847,59 @@ const GLOBAL_CONTENT_BLOCKS_SEED = [
           titulo: "Propiedad intelectual",
           contenido:
             "Todos los contenidos del sitio web, incluyendo a título enunciativo textos, imágenes, logotipos, iconos y software, son propiedad de Domio Inmobiliaria o de terceros que han autorizado su uso, y están protegidos por las leyes de propiedad intelectual e industrial. Queda prohibida la reproducción total o parcial sin autorización expresa de su titular.",
+        },
+      ],
+    },
+  },
+  {
+    pageKey: "privacidad" as const,
+    blockKey: "contenido" as const,
+    payload: {
+      titulo: "Política de Privacidad",
+      secciones: [
+        {
+          titulo: "Responsable del tratamiento",
+          contenido:
+            "Domio Inmobiliaria, con CIF B-12345678 y domicilio en Santa Cruz de Tenerife, es responsable del tratamiento de los datos personales que nos facilitas a través de este sitio web. Puedes contactar con nosotros en info@domio.es para cualquier cuestión relacionada con tus datos.",
+        },
+        {
+          titulo: "Datos que recopilamos y finalidad",
+          contenido:
+            "Tratamos los datos que nos proporcionas a través de los formularios de contacto y de solicitud de información (nombre, teléfono, correo electrónico y el mensaje que nos envías) con la finalidad de atender tu consulta, gestionar visitas y ofrecerte información sobre inmuebles que puedan interesarte. La base legal es tu consentimiento y el interés legítimo en atender tu solicitud.",
+        },
+        {
+          titulo: "Conservación y cesión de datos",
+          contenido:
+            "Conservamos tus datos durante el tiempo necesario para atender tu solicitud y, posteriormente, durante los plazos legalmente exigibles. No cedemos tus datos a terceros salvo obligación legal o cuando sea imprescindible para prestarte el servicio solicitado.",
+        },
+        {
+          titulo: "Tus derechos",
+          contenido:
+            "Puedes ejercer en cualquier momento tus derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiéndonos a info@domio.es. Asimismo, tienes derecho a presentar una reclamación ante la Agencia Española de Protección de Datos si consideras que el tratamiento no se ajusta a la normativa vigente.",
+        },
+      ],
+    },
+  },
+  {
+    pageKey: "cookies" as const,
+    blockKey: "contenido" as const,
+    payload: {
+      titulo: "Política de Cookies",
+      secciones: [
+        {
+          titulo: "Qué son las cookies",
+          contenido:
+            "Las cookies son pequeños archivos de texto que los sitios web almacenan en tu dispositivo cuando los visitas. Sirven para que la página funcione correctamente, recordar tus preferencias y obtener información estadística sobre el uso del sitio.",
+        },
+        {
+          titulo: "Cookies que utilizamos",
+          contenido:
+            "Utilizamos cookies técnicas, necesarias para el funcionamiento del sitio y la navegación entre secciones, y cookies de medición que nos ayudan a entender de forma anónima cómo se usa la web para mejorarla. No utilizamos cookies con fines publicitarios ni de perfilado.",
+        },
+        {
+          titulo: "Cómo gestionar las cookies",
+          contenido:
+            "Puedes permitir, bloquear o eliminar las cookies instaladas en tu equipo configurando las opciones de tu navegador. Ten en cuenta que, si desactivas las cookies técnicas, es posible que algunas funciones del sitio no estén disponibles.",
         },
       ],
     },

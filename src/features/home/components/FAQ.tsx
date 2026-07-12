@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useId } from "react";
+import Link from "next/link";
 import type { FAQPayload } from "@/features/home/types";
 
 interface FAQProps {
@@ -17,24 +18,33 @@ export function FAQ({ data }: FAQProps) {
   };
 
   return (
-    <section className="py-section-lg px-6 md:px-[56px] bg-bg-surface-sunken" aria-labelledby="faq-title">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-12 lg:gap-16">
+    <section id="faq" className="scroll-mt-[80px] py-section-lg px-6 md:px-[56px] bg-bg-canvas" aria-labelledby="faq-title">
+      <div className="max-w-[1280px] mx-auto grid grid-cols-1 items-start lg:grid-cols-[1fr_1.2fr] gap-12 lg:gap-[96px]">
         {/* ── Left: section header ────────────────────────────────────── */}
         <div>
-          <span className="font-mono text-[13px] uppercase tracking-[0.18em] text-accent-default relative pl-6 before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[20px] before:h-[2px] before:bg-gradient-to-r before:from-accent-default before:to-transparent">
-            FAQ
+          <span className="inline-flex items-center gap-3 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-terracota before:h-px before:w-[32px] before:bg-gradient-to-r before:from-terracota before:to-transparent before:content-['']">
+            Preguntas frecuentes
           </span>
           <h2
             id="faq-title"
-            className="font-display text-display-md text-fg-default mt-4 mb-4"
+            className="mt-5 font-display text-display-md text-fg-default"
           >
             {title}
           </h2>
           {subtitle && (
-            <p className="font-sans text-body-md text-fg-muted max-w-[65ch]">
+            <p className="mt-6 font-sans text-[19px] leading-[1.6] text-fg-muted max-w-[52ch]">
               {subtitle}
             </p>
           )}
+          <Link
+            href="/contacto"
+            className="group mt-8 inline-flex items-center gap-[10px] rounded-pill border-[1.5px] border-fg-default px-[26.5px] py-[13.5px] font-sans text-[15px] font-medium tracking-[-0.005em] text-fg-default transition-all duration-deliberate ease-standard hover:bg-fg-default hover:text-bg-canvas"
+          >
+            Ponerse en contacto
+            <span className="transition-transform duration-250 group-hover:translate-x-[3px]">
+              →
+            </span>
+          </Link>
         </div>
 
         {/* ── Right: accordion ────────────────────────────────────────── */}
@@ -55,7 +65,7 @@ export function FAQ({ data }: FAQProps) {
                       id={headingId}
                       type="button"
                       onClick={() => toggle(i)}
-                      className="w-full flex items-center justify-between gap-4 py-7 px-1 text-left font-display text-body-lg text-fg-default transition-colors duration-standard ease-standard hover:text-accent-default focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-2 focus-visible:rounded-[4px]"
+                      className="w-full flex items-center justify-between gap-5 py-7 px-1 text-left font-display text-[18px] font-normal tracking-[-0.015em] text-fg-default transition-colors duration-standard ease-standard hover:text-fg-muted focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-2 focus-visible:rounded-[4px]"
                       aria-expanded={isOpen}
                       aria-controls={panelId}
                     >
@@ -91,7 +101,7 @@ export function FAQ({ data }: FAQProps) {
                       isOpen ? "max-h-[320px] opacity-100" : "max-h-0 opacity-0"
                     }`}
                   >
-                    <p className="px-1 pb-7 font-sans text-body-md text-fg-subtle">
+                    <p className="px-1 pb-7 font-sans text-[15px] leading-[1.65] text-fg-subtle">
                       {item.answer}
                     </p>
                   </div>

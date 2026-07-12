@@ -87,26 +87,29 @@ export function InfoBar({ promocion }: InfoBarProps) {
   ];
 
   return (
-    <div className="bg-bg-surface">
+    <section
+      aria-label="Datos principales"
+      className="border-b border-border-default bg-bg-surface"
+    >
       <div className="mx-auto grid max-w-[1280px] grid-cols-2 md:grid-cols-4">
         {items.map((item, index) => (
           <div
             key={item.label}
-            className={`flex flex-col items-center px-4 py-6 text-center md:px-8 md:py-8 ${
+            className={`flex flex-col items-center px-4 py-6 text-center md:px-8 md:py-7 ${
               index < items.length - 1
                 ? "border-r border-border-default"
                 : ""
-            }`}
+            } ${index < 2 ? "border-b border-border-default md:border-b-0" : ""}`}
           >
-            <span className="font-display italic text-[32px] font-normal tracking-[-0.02em] leading-tight text-fg-default">
+            <span className="font-display text-[28px] font-normal leading-none tracking-[-0.02em] text-fg-default md:text-[32px]">
               {item.value}
             </span>
-            <span className="mt-1 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
+            <span className="mt-2 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-fg-subtle">
               {item.label}
             </span>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

@@ -40,18 +40,15 @@ describe("Hero", () => {
 
   it("renders trust stats in the TrustCard", () => {
     render(<Hero data={mockData} />);
-    // Values appear in both TrustCard and marquee, so use getAllByText and verify at least 2
-    const fifteenElements = screen.getAllByText("15");
-    expect(fifteenElements.length).toBeGreaterThanOrEqual(2);
-    const fiveHundredElements = screen.getAllByText("500");
-    expect(fiveHundredElements.length).toBeGreaterThanOrEqual(2);
-    const tenElements = screen.getAllByText("10");
-    expect(tenElements.length).toBeGreaterThanOrEqual(2);
+    // Stats render in the TrustCard; the marquee shows benefit phrases, not the values
+    expect(screen.getAllByText("15").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("500").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("10").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders the eyebrow label", () => {
     render(<Hero data={mockData} />);
-    expect(screen.getByText("Promociones")).toBeInTheDocument();
+    expect(screen.getByText(/Inmobiliaria · Canarias/)).toBeInTheDocument();
   });
 
   it("has accessible landmark", () => {

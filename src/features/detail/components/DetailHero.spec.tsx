@@ -130,26 +130,19 @@ describe("DetailHero", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders type/operation/status pills", () => {
+  it("renders the construction status badge", () => {
     const promocion = createMockPromocion();
     render(<DetailHero promocion={promocion} />);
-    expect(screen.getByText("Ático")).toBeInTheDocument();
-    expect(screen.getByText("Venta")).toBeInTheDocument();
     expect(screen.getByText("Sobre plano")).toBeInTheDocument();
   });
 
-  it("renders LIVE badge for fresh promos", () => {
-    const promocion = createMockPromocion({ createdAt: new Date() });
+  it("renders Share and Favorite actions", () => {
+    const promocion = createMockPromocion();
     render(<DetailHero promocion={promocion} />);
-    expect(screen.getByText("LIVE")).toBeInTheDocument();
-  });
-
-  it("does not render LIVE badge for old promos", () => {
-    const oldDate = new Date();
-    oldDate.setDate(oldDate.getDate() - 30);
-    const promocion = createMockPromocion({ createdAt: oldDate });
-    render(<DetailHero promocion={promocion} />);
-    expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /compartir/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("favorite-button")).toBeInTheDocument();
   });
 
   it("renders fallback gradient when no cover image", () => {

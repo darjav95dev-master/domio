@@ -27,19 +27,30 @@ export function BlockUbicacion({ block }: BlockUbicacionProps) {
 
   return (
     <section aria-label="Ubicación y servicios" data-block-type="UBICACION_SERVICIOS">
-      <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {items.map((item, index) => (
-          <li
-            key={index}
-            className="flex items-center justify-between rounded-card border border-border-default bg-bg-surface px-5 py-4"
-          >
-            <span className="text-base text-fg-default">{item.service}</span>
-            <span className="font-mono text-[11px] tracking-[0.04em] tabular-nums text-fg-subtle">
-              {item.distance}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="overflow-hidden rounded-[14px] border border-border-default bg-bg-surface">
+        <div className="border-b border-border-subtle px-7 py-5">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-fg-subtle">
+            Servicios cercanos
+          </p>
+        </div>
+        <ul>
+          {items.map((item, index) => (
+            <li
+              key={index}
+              className={`flex items-center justify-between gap-6 px-7 py-[18px] ${
+                index < items.length - 1 ? "border-b border-border-subtle" : ""
+              }`}
+            >
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-fg-subtle">
+                {item.service}
+              </span>
+              <span className="font-display text-[18px] font-normal tabular-nums tracking-[-0.01em] text-fg-default">
+                {item.distance}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }

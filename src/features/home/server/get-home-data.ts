@@ -26,7 +26,7 @@ function extractPayload<T>(block: ContentBlock | undefined, fallback: T): T {
 // ── Default payloads (fallback when content_blocks are not seeded) ──────
 
 const defaultHero: HeroPayload = {
-  claim: "Tu hogar en Canarias empieza aquí",
+  claim: "Tu hogar en Canarias, sin *complicaciones*. Sin sorpresas.",
   lead: "Descubre las mejores propiedades en Tenerife. Venta y alquiler de pisos, áticos, chalets y locales comerciales con el respaldo de Domio.",
   ctaPrimary: "Ver propiedades",
   ctaSecondary: "Contactar",
@@ -42,8 +42,10 @@ const defaultHero: HeroPayload = {
 };
 
 const defaultComoTrabajamos: HowWeWorkPayload = {
-  title: "Cómo trabajamos",
-  subtitle: "Nuestro proceso transparente de principio a fin.",
+  title:
+    "Comprar o vender casa en Canarias es, en el fondo, esto: alguien que te acompaña bien.",
+  subtitle:
+    "Sin sorpresas ni letra pequeña. Tú decides, nosotros nos encargamos de que cada paso salga bien — desde la primera visita hasta las llaves.",
   steps: [
     { numeral: "01", icon: "magnifying-glass", title: "Analizamos", body: "Estudiamos tus necesidades para encontrar la propiedad ideal." },
     { numeral: "02", icon: "house", title: "Visitamos", body: "Te acompañamos a las visitas con asesoramiento personalizado." },
@@ -53,12 +55,13 @@ const defaultComoTrabajamos: HowWeWorkPayload = {
 };
 
 const defaultAbout: AboutDomioPayload = {
-  title: "Quiénes somos",
-  subtitle: "Más de 15 años creando hogares en Canarias.",
+  title: "Comprar o vender sin que nadie te haga perder el tiempo.",
+  subtitle:
+    "En una agencia al uso pagas de más y te enteras de poco. Con Domio, cada dato está sobre la mesa desde el primer día.",
   imageId:
     "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=2400&auto=format&fit=crop",
   imageAlt: "Salón luminoso de una vivienda gestionada por Domio en Tenerife",
-  tagText: "Desde 2010",
+  tagText: "El método Domio",
   rows: [
     { aspect: "Experiencia", agenciaTradicional: "Variable según el agente", domio: "Equipo con 15+ años en Tenerife" },
     { aspect: "Visibilidad", agenciaTradicional: "Escaparate local limitado", domio: "Catálogo online completo con precios" },
@@ -68,8 +71,9 @@ const defaultAbout: AboutDomioPayload = {
 };
 
 const defaultTrust: TrustPayload = {
-  title: "Confianza",
-  subtitle: "Los números hablan por nosotros.",
+  title: "Años escuchando a quien busca casa en Canarias. Y cumpliendo.",
+  subtitle:
+    "No somos una promesa, somos un historial: cientos de operaciones cerradas, familias que ya viven donde querían y un equipo que responde.",
   metrics: [
     { value: "15", unit: "años", label: "de experiencia en el sector inmobiliario canario" },
     { value: "500", unit: "+", label: "inmuebles gestionados con éxito" },
@@ -84,8 +88,8 @@ const defaultTrust: TrustPayload = {
 };
 
 const defaultCTA: CTAPayload = {
-  title: "¿Listo para encontrar tu hogar ideal?",
-  body: "Déjanos ayudarte a dar el primer paso hacia tu nueva propiedad en Tenerife.",
+  title: "Te ayudamos a encontrar casa donde otros solo ven un negocio.",
+  body: "Si alguna vez pensaste que tu casa en Canarias no era posible, siéntate con nosotros y hablémoslo con calma.",
   ctaLabel: "Solicitar visita",
   ctaHref: "/contacto",
   backgroundImageId:
@@ -93,8 +97,9 @@ const defaultCTA: CTAPayload = {
 };
 
 const defaultFAQ: FAQPayload = {
-  title: "Preguntas frecuentes",
-  subtitle: "Todo lo que necesitas saber sobre nuestros servicios inmobiliarios.",
+  title: "Lo que todo el mundo pregunta antes de dar el paso.",
+  subtitle:
+    "Sin letra pequeña ni lenguaje técnico. Si no encuentras tu respuesta, escríbenos.",
   items: [
     { question: "¿Qué tipos de propiedad gestionan?", answer: "Trabajamos con todo tipo de inmuebles: pisos, áticos, chalets, locales comerciales, oficinas y terrenos. Tanto en venta como en alquiler." },
     { question: "¿Cuánto cuesta vender una propiedad con Domio?", answer: "Nuestras tarifas son transparentes y se acuerdan desde el principio. Contacta con nosotros para una valoración personalizada sin compromiso." },

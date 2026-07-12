@@ -2,14 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { cn } from "@/shared/utils/cn";
 import { useFavorites } from "@/features/favorites/useFavorites";
 import { LogoMark } from "@/shared/components/logo-mark";
 
 const NAV_LINKS = [
-  { label: "Promociones", href: "/portafolio" },
-  { label: "Contacto", href: "/contacto" },
-  { label: "Sobre", href: "/sobre" },
+  { label: "Cómo funciona", href: "/#como" },
+  { label: "Promociones", href: "/#promos" },
+  { label: "Confianza", href: "/#confianza" },
+  { label: "Preguntas", href: "/#faq" },
 ] as const;
 
 const SCROLL_THRESHOLD = 40;
@@ -27,6 +29,7 @@ export function Nav() {
   const [isScrolled, setIsScrolled] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const { count: favCount, ready: favReady } = useFavorites();
+  const pathname = usePathname();
 
   const handleScroll = useCallback(() => {
     const scrolled = window.scrollY > SCROLL_THRESHOLD;
@@ -35,23 +38,24 @@ export function Nav() {
 
   useEffect(() => {
     // Only use transparent (over-hero) mode if the page has a dark hero
-    // section as first child of <main>. On light-background pages like
+    // section marked with [data-dark-hero]. On light-background pages like
     // portafolio, stay in scrolled (solid) mode to avoid white-on-light
     // contrast failures.
-    const main = document.getElementById("main-content");
-    const hasDarkHero = main?.firstElementChild?.matches(
-      '[class*="bg-bg-band-ink"], [class*="h-[520px]"], [class*="h-\\[520"]',
-    );
+    const hasDarkHero = document.querySelector("[data-dark-hero]") !== null;
 
-    if (hasDarkHero) {
-      handleScroll();
-    } else {
+    // Light-background pages (no dark hero): stay solid always, don't listen to
+    // scroll — otherwise scrollY===0 would flip the nav to white-on-light.
+    if (!hasDarkHero) {
       setIsScrolled(true);
+      return;
     }
 
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
+    // Re-run on route change: the Nav lives in the layout and persists across
+    // client-side navigations, so detection must refresh for each new page.
+  }, [handleScroll, pathname]);
 
   // Close drawer on route change (link click)
   const closeDrawer = useCallback(() => {
@@ -78,7 +82,7 @@ export function Nav() {
         role="navigation"
         aria-label="Navegación principal"
       >
-        <div className="flex items-center justify-between">
+        <div className="relative flex items-center justify-between">
           {/* Logo */}
           <Link
             href="/"
@@ -91,14 +95,14 @@ export function Nav() {
             </em>
           </Link>
 
-          {/* Desktop links */}
-          <div className="hidden items-center gap-[40px] md:flex">
+          {/* Desktop links — centered group */}
+          <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-[40px] md:flex">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "relative font-sans text-[13.5px] font-medium",
+                  "relative whitespace-nowrap font-sans text-[13.5px] font-medium",
                   // Underline hover animation (0→100% width)
                   "after:absolute after:bottom-[-2px] after:left-1/2 after:h-[1px] after:w-0",
                   "after:bg-current after:transition-all after:duration-250 after:ease-standard",
@@ -109,7 +113,10 @@ export function Nav() {
                 {link.label}
               </Link>
             ))}
+          </div>
 
+          {/* Right group — favorites + CTA */}
+          <div className="hidden items-center gap-[40px] md:flex">
             {/* Favorites */}
             <Link
               href="/favoritos"

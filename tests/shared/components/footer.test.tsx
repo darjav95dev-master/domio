@@ -18,10 +18,10 @@ describe("Footer (T004)", () => {
 
   it("renders the Domio tagline in Fraunces italic", async () => {
     render(await Footer());
-    const em = screen.getByText(/promociones inmobiliarias/i);
-    expect(em).toBeInTheDocument();
-    // The <em> is inside a <p> with font-display; <em> has not-italic
-    const parentP = em.closest("p");
+    const tagline = screen.getByText(/solo ven un negocio/i);
+    expect(tagline).toBeInTheDocument();
+    // The tagline lives in a <p> with font-display (Fraunces) italic
+    const parentP = tagline.closest("p");
     expect(parentP?.className).toMatch(/font-display/);
   });
 
@@ -30,46 +30,41 @@ describe("Footer (T004)", () => {
     const links = screen.getAllByRole("link");
     const hrefs = links.map((l) => l.getAttribute("href"));
     expect(hrefs).toContain("/sobre");
-    expect(hrefs).toContain("/equipo");
     expect(hrefs).toContain("/contacto");
+    // "Equipo" routes to /sobre (no dedicated public team page yet).
+    expect(screen.getAllByRole("link", { name: "Equipo" })[0]).toHaveAttribute(
+      "href",
+      "/sobre",
+    );
   });
 
-  it("renders the 'Promociones' column with Catálogo, Destacados, Novedades links", async () => {
+  it("renders the 'Promociones' column pointing to the catalog (incl. island filters)", async () => {
     render(await Footer());
     const links = screen.getAllByRole("link");
     const hrefs = links.map((l) => l.getAttribute("href"));
     expect(hrefs).toContain("/portafolio");
-    expect(hrefs).toContain("/portafolio/destacados");
-    expect(hrefs).toContain("/portafolio/novedades");
+    expect(hrefs).toContain("/portafolio?island=Tenerife");
+    expect(hrefs).toContain("/portafolio?island=Gran+Canaria");
   });
 
-  it("renders the 'Legal' column with Aviso Legal, Privacidad, Cookies", async () => {
+  it("links the legal pages under /legal", async () => {
     render(await Footer());
     const links = screen.getAllByRole("link");
-    const legalLinks = links.filter((l) =>
-      l.getAttribute("href")?.startsWith("/legal"),
-    );
-    expect(legalLinks.length).toBeGreaterThanOrEqual(3);
-    expect(
-      legalLinks.some((l) => l.getAttribute("href") === "/legal/aviso-legal"),
-    ).toBe(true);
-    expect(
-      legalLinks.some((l) => l.getAttribute("href") === "/legal/privacidad"),
-    ).toBe(true);
-    expect(
-      legalLinks.some((l) => l.getAttribute("href") === "/legal/cookies"),
-    ).toBe(true);
+    const hrefs = links.map((l) => l.getAttribute("href"));
+    expect(hrefs).toContain("/legal/aviso-legal");
+    expect(hrefs).toContain("/legal/privacidad");
+    expect(hrefs).toContain("/legal/cookies");
   });
 
   it("renders the contact info with email and address placeholder", async () => {
     render(await Footer());
-    expect(screen.getByText(/info@domio\.es/i)).toBeInTheDocument();
-    expect(screen.getByText(/tenerife/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/info@domio\.es/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/tenerife/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders a legal row with copyright text", async () => {
     render(await Footer());
-    expect(screen.getByText(/todos los derechos reservados/i)).toBeInTheDocument();
+    expect(screen.getByText(/inmobiliaria en canarias/i)).toBeInTheDocument();
   });
 
   it("renders links with proper href attributes", async () => {

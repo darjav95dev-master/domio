@@ -5,9 +5,9 @@ import { useEffect, useRef, type RefObject } from "react";
 interface UseScrollRevealOptions {
   /** Delay in ms between each element (default: 80) */
   stagger?: number;
-  /** Root margin for IntersectionObserver (default: "0px 0px -80px 0px") */
+  /** Root margin for IntersectionObserver (default: "0px 0px 15% 0px") */
   rootMargin?: string;
-  /** Threshold for IntersectionObserver (default: 0.15) */
+  /** Threshold for IntersectionObserver (default: 0) */
   threshold?: number;
 }
 
@@ -29,7 +29,7 @@ export function useScrollReveal(
   selector: string = "[data-reveal]",
   options: UseScrollRevealOptions = {},
 ): RefObject<HTMLDivElement | null> {
-  const { stagger = 80, rootMargin = "0px 0px -80px 0px", threshold = 0.15 } = options;
+  const { stagger = 80, rootMargin = "0px 0px 15% 0px", threshold = 0 } = options;
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {

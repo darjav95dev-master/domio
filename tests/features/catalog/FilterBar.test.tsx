@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 
 // Mock next/navigation
 const mockReplace = vi.fn();
@@ -16,59 +16,59 @@ describe("FilterBar", () => {
     vi.clearAllMocks();
   });
 
-  it("renders as a form with role search", () => {
+  it("renders as a search landmark", () => {
     render(<FilterBar />);
     expect(screen.getByRole("search")).toBeInTheDocument();
   });
 
-  it("renders all main filter controls", () => {
+  it("renders the row of custom dropdown triggers", () => {
     render(<FilterBar />);
-    expect(screen.getByLabelText("Isla")).toBeInTheDocument();
-    expect(screen.getByLabelText("Municipio")).toBeInTheDocument();
-    expect(screen.getByLabelText("Tipo")).toBeInTheDocument();
-    expect(screen.getByLabelText("Operación")).toBeInTheDocument();
-    expect(screen.getByLabelText("Dormitorios")).toBeInTheDocument();
-    expect(screen.getByLabelText("Baños")).toBeInTheDocument();
-    expect(screen.getByLabelText("Estado de obra")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Operación" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tipo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Isla" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dormitorios" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Precio" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Más filtros" })).toBeInTheDocument();
   });
 
-  it("renders price range inputs", () => {
+  it("opens a dropdown and reveals its options on click", () => {
     render(<FilterBar />);
-    expect(screen.getByLabelText("Precio mín.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Precio máx.")).toBeInTheDocument();
+    // Options are not in the DOM until the dropdown is opened.
+    expect(screen.queryByRole("option", { name: "Venta" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Operación" }));
+    expect(screen.getByRole("option", { name: "Venta" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Alquiler" })).toBeInTheDocument();
   });
 
-  it("renders amenity checkboxes", () => {
+  it("applies a filter when an option is selected", () => {
     render(<FilterBar />);
-    // First 3 amenities rendered as checkboxes
-    expect(screen.getByLabelText("Ascensor")).toBeInTheDocument();
-    expect(screen.getByLabelText("Terraza")).toBeInTheDocument();
-    expect(screen.getByLabelText("Balcón")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Isla" }));
+    fireEvent.click(screen.getByRole("option", { name: "Tenerife" }));
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.stringContaining("island=Tenerife"),
+      expect.objectContaining({ scroll: false }),
+    );
   });
 
-  it("renders active filter chips when filters are present", () => {
-    const filters = {
-      island: "Tenerife",
-      propertyType: "piso",
-    };
-    const { container } = render(<FilterBar initialFilters={filters} />);
-    // Chips render inside aria-live region after the control section
-    const chipsContainer = container.querySelector("[aria-live='polite']");
-    expect(chipsContainer).toBeInTheDocument();
-    expect(chipsContainer!.textContent).toContain("Tenerife");
-    expect(chipsContainer!.textContent).toContain("Piso");
+  it("shows the selected value in the trigger and marks it active", () => {
+    render(<FilterBar initialFilters={{ propertyType: "piso" }} />);
+    // The Tipo trigger now reads "Piso" instead of the placeholder.
+    expect(screen.getByRole("button", { name: "Piso" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tipo" })).not.toBeInTheDocument();
   });
 
-  it("renders clear button when activeCount > 0", () => {
+  it("exposes advanced filters inside the 'Más filtros' dropdown", () => {
+    render(<FilterBar />);
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const panel = screen.getByRole("listbox");
+    expect(within(panel).getByText("Municipio")).toBeInTheDocument();
+    expect(within(panel).getByText("Servicios")).toBeInTheDocument();
+    expect(within(panel).getByLabelText("Ascensor")).toBeInTheDocument();
+  });
+
+  it("renders a global clear button when filters are active", () => {
     render(<FilterBar initialFilters={{ island: "Tenerife" }} />);
-    expect(
-      screen.getByRole("button", { name: /limpiar filtros/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("calls clearFilters when clear button is clicked", () => {
-    render(<FilterBar initialFilters={{ island: "Tenerife" }} />);
-    const clearBtn = screen.getByRole("button", { name: /limpiar filtros/i });
+    const clearBtn = screen.getByRole("button", { name: /limpiar \(/i });
     fireEvent.click(clearBtn);
     expect(mockReplace).toHaveBeenCalledWith(
       "/portafolio",

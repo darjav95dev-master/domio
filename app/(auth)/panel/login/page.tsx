@@ -53,6 +53,7 @@ export default function LoginPage() {
   }
 
   return (
+    <div className="flex min-h-screen items-center justify-center bg-bg-canvas px-6">
     <div className="w-full max-w-sm rounded-card border border-border-default bg-bg-surface p-8">
       <h1 className="mb-8 text-center font-display text-2xl font-medium text-fg-default">
         Panel de Administración
@@ -94,6 +95,7 @@ export default function LoginPage() {
           {isPending ? "Iniciando sesión..." : "Iniciar sesión"}
         </Button>
       </form>
+    </div>
     </div>
   );
 }

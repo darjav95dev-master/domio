@@ -5,16 +5,25 @@ import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 import { DetailHero } from "@/features/detail/components/DetailHero";
 import { InfoBar } from "@/features/detail/components/InfoBar";
-import { EditorialBlocks } from "@/features/detail/components/EditorialBlocks";
+import { DetailSection } from "@/features/detail/components/DetailSection";
+import { IntroStats } from "@/features/detail/components/IntroStats";
+import { BlockDescripcion } from "@/features/detail/components/BlockDescripcion";
+import { BlockCalidades } from "@/features/detail/components/BlockCalidades";
+import { BlockZonasComunes } from "@/features/detail/components/BlockZonasComunes";
+import { BlockUbicacion } from "@/features/detail/components/BlockUbicacion";
+import { BlockPlazos } from "@/features/detail/components/BlockPlazos";
+import { DetailGallery } from "@/features/detail/components/DetailGallery";
 import { TypologyTable } from "@/features/detail/components/TypologyTable";
 import { MapPromocion } from "@/features/detail/components/MapPromocion";
+import { ProjectInfoTable } from "@/features/detail/components/ProjectInfoTable";
+import { PurchaseProcess } from "@/features/detail/components/PurchaseProcess";
+import { DetailCTA } from "@/features/detail/components/DetailCTA";
 import { ContactForm } from "@/features/engagement/components/ContactForm";
 import { WhatsAppButton } from "@/features/engagement/components/WhatsAppButton";
-import { ShareButton } from "@/features/engagement/components/ShareButton";
-import { FavoriteButton } from "@/features/favorites/FavoriteButton";
 import { RelatedProperties } from "@/features/engagement/components/RelatedProperties";
 import { getContactConfig } from "@/features/engagement/server/get-contact-config";
 import { buildBreadcrumbJsonLd } from "@/features/seo/server/breadcrumb-json-ld";
+import { PROPERTY_TYPE_LABELS } from "@/shared/constants/domain-labels";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,6 +97,33 @@ export default async function DetailPage({ params }: DetailPageProps) {
   // Fetch contact config for WhatsApp
   const contactConfig = await getContactConfig();
 
+  // Resolve content blocks by type. ZONAS_COMUNES and PLAZOS_GARANTIAS are
+  // only meaningful for portfolio (obra nueva) promotions, matching the
+  // previous EditorialBlocks gating.
+  const isPortfolio = promocion.kind === "portfolio";
+  const blockOf = (type: string) =>
+    promocion.contentBlocks.find((b) => b.blockType === type) ?? null;
+  const descripcionBlock = blockOf("DESCRIPCION_GENERAL");
+  const calidadesBlock = blockOf("MEMORIA_CALIDADES");
+  const ubicacionBlock = blockOf("UBICACION_SERVICIOS");
+  const zonasBlock = isPortfolio ? blockOf("ZONAS_COMUNES") : null;
+  const plazosBlock = isPortfolio ? blockOf("PLAZOS_GARANTIAS") : null;
+
+  // Intro heading, e.g. "Casa en Arona" — falls back to the promotion name.
+  const propertyTypeLabel =
+    promocion.propertyType &&
+    PROPERTY_TYPE_LABELS[
+      promocion.propertyType as keyof typeof PROPERTY_TYPE_LABELS
+    ];
+  const introTitle =
+    propertyTypeLabel && promocion.municipality
+      ? `${propertyTypeLabel} en ${promocion.municipality}`
+      : promocion.name;
+
+  const hasGallery = promocion.mediaAssets.some(
+    (a) => a.kind === "IMAGE_GALLERY",
+  );
+
   // Build BreadcrumbList JSON-LD
   const breadcrumbJsonLd = buildBreadcrumbJsonLd({
     name: promocion.name,
@@ -113,98 +149,195 @@ export default async function DetailPage({ params }: DetailPageProps) {
       />
 
       <article>
-        {/* Detail Hero — 520px fixed height */}
+        {/* Hero + primary metrics — stay on Fraunces, like the reference */}
         <DetailHero promocion={promocion} />
-
-        {/* InfoBar — 4-column metric grid */}
         <InfoBar promocion={promocion} />
 
-        {/* Body: Editorial blocks + Typology table + Map */}
-        <div className="bg-bg-surface-sunken">
-          <div className="mx-auto max-w-[1280px] px-6 py-section-md md:px-10 md:py-section-lg">
-            <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1.6fr_1fr]">
-              {/* Main content column */}
-              <div className="space-y-section-md">
-                {/* Editorial blocks */}
-                <EditorialBlocks promocion={promocion} />
+        {/* Stacked editorial sections use Instrument Serif for display type,
+            matching the CoviCanarias detail reference. Scoped via a
+            --font-display override so the rest of the site keeps Fraunces. */}
+        <div style={{ "--font-display": "var(--font-instrument)" } as React.CSSProperties}>
+        {/* 1. Intro + stats */}
+        <DetailSection
+          bg="cream"
+          tag="El inmueble"
+          tagVariant="orange"
+          title={introTitle}
+          subtitle={
+            descripcionBlock ? (
+              <span className="block [&_[data-block-type]>div]:mx-auto [&_[data-block-type]>div]:max-w-[520px]">
+                <BlockDescripcion block={descripcionBlock} />
+              </span>
+            ) : undefined
+          }
+        >
+          <IntroStats promocion={promocion} />
+        </DetailSection>
 
-                {/* Typology table */}
-                <section>
-                  <div className="mb-6">
-                    <p className="relative mb-3 pl-10 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-accent-default before:absolute before:left-0 before:top-1/2 before:h-px before:w-8 before:-translate-y-1/2 before:bg-[linear-gradient(90deg,var(--accent-default),transparent)]">
-                      Tipologías
-                    </p>
-                    <h2 className="font-display text-[clamp(28px,3.2vw,40px)] font-normal tracking-[-0.035em] leading-[1.05] text-fg-default">
-                      Tipos de vivienda
-                    </h2>
-                  </div>
-                  <TypologyTable promocion={promocion} />
-                </section>
+        {/* 2. Tipologías */}
+        {promocion.tipologias.length > 0 && (
+          <DetailSection
+            bg="white"
+            tag="Elige la tuya"
+            tagVariant="purple"
+            title="Tipos de vivienda"
+            subtitle="Modelos disponibles con sus superficies y precios de referencia."
+          >
+            <TypologyTable promocion={promocion} />
+          </DetailSection>
+        )}
 
-                {/* Map — only minimal props to Client Component */}
-                <section>
-                  <div className="mb-6">
-                    <p className="relative mb-3 pl-10 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-accent-default before:absolute before:left-0 before:top-1/2 before:h-px before:w-8 before:-translate-y-1/2 before:bg-[linear-gradient(90deg,var(--accent-default),transparent)]">
-                      Ubicación
-                    </p>
-                    <h2 className="font-display text-[clamp(28px,3.2vw,40px)] font-normal tracking-[-0.035em] leading-[1.05] text-fg-default">
-                      Mapa
-                    </h2>
-                  </div>
-                  <MapPromocion
-                    coordinates={mapCoordinates}
-                    mode={promocion.mapPrivacyMode as "EXACT" | "AREA"}
-                    name={promocion.name}
-                  />
-                </section>
-              </div>
+        {/* 3. Galería — only when the promotion has gallery images */}
+        {hasGallery && (
+          <DetailSection
+            bg="alt"
+            tag="Tu futuro hogar"
+            tagVariant="orange"
+            title="Cómo será tu hogar"
+            subtitle="Espacios pensados para el día a día, con luz natural y acabados contemporáneos."
+          >
+            <DetailGallery promocion={promocion} />
+          </DetailSection>
+        )}
 
-              {/* Sticky aside column — ContactForm + action buttons */}
-              <aside className="lg:sticky lg:top-24 lg:self-start">
-                <div className="space-y-6">
-                  {/* Property info summary */}
-                  <div className="rounded-surface border border-border-default bg-bg-surface p-6 md:p-8">
-                    <p className="font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
-                      {promocion.name}
-                    </p>
-                    {promocion.municipality && (
-                      <p className="mt-2 font-mono text-[11px] tracking-[0.04em] tabular-nums text-fg-subtle">
-                        {promocion.municipality}
-                        {promocion.island ? `, ${promocion.island}` : ""}
-                      </p>
-                    )}
-                  </div>
+        {/* 4. Memoria de calidades */}
+        {calidadesBlock && (
+          <DetailSection
+            bg="white"
+            tag="Acabados"
+            tagVariant="purple"
+            title="Memoria de calidades"
+            subtitle="Cada elemento elegido con criterio, pensado para durar y acompañar tu día a día."
+          >
+            <BlockCalidades block={calidadesBlock} />
+          </DetailSection>
+        )}
 
-                  {/* Contact form */}
-                  <div className="rounded-surface border border-border-default bg-bg-surface p-6 md:p-8">
-                    <h3 className="mb-5 font-display text-[21px] font-medium tracking-[-0.015em] text-fg-default">
-                      Solicitar información
-                    </h3>
-                    <ContactForm
-                      promocionId={promocion.id}
-                      tipologias={promocion.tipologias}
-                    />
-                  </div>
+        {/* 5. Zonas comunes (portfolio) */}
+        {zonasBlock && (
+          <DetailSection
+            bg="cream"
+            tag="Instalaciones"
+            tagVariant="orange"
+            title="Zonas comunes"
+          >
+            <BlockZonasComunes block={zonasBlock} />
+          </DetailSection>
+        )}
 
-                  {/* WhatsApp + Share buttons */}
-                  <div className="flex flex-col gap-3">
-                    <WhatsAppButton
-                      phoneNumber={contactConfig.whatsappNumber}
-                      prefilledMessage={contactConfig.whatsappPrefilledMessage}
-                      promocionName={promocion.name}
-                    />
-                    <div className="flex items-center gap-3">
-                      <ShareButton />
-                      <FavoriteButton id={promocion.id} name={promocion.name} />
-                    </div>
-                  </div>
-                </div>
-              </aside>
+        {/* 6. Estado de la obra (portfolio) */}
+        {plazosBlock && (
+          <DetailSection
+            bg="white"
+            tag="Avance del proyecto"
+            tagVariant="orange"
+            title="Plazos y garantías"
+          >
+            <div className="mx-auto max-w-[720px] rounded-[14px] border border-border-default bg-bg-surface p-8">
+              <BlockPlazos block={plazosBlock} />
             </div>
+          </DetailSection>
+        )}
+
+        {/* 7. Ubicación — map + nearby services */}
+        <DetailSection
+          bg="cream"
+          tag="Entorno"
+          tagVariant="orange"
+          title="Ubicación"
+          subtitle={
+            promocion.address ??
+            [promocion.municipality, promocion.island]
+              .filter(Boolean)
+              .join(", ")
+          }
+        >
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="overflow-hidden rounded-[14px] border border-border-default bg-bg-surface">
+              <MapPromocion
+                coordinates={mapCoordinates}
+                mode={promocion.mapPrivacyMode as "EXACT" | "AREA"}
+                name={promocion.name}
+              />
+            </div>
+            {ubicacionBlock && <BlockUbicacion block={ubicacionBlock} />}
           </div>
+        </DetailSection>
+
+        {/* 8. Proceso */}
+        {(promocion.operation === "SALE" ||
+          promocion.operation === "RENT" ||
+          promocion.operation === "SALE_AND_RENT") && (
+          <DetailSection
+            bg="white"
+            tag="Cómo funciona"
+            tagVariant="purple"
+            title={
+              promocion.operation === "RENT"
+                ? "El proceso de alquiler"
+                : "El proceso de compra"
+            }
+            subtitle="Te acompañamos en cada paso, con transparencia y sin compromiso."
+          >
+            <PurchaseProcess operation={promocion.operation} />
+          </DetailSection>
+        )}
+
+        {/* 9. Información del proyecto */}
+        <DetailSection
+          bg="cream"
+          tag="Ficha técnica"
+          tagVariant="gold"
+          title="Información del inmueble"
+        >
+          <ProjectInfoTable promocion={promocion} />
+        </DetailSection>
+
+        {/* 10. CTA */}
+        <DetailSection bg="white">
+          <DetailCTA
+            promocion={promocion}
+            phone={contactConfig.whatsappNumber}
+            contactAnchor="contacto"
+          />
+        </DetailSection>
+
+        {/* 11. Contact form (functional) */}
+        <DetailSection
+          bg="cream"
+          id="contacto"
+          tag="Contacto"
+          tagVariant="orange"
+          title="Solicitar información"
+          subtitle="Déjanos tus datos y un agente te responderá lo antes posible."
+        >
+          <div className="mx-auto max-w-[560px] space-y-6">
+            <div className="rounded-[14px] border border-border-default bg-bg-surface p-6 md:p-8">
+              <ContactForm
+                promocionId={promocion.id}
+                tipologias={promocion.tipologias}
+              />
+            </div>
+            <WhatsAppButton
+              phoneNumber={contactConfig.whatsappNumber}
+              prefilledMessage={contactConfig.whatsappPrefilledMessage}
+              promocionName={promocion.name}
+            />
+          </div>
+        </DetailSection>
+
+        {/* Legal disclaimer band */}
+        <div className="border-t border-border-subtle bg-bg-surface-sunken px-6 py-8 md:px-12">
+          <p className="mx-auto max-w-[1180px] text-center text-[11px] leading-[1.65] text-fg-subtle">
+            Las imágenes, infografías y planos son orientativos y pueden estar
+            sujetos a modificaciones. Los precios y superficies indicados son
+            orientativos y no constituyen oferta contractual. Consulta las
+            condiciones concretas con nuestro equipo.
+          </p>
+        </div>
         </div>
 
-        {/* Related Properties — at the bottom */}
+        {/* Related properties */}
         <RelatedProperties
           promocionId={promocion.id}
           location={mapCoordinates}

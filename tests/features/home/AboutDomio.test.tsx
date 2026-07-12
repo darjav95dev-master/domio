@@ -30,10 +30,10 @@ describe("AboutDomio", () => {
     expect(screen.getByText("Desde 2010")).toBeInTheDocument();
   });
 
-  it("renders compare table row headers", () => {
+  it("renders the two compare column headers", () => {
     render(<AboutDomio data={mockData} />);
-    expect(screen.getByText("Experiencia")).toBeInTheDocument();
-    expect(screen.getByText("Visibilidad")).toBeInTheDocument();
+    expect(screen.getByText("Otras agencias")).toBeInTheDocument();
+    expect(screen.getByText("Domio")).toBeInTheDocument();
   });
 
   it("renders Domio values in the table", () => {

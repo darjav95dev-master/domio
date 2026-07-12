@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter, Geist_Mono } from "next/font/google";
+import { Fraunces, Inter, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { RootErrorBoundary } from "@/shared/components/root-error-boundary";
 import "./globals.css";
 
@@ -26,6 +26,17 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+// Instrument Serif — used only on the property detail sections, matching the
+// CoviCanarias reference (lighter, editorial serif). Hero and rest of the site
+// stay on Fraunces.
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Domio",
   description: "Plataforma de comercialización inmobiliaria",
@@ -46,7 +57,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${fraunces.variable} ${inter.variable} ${geistMono.variable}`}
+      className={`${fraunces.variable} ${inter.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
       style={{ colorScheme: "light" }}
     >
       <body className="min-h-screen antialiased">

@@ -122,32 +122,37 @@ export default async function PortafolioPage({ searchParams }: PageProps) {
 
   return (
     <div className="min-h-screen">
-      {/* Header band ------------------------------------------------------ */}
-      <section className="bg-bg-canvas pb-10 pt-[120px]">
-        <div className="mx-auto max-w-[1200px] px-6 md:px-12 xl:px-14">
+      {/* Header band (centered, paper-2) --------------------------------- */}
+      <section className="bg-bg-surface-sunken pb-16 pt-[104px]">
+        <div className="mx-auto max-w-[1200px] px-6 text-center md:px-12">
+          <span className="inline-flex items-center gap-3 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-terracota before:h-px before:w-[32px] before:bg-gradient-to-r before:from-terracota before:to-transparent before:content-['']">
+            Nuestras promociones
+          </span>
           <h1
             className={cn(
-              "font-display text-[clamp(36px,4.8vw,64px)] font-normal leading-[1.05] tracking-[-0.035em]",
+              "mx-auto mt-5 max-w-[18ch] font-display text-[clamp(36px,5vw,68px)] font-normal leading-[1.05] tracking-[-0.035em]",
               "text-fg-default",
             )}
           >
-            Promociones
+            Tu próxima casa te espera <em className="font-normal italic">aquí</em>.
           </h1>
-          <p className="mt-4 max-w-[52ch] font-sans text-[19px] leading-[1.6] text-fg-muted">
-            Explora nuestra selección de inmuebles en las Islas Canarias.
-            Encuentra el espacio ideal para ti o tu negocio.
+          <p className="mx-auto mt-4 max-w-[52ch] font-sans text-[19px] leading-[1.6] text-fg-muted">
+            Venta y alquiler de inmuebles en toda Canarias. Encuentra el tuyo.
           </p>
+
+          {/* Integrated compact filter toolbar */}
+          <div className="mt-10">
+            <Suspense fallback={<FilterBarSkeleton />}>
+              <FilterBar initialFilters={initialFilters} />
+            </Suspense>
+          </div>
         </div>
       </section>
 
-      {/* Filter bar + catalog content ------------------------------------ */}
-      <section className="bg-bg-canvas pb-20">
+      {/* Catalog content ------------------------------------------------- */}
+      <section className="bg-bg-canvas pb-20 pt-12">
         <div className="mx-auto max-w-[1200px] px-6 md:px-12 xl:px-14">
-          <Suspense fallback={<FilterBarSkeleton />}>
-            <FilterBar initialFilters={initialFilters} />
-          </Suspense>
-
-          <div className="mt-8">
+          <div>
             {items.length > 0 ? (
               <CatalogGrid
                 items={items}
@@ -171,12 +176,10 @@ export default async function PortafolioPage({ searchParams }: PageProps) {
 
 function FilterBarSkeleton() {
   return (
-    <div className="rounded-surface border border-border-subtle bg-bg-surface p-inline-md pb-stack-sm">
-      <div className="flex flex-wrap gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[50px] w-[140px] rounded-control" />
-        ))}
-      </div>
+    <div className="mx-auto flex max-w-[940px] flex-wrap items-center justify-center gap-2.5">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <Skeleton key={i} className="h-[38px] w-[120px] rounded-pill" />
+      ))}
     </div>
   );
 }

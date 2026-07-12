@@ -28,12 +28,13 @@ describe("Nav (T006)", () => {
     expect(logo).toHaveAttribute("href", "/");
   });
 
-  it("renders navigation links: Promociones, Contacto, Sobre", () => {
+  it("renders navigation links: Cómo funciona, Promociones, Confianza, Preguntas", () => {
     render(<Nav />);
     const labels = screen.getAllByRole("link").map((l) => l.textContent?.trim());
+    expect(labels).toContain("Cómo funciona");
     expect(labels).toContain("Promociones");
-    expect(labels).toContain("Contacto");
-    expect(labels).toContain("Sobre");
+    expect(labels).toContain("Confianza");
+    expect(labels).toContain("Preguntas");
   });
 
   it("renders a CTA with 'Contactar' text", () => {
@@ -100,9 +101,9 @@ describe("Nav (T006)", () => {
   it("renders links with proper href attributes", () => {
     render(<Nav />);
     const hrefs = screen.getAllByRole("link").map((l) => l.getAttribute("href"));
-    expect(hrefs).toContain("/portafolio");
+    expect(hrefs).toContain("/#como");
+    expect(hrefs).toContain("/#promos");
     expect(hrefs).toContain("/contacto");
-    expect(hrefs).toContain("/sobre");
     expect(hrefs).toContain("/");
   });
 });

@@ -10,7 +10,16 @@ export interface ShareButtonProps {
   url?: string;
   title?: string;
   text?: string;
+  /** "onDark" renders a glass pill legible over dark imagery (e.g. the hero). */
+  variant?: "default" | "onDark";
 }
+
+const VARIANT_CLASS: Record<NonNullable<ShareButtonProps["variant"]>, string> = {
+  default:
+    "border-border-default text-fg-muted hover:border-fg-default hover:text-fg-default",
+  onDark:
+    "border-white/25 bg-white/15 text-white backdrop-blur-[8px] hover:border-white/60 hover:bg-white/25",
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -20,6 +29,7 @@ export function ShareButton({
   url = typeof window !== "undefined" ? window.location.href : "",
   title = "Domio",
   text,
+  variant = "default",
 }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,7 +77,7 @@ export function ShareButton({
       <button
         type="button"
         onClick={handleShare}
-        className="flex items-center gap-2 rounded-pill border border-border-default px-[18px] py-[11px] font-sans text-sm font-medium leading-[1.5] text-fg-muted transition-all duration-350 ease-[cubic-bezier(.2,.8,.2,1)] hover:border-fg-default hover:text-fg-default focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-3 focus-visible:rounded-[4px]"
+        className={`flex items-center gap-2 rounded-pill border px-[18px] py-[11px] font-sans text-sm font-medium leading-[1.5] transition-all duration-350 ease-[cubic-bezier(.2,.8,.2,1)] focus-visible:rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-focus-ring ${VARIANT_CLASS[variant]}`}
         aria-label="Compartir enlace"
       >
         {/* Share icon */}

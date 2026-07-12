@@ -35,7 +35,7 @@ export function FavoriteButton({ id, name, className }: FavoriteButtonProps) {
         toggle(id);
       }}
       className={cn(
-        "relative z-20 flex h-10 w-10 items-center justify-center rounded-full",
+        "z-20 flex h-10 w-10 items-center justify-center rounded-full",
         "bg-white/85 text-fg-default backdrop-blur-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.15)]",
         "transition-all duration-250 ease-standard hover:scale-110 hover:bg-white",
         "focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-2",

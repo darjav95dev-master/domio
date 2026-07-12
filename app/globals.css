@@ -331,6 +331,36 @@
     text-wrap: balance;
   }
 
+  /* Base heading typography ported from the CoviCanarias reference.
+     Utilities (e.g. text-[clamp(...)]) always win over these element rules. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display), "Times New Roman", serif;
+    font-weight: 400;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    color: var(--fg-default);
+  }
+
+  h1 {
+    font-size: clamp(52px, 7vw, 96px);
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+  }
+
+  h2 {
+    font-size: clamp(36px, 4.8vw, 64px);
+    line-height: 1.05;
+  }
+
+  h3 {
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+  }
+
   p,
   li {
     text-wrap: pretty;
