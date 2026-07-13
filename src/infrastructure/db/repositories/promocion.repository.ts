@@ -1,4 +1,4 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc, count } from "drizzle-orm";
 import {
   promociones,
   tipologias,
@@ -10,7 +10,12 @@ import type { PromocionContentBlock } from "@/infrastructure/db/schema/promocion
 import type { MediaAsset } from "@/infrastructure/db/schema/media-assets";
 import { TipologiaSyncService } from "@/infrastructure/db/services/tipologia-sync.service";
 import { PromocionHistoryRecorder } from "@/infrastructure/db/repositories/promocion-history-recorder";
-import { PROMOCION_SELECT_COLUMNS } from "@/infrastructure/db/repositories/promocion-cursor.query";
+import {
+  PROMOCION_SELECT_COLUMNS,
+  type PromocionFilters,
+  type PromocionListRow,
+} from "@/infrastructure/db/repositories/promocion-cursor.query";
+import type { PaginatedResult } from "@/shared/types/pagination";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import type { TenantContext, Transaction } from "@/infrastructure/tenant/TenantContext";
 
@@ -120,6 +125,69 @@ export class PromocionRepository extends TenantAwareRepository {
   constructor(ctx: TenantContext) {
     super(ctx);
     this.authCtx = ctx.type === "authenticated" ? (ctx as AuthenticatedContext) : null;
+  }
+
+  // ── Offset-based pagination (backoffice catalog) ──
+
+  async findAll(
+    filters: PromocionFilters,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResult<PromocionListRow>> {
+    return this.withTransaction(async (tx) => {
+      const conditions: ReturnType<typeof eq>[] = [
+        eq(promociones.tenantId, this.ctx.getTenantId()),
+      ];
+
+      if (filters.status) {
+        conditions.push(eq(promociones.status, filters.status));
+      }
+      if (filters.kind) {
+        conditions.push(eq(promociones.kind, filters.kind));
+      }
+      if (filters.island) {
+        conditions.push(eq(promociones.island, filters.island));
+      }
+      if (filters.municipality) {
+        conditions.push(eq(promociones.municipality, filters.municipality));
+      }
+      if (filters.constructionStatus) {
+        conditions.push(
+          eq(promociones.constructionStatus, filters.constructionStatus),
+        );
+      }
+
+      if (this.authCtx?.role === "AGENT") {
+        conditions.push(
+          eq(promociones.assignedAgentId, this.authCtx.userId),
+        );
+      } else if (filters.assignedAgentId) {
+        conditions.push(
+          eq(promociones.assignedAgentId, filters.assignedAgentId),
+        );
+      }
+
+      const whereClause = and(...conditions);
+      const offset = (page - 1) * limit;
+
+      const items = await tx
+        .select(PROMOCION_SELECT_COLUMNS)
+        .from(promociones)
+        .leftJoin(users, eq(promociones.assignedAgentId, users.id))
+        .where(whereClause)
+        .orderBy(desc(promociones.updatedAt))
+        .limit(limit)
+        .offset(offset);
+
+      const totalResult = await tx
+        .select({ count: count() })
+        .from(promociones)
+        .where(whereClause);
+
+      const total = Number(totalResult[0]?.count ?? 0);
+
+      return { items, total };
+    });
   }
 
   async findById(

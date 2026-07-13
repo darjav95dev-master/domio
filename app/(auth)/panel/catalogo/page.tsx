@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
-import { PromocionCursorQuery } from "@/infrastructure/db/repositories/promocion-cursor.query";
+import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
 import { CatalogFilters } from "@/features/promociones/components/catalog-filters";
 import { CatalogList } from "@/features/promociones/components/catalog-list";
 import type {
@@ -65,7 +65,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   // ── Parse filters ──────────────────────────────────────────────────────
-  const filters: Parameters<PromocionCursorQuery["findAllWithCursor"]>[0] = {};
+  const filters: Parameters<PromocionRepository["findAll"]>[0] = {};
 
   const status = paramValue(params, "status");
   if (status) filters.status = status as PromocionStatus;
@@ -84,24 +84,21 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     filters.constructionStatus = constructionStatus as ConstructionStatus;
 
   // ── Parse pagination ───────────────────────────────────────────────────
+  const page = paramInt(params, "page", 1);
   const limit = paramInt(params, "limit", 20);
-  const cursor = paramValue(params, "cursor");
+
   // ── Fetch data ─────────────────────────────────────────────────────────
   const ctx = new AuthenticatedContext(
     session.tenantId,
     session.userId,
     session.role,
   );
-  const cursorQuery = new PromocionCursorQuery(ctx);
+  const repo = new PromocionRepository(ctx);
 
-  // Always use cursor-based pagination. Absence of cursor = first page (cursor = "").
-  const result = await cursorQuery.findAllWithCursor(filters, {
-    cursor: cursor ?? "",
-    limit,
-  });
+  const { items, total } = await repo.findAll(filters, page, limit);
 
-  // Map to CatalogListItem
-  const catalogItems = result.items.map((item) => ({
+  // ── Map to CatalogListItem ─────────────────────────────────────────────
+  const catalogItems = items.map((item) => ({
     id: item.id,
     name: item.name,
     propertyType: item.propertyType,
@@ -112,56 +109,16 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     assignedAgentName: item.assignedAgentName,
   }));
 
-  return (
-    <CursorCatalogPage
-      catalogItems={catalogItems}
-      total={result.total}
-      nextCursor={result.nextCursor}
-      params={params}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Cursor-based catalog page
-// ---------------------------------------------------------------------------
-
-async function CursorCatalogPage({
-  catalogItems,
-  total,
-  nextCursor,
-  params,
-}: {
-  catalogItems: Array<{
-    id: string;
-    name: string;
-    propertyType: string | null;
-    operation: string | null;
-    status: string;
-    kind: string;
-    municipality: string | null;
-    assignedAgentName: string | null;
-  }>;
-  total: number;
-  nextCursor: string | null;
-  params: Record<string, string | string[] | undefined>;
-}) {
-  // Build current params for nav links
-  const baseParams = new URLSearchParams();
+  // ── Build currentParams string for pagination ──────────────────────────
+  const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (typeof value === "string" && value.length > 0 && key !== "cursor" && key !== "prev") {
-      baseParams.set(key, value);
+    if (typeof value === "string" && value.length > 0) {
+      qs.set(key, value);
     }
   }
-  const limit = baseParams.get("limit") ?? "20";
-  baseParams.set("limit", limit);
-  const baseQs = baseParams.toString();
+  const currentParams = qs.toString();
 
-  const prevHref = baseQs.length > 0 ? `?${baseQs}` : "?";
-  const nextHref = nextCursor
-    ? `?${baseParams.toString()}&cursor=${encodeURIComponent(nextCursor)}&prev=1`
-    : null;
-
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -184,14 +141,10 @@ async function CursorCatalogPage({
       <CatalogList
         items={catalogItems}
         total={total}
-        page={1}
-        limit={Number(limit)}
-        currentParams=""
-        nextCursor={nextCursor}
-        prevHref={prevHref}
-        nextHref={nextHref}
+        page={page}
+        limit={limit}
+        currentParams={currentParams}
       />
     </div>
   );
 }
-

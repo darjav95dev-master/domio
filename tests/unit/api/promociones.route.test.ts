@@ -15,15 +15,11 @@ const mockSession = vi.hoisted(() => ({
   >(),
 }));
 
-const mockFindAllWithCursor = vi.fn();
+const mockFindAll = vi.fn();
 const mockCreate = vi.fn();
 
 const mockRepository = vi.hoisted(() => ({
   PromocionRepository: vi.fn(),
-}));
-
-const mockCursorQuery = vi.hoisted(() => ({
-  PromocionCursorQuery: vi.fn(),
 }));
 
 vi.mock("@/infrastructure/auth/session", () => ({
@@ -34,13 +30,6 @@ vi.mock(
   "@/infrastructure/db/repositories/promocion.repository",
   () => ({
     PromocionRepository: mockRepository.PromocionRepository,
-  }),
-);
-
-vi.mock(
-  "@/infrastructure/db/repositories/promocion-cursor.query",
-  () => ({
-    PromocionCursorQuery: mockCursorQuery.PromocionCursorQuery,
   }),
 );
 
@@ -95,29 +84,31 @@ const mockPromocionRow = {
 describe("GET /api/internal/promociones", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindAllWithCursor.mockReset();
+    mockFindAll.mockReset();
   });
 
-  it("returns 200 with cursor-paginated results when session is valid", async () => {
+  it("returns 200 with paginated results when session is valid", async () => {
     mockSession.getServerSession.mockResolvedValue(validSession);
 
-    const mockImpl = mockFindAllWithCursor.mockResolvedValue({
+    const mockFindAllImpl = mockFindAll.mockResolvedValue({
       items: [mockPromocionRow],
-      nextCursor: null,
       total: 1,
     });
-    mockCursorQuery.PromocionCursorQuery.mockImplementation(() => ({
-      findAllWithCursor: mockImpl,
+    mockRepository.PromocionRepository.mockImplementation(() => ({
+      findAll: mockFindAllImpl,
     }));
 
-    const request = new Request(`${BASE_URL}?limit=50`);
+    const request = new Request(
+      `${BASE_URL}?page=1&limit=50`,
+    );
     const response = await GET(request);
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body).toHaveProperty("items");
     expect(body).toHaveProperty("total");
-    expect(body).toHaveProperty("nextCursor");
+    expect(body).toHaveProperty("page", 1);
+    expect(body).toHaveProperty("limit", 50);
     expect(body.items).toHaveLength(1);
     expect(body.total).toBe(1);
   });
@@ -133,24 +124,23 @@ describe("GET /api/internal/promociones", () => {
     expect(body.error).toBe("Unauthenticated");
   });
 
-  it("passes query params as filters to findAllWithCursor", async () => {
+  it("passes query params as filters to findAll", async () => {
     mockSession.getServerSession.mockResolvedValue(validSession);
 
-    const mockImpl = mockFindAllWithCursor.mockResolvedValue({
+    const mockFindAllImpl = mockFindAll.mockResolvedValue({
       items: [],
-      nextCursor: null,
       total: 0,
     });
-    mockCursorQuery.PromocionCursorQuery.mockImplementation(() => ({
-      findAllWithCursor: mockImpl,
+    mockRepository.PromocionRepository.mockImplementation(() => ({
+      findAll: mockFindAllImpl,
     }));
 
     const request = new Request(
-      `${BASE_URL}?status=PUBLISHED&kind=portfolio&island=Tenerife&municipality=Santa+Cruz&assignedAgentId=agent-1&constructionStatus=READY&limit=25`,
+      `${BASE_URL}?status=PUBLISHED&kind=portfolio&island=Tenerife&municipality=Santa+Cruz&assignedAgentId=agent-1&constructionStatus=READY&page=2&limit=25`,
     );
     await GET(request);
 
-    expect(mockImpl).toHaveBeenCalledWith(
+    expect(mockFindAllImpl).toHaveBeenCalledWith(
       {
         status: "PUBLISHED",
         kind: "portfolio",
@@ -159,21 +149,24 @@ describe("GET /api/internal/promociones", () => {
         assignedAgentId: "agent-1",
         constructionStatus: "READY",
       },
-      expect.objectContaining({ limit: 25 }),
+      2,
+      25,
     );
   });
 
   it("returns 500 with Internal server error when repository throws", async () => {
     mockSession.getServerSession.mockResolvedValue(validSession);
 
-    const mockImpl = mockFindAllWithCursor.mockRejectedValue(
+    const mockFindAllImpl = mockFindAll.mockRejectedValue(
       new Error("DB error"),
     );
-    mockCursorQuery.PromocionCursorQuery.mockImplementation(() => ({
-      findAllWithCursor: mockImpl,
+    mockRepository.PromocionRepository.mockImplementation(() => ({
+      findAll: mockFindAllImpl,
     }));
 
-    const request = new Request(BASE_URL);
+    const request = new Request(
+      BASE_URL,
+    );
     const response = await GET(request);
     const body = await response.json();
 
