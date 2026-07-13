@@ -381,7 +381,7 @@ describe("contactConfigSchema", () => {
   it("accepts a complete valid contact config", () => {
     const result = contactConfigSchema.safeParse({
       phone: "+34 900 123 456",
-      email: "info@domio.com",
+      email: "info@wedomio.com",
       address: "Calle Mayor 1, Madrid",
       hours: "Lun-Vie 9:00-18:00",
       whatsappNumber: "+34 600 123 456",

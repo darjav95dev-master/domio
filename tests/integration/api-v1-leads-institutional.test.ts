@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const API_URL = "https://domio.com/api/v1/leads/institutional";
+const API_URL = "https://wedomio.com/api/v1/leads/institutional";
 const TENANT_ID = "00000000-0000-4000-8000-000000000001";
 const TEST_EMAIL = "test@example.com";
 const TEST_CONSENT_BASIS = "RGPD consent";

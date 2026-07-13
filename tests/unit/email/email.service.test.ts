@@ -11,7 +11,7 @@ import type { EmailRepository } from "@/infrastructure/email/email.repository";
 
 // ─── Constants ────────────────────────────────────────────────────────
 
-const BACKOFFICE_URL = "https://panel.domio.com/leads/1";
+const BACKOFFICE_URL = "https://panel.wedomio.com/leads/1";
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ function fakeEmailRow(overrides: Partial<EmailQueue> = {}): EmailQueue {
 }
 
 const validInput = {
-  toEmail: "agent@domio.com",
+  toEmail: "agent@wedomio.com",
   template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
   payload: {
     agentName: "Ana García",
@@ -69,7 +69,7 @@ describe("EmailService", () => {
       expect(mockInsert).toHaveBeenCalledTimes(1);
       const insertArg = mockInsert.mock.calls[0]![0] as Record<string, unknown>;
 
-      expect(insertArg.toEmail).toBe("agent@domio.com");
+      expect(insertArg.toEmail).toBe("agent@wedomio.com");
       expect(insertArg.template).toBe(EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT);
       expect(insertArg.status).toBe("PENDING");
       expect(insertArg.attempts).toBe(0);

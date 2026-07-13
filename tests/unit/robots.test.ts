@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 
-const SITE_URL = "https://domio.com";
+const SITE_URL = "https://wedomio.com";
 
 describe("robots configuration", () => {
   afterEach(() => {

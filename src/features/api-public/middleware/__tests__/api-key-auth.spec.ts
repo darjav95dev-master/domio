@@ -36,7 +36,7 @@ vi.mock("bcryptjs", () => ({
 describe("extractApiKeyFromRequest", () => {
   it("should extract key from x-api-key header", async () => {
     const { extractApiKeyFromRequest } = await import("../api-key-auth");
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: { "x-api-key": "my-api-key" },
     });
     expect(extractApiKeyFromRequest(request)).toBe("my-api-key");
@@ -44,7 +44,7 @@ describe("extractApiKeyFromRequest", () => {
 
   it("should extract key from Authorization Bearer header", async () => {
     const { extractApiKeyFromRequest } = await import("../api-key-auth");
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: { authorization: "Bearer my-bearer-key" },
     });
     expect(extractApiKeyFromRequest(request)).toBe("my-bearer-key");
@@ -52,7 +52,7 @@ describe("extractApiKeyFromRequest", () => {
 
   it("should prefer Authorization Bearer over x-api-key", async () => {
     const { extractApiKeyFromRequest } = await import("../api-key-auth");
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: {
         authorization: "Bearer bearer-key",
         "x-api-key": "x-api-key-value",
@@ -63,13 +63,13 @@ describe("extractApiKeyFromRequest", () => {
 
   it("should return null when no header is present", async () => {
     const { extractApiKeyFromRequest } = await import("../api-key-auth");
-    const request = new Request("https://api.domio.com/api/v1/promociones");
+    const request = new Request("https://api.wedomio.com/api/v1/promociones");
     expect(extractApiKeyFromRequest(request)).toBeNull();
   });
 
   it("should reject Bearer with no token", async () => {
     const { extractApiKeyFromRequest } = await import("../api-key-auth");
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: { authorization: "Bearer " },
     });
     expect(extractApiKeyFromRequest(request)).toBeNull();
@@ -77,7 +77,7 @@ describe("extractApiKeyFromRequest", () => {
 
   it("should reject Authorization header without Bearer prefix", async () => {
     const { extractApiKeyFromRequest } = await import("../api-key-auth");
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: { authorization: "Basic dXNlcjpwYXNz" },
     });
     expect(extractApiKeyFromRequest(request)).toBeNull();
@@ -142,7 +142,7 @@ describe("validateApiKey", () => {
     ]);
     const mockTouch = vi.fn().mockResolvedValue(undefined);
 
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: { "x-api-key": "valid-key" },
     });
 
@@ -158,7 +158,7 @@ describe("validateApiKey", () => {
 
   it("should throw 401 when no API key is present", async () => {
     const { validateApiKey } = await import("../api-key-auth");
-    const request = new Request("https://api.domio.com/api/v1/promociones");
+    const request = new Request("https://api.wedomio.com/api/v1/promociones");
 
     await expect(validateApiKey(request)).rejects.toThrow(ContextResolutionError);
     await expect(validateApiKey(request)).rejects.toHaveProperty("status", 401);
@@ -170,7 +170,7 @@ describe("validateApiKey", () => {
     mockBcryptCompare.mockResolvedValue(false);
     const mockFindKeys = vi.fn().mockResolvedValue([]);
 
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: { "x-api-key": "unknown-key" },
     });
 
@@ -192,7 +192,7 @@ describe("validateApiKey", () => {
     ]);
     const mockTouch = vi.fn().mockResolvedValue(undefined);
 
-    const request = new Request("https://api.domio.com/api/v1/promociones", {
+    const request = new Request("https://api.wedomio.com/api/v1/promociones", {
       headers: { "x-api-key": "valid-key" },
     });
 

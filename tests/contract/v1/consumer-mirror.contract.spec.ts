@@ -20,7 +20,7 @@ import type { PromocionListRow } from "@/infrastructure/db/repositories/promocio
 
 const NOW = new Date("2026-07-08T12:00:00.000Z");
 const VALID_UUID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-const PROMOCIONES_URL = "https://domio.com/api/v1/promociones";
+const PROMOCIONES_URL = "https://wedomio.com/api/v1/promociones";
 // Lead fixture data extracted to avoid sonarjs/no-duplicate-string
 
 /**

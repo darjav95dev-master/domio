@@ -58,7 +58,7 @@ describe("ResendClientImpl", () => {
 
       expect(result).toEqual({ id: "email-123" });
       expect(mockEmailsSend).toHaveBeenCalledWith({
-        from: "noreply@domio.com",
+        from: "noreply@wedomio.com",
         to: sendInput.to,
         subject: sendInput.subject,
         html: sendInput.html,
@@ -74,10 +74,10 @@ describe("ResendClientImpl", () => {
       });
 
       const client = new ResendClientImpl(VALID_KEY);
-      await client.send({ ...sendInput, from: "custom@domio.com" });
+      await client.send({ ...sendInput, from: "custom@wedomio.com" });
 
       expect(mockEmailsSend).toHaveBeenCalledWith(
-        expect.objectContaining({ from: "custom@domio.com" }),
+        expect.objectContaining({ from: "custom@wedomio.com" }),
       );
     });
 

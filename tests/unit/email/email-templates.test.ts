@@ -33,9 +33,9 @@ function omit<T extends Record<string, unknown>, K extends keyof T>(
   return result;
 }
 
-const BACKOFFICE_URL = "https://panel.domio.com/leads/123";
-const RESET_URL = "https://panel.domio.com/reset/abc123";
-const SETUP_URL = "https://panel.domio.com/setup/abc123";
+const BACKOFFICE_URL = "https://panel.wedomio.com/leads/123";
+const RESET_URL = "https://panel.wedomio.com/reset/abc123";
+const SETUP_URL = "https://panel.wedomio.com/setup/abc123";
 const NOT_A_URL = "not-a-url";
 
 describe("EMAIL_TEMPLATE_NAMES", () => {
@@ -88,7 +88,7 @@ describe("leadConfirmationSchema", () => {
   const validPayload = {
     leadName: "Carlos López",
     promotionName: "Residencial Marina",
-    contactEmail: "info@domio.com",
+    contactEmail: "info@wedomio.com",
   };
 
   it("accepts valid payload for lead-confirmation", () => {

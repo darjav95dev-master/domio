@@ -14,7 +14,7 @@ const mockContactConfig = {
   whatsappNumber: "+34612345678",
   whatsappPrefilledMessage: "Hola, me interesa la promoción",
   phone: "+34922123456",
-  email: "info@domio.com",
+  email: "info@wedomio.com",
   address: "Calle Principal 1, Santa Cruz",
   hours: "L-V 9:00-18:00",
   updatedBy: null,

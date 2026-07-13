@@ -39,7 +39,7 @@ afterEach(() => {
 
 describe("ShareButton", () => {
   it("renders the share button", () => {
-    render(<ShareButton url="https://domio.com/test" />);
+    render(<ShareButton url="https://wedomio.com/test" />);
 
     expect(
       screen.getByRole("button", { name: /compartir enlace/i }),
@@ -49,7 +49,7 @@ describe("ShareButton", () => {
   it("uses Web Share API when available", async () => {
     mockShare.mockResolvedValueOnce(undefined);
 
-    render(<ShareButton url="https://domio.com/test" />);
+    render(<ShareButton url="https://wedomio.com/test" />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /compartir enlace/i }),
@@ -59,7 +59,7 @@ describe("ShareButton", () => {
       expect(mockShare).toHaveBeenCalledWith({
         title: "Domio",
         text: "Domio",
-        url: "https://domio.com/test",
+        url: "https://wedomio.com/test",
       });
     });
   });
@@ -73,7 +73,7 @@ describe("ShareButton", () => {
     });
     mockClipboardWrite.mockResolvedValueOnce(undefined);
 
-    render(<ShareButton url="https://domio.com/test" />);
+    render(<ShareButton url="https://wedomio.com/test" />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /compartir enlace/i }),
@@ -81,7 +81,7 @@ describe("ShareButton", () => {
 
     await waitFor(() => {
       expect(mockClipboardWrite).toHaveBeenCalledWith(
-        "https://domio.com/test",
+        "https://wedomio.com/test",
       );
     });
   });
@@ -90,7 +90,7 @@ describe("ShareButton", () => {
     mockShare.mockRejectedValueOnce(new Error("AbortError"));
     mockClipboardWrite.mockResolvedValueOnce(undefined);
 
-    render(<ShareButton url="https://domio.com/test" />);
+    render(<ShareButton url="https://wedomio.com/test" />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /compartir enlace/i }),
@@ -98,7 +98,7 @@ describe("ShareButton", () => {
 
     await waitFor(() => {
       expect(mockClipboardWrite).toHaveBeenCalledWith(
-        "https://domio.com/test",
+        "https://wedomio.com/test",
       );
     });
   });
@@ -112,7 +112,7 @@ describe("ShareButton", () => {
     });
     mockClipboardWrite.mockResolvedValueOnce(undefined);
 
-    render(<ShareButton url="https://domio.com/test" />);
+    render(<ShareButton url="https://wedomio.com/test" />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /compartir enlace/i }),
@@ -133,7 +133,7 @@ describe("ShareButton", () => {
     });
     mockClipboardWrite.mockResolvedValueOnce(undefined);
 
-    render(<ShareButton url="https://domio.com/test" />);
+    render(<ShareButton url="https://wedomio.com/test" />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /compartir enlace/i }),

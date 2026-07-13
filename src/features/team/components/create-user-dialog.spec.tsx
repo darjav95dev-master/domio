@@ -25,7 +25,7 @@ describe("CreateUserDialog", () => {
       data: {
         id: "new-id",
         tenantId: "t-1",
-        email: "new@domio.com",
+        email: "new@wedomio.com",
         name: "New User",
         role: "AGENT",
         isActive: true,
@@ -105,7 +105,7 @@ describe("CreateUserDialog", () => {
     fireEvent.change(nameInput, { target: { value: "New User" } });
 
     const emailInput = screen.getByLabelText("Email");
-    fireEvent.change(emailInput, { target: { value: "new@domio.com" } });
+    fireEvent.change(emailInput, { target: { value: "new@wedomio.com" } });
 
     const roleSelect = screen.getByLabelText("Rol");
     fireEvent.change(roleSelect, { target: { value: "AGENT" } });
@@ -116,7 +116,7 @@ describe("CreateUserDialog", () => {
 
     expect(mockCreateUserAction).toHaveBeenCalledWith({
       name: "New User",
-      email: "new@domio.com",
+      email: "new@wedomio.com",
       role: "AGENT",
     });
   });
@@ -131,7 +131,7 @@ describe("CreateUserDialog", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "New User" } });
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@domio.com" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@wedomio.com" } });
     const form = screen.getByRole("dialog").querySelector("form")!;
     fireEvent.submit(form);
 
@@ -150,7 +150,7 @@ describe("CreateUserDialog", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "New User" } });
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@domio.com" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@wedomio.com" } });
     const form = screen.getByRole("dialog").querySelector("form")!;
     fireEvent.submit(form);
 
@@ -174,7 +174,7 @@ describe("CreateUserDialog", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "New User" } });
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@domio.com" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@wedomio.com" } });
     const form = screen.getByRole("dialog").querySelector("form")!;
     fireEvent.submit(form);
 

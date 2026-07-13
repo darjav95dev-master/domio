@@ -81,7 +81,7 @@ describe("getContactPageData", () => {
     const fakeContactConfig = {
       tenantId: TENANT_ID,
       phone: "+34 922 123 456",
-      email: "info@domio.com",
+      email: "info@wedomio.com",
       address: "Calle Ejemplo 123, Santa Cruz de Tenerife",
       hours: "Lun–Vie 9:00–18:00",
       whatsappNumber: "+34 600 123 456",
@@ -100,7 +100,7 @@ describe("getContactPageData", () => {
 
     expect(result.contactConfig).not.toBeNull();
     expect(result.contactConfig!.phone).toBe("+34 922 123 456");
-    expect(result.contactConfig!.email).toBe("info@domio.com");
+    expect(result.contactConfig!.email).toBe("info@wedomio.com");
     expect(result.contactConfig!.officeLat).toBeCloseTo(28.4636, 10);
     expect(result.contactConfig!.officeLng).toBeCloseTo(-16.2518, 10);
     expect(mockGetTenantId).toHaveBeenCalled();

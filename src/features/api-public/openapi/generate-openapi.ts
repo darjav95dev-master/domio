@@ -308,7 +308,7 @@ export function generateOpenAPISpec(): Record<string, unknown> {
     },
     servers: [
       {
-        url: "https://domio.com",
+        url: "https://wedomio.com",
         description: "Production server",
       },
       {

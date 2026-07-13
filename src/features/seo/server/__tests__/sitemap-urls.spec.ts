@@ -101,13 +101,13 @@ describe("buildSitemapUrls", () => {
 
   it("builds absolute loc URL with slug appended to site URL", async () => {
     const mockRepo = createMockPromocionRepository([publishedPortfolio]);
-    process.env.NEXT_PUBLIC_SITE_URL = "https://domio.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://wedomio.com";
     const { buildSitemapUrls } = await import("../sitemap-urls");
 
     const result = await buildSitemapUrls(mockRepo);
 
     expect(result[0]?.loc).toBe(
-      "https://domio.com/inmuebles/piso-en-venta-en-santa-cruz-3hab-a4c9",
+      "https://wedomio.com/inmuebles/piso-en-venta-en-santa-cruz-3hab-a4c9",
     );
   });
 

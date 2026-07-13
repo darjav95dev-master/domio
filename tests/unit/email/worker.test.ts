@@ -40,7 +40,7 @@ try {
 
 const TEST_ROW_ID = "00000000-0000-0000-0000-000000000001";
 const BASE_TIME = "2026-07-08T12:00:00Z";
-const BACKOFFICE_URL = "https://panel.domio.com/leads/1";
+const BACKOFFICE_URL = "https://panel.wedomio.com/leads/1";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ const mockTemplateRegistry = { getTemplate: mockGetTemplate };
 function fakeEmailRow(overrides: Partial<EmailQueue> = {}): EmailQueue {
   return {
     id: TEST_ROW_ID,
-    toEmail: "agent@domio.com",
+    toEmail: "agent@wedomio.com",
     template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
     payload: {
       agentName: "Ana García",
@@ -136,7 +136,7 @@ describe("Email Worker", () => {
 
       // Should send the email with template content
       expect(mockSend).toHaveBeenCalledWith({
-        to: "agent@domio.com",
+        to: "agent@wedomio.com",
         subject: defaultContent.subject,
         html: defaultContent.html,
         text: defaultContent.text,

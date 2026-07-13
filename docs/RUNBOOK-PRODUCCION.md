@@ -1,12 +1,12 @@
-# Runbook — de 0 a domio.com en producción
+# Runbook — de 0 a wedomio.com en producción
 
 > Guía paso a paso pensada para **no perderte**. Sigue las fases **en orden**.
 > Cada fase tiene: 🎯 objetivo · ⛔ requisito previo · los pasos · 👀 qué deberías
 > ver · 🔧 si falla · ✅ puerta de salida (no pases a la siguiente hasta cumplirla).
 >
 > Leyenda: 👤 = solo puedes hacerlo tú (compra/cuenta/panel web) · 💻 = comando.
-> Datos fijos del proyecto: repo `darjav95dev-master/domio` · dominio `domio.com` /
-> `dev.domio.com` · tenant público `00000000-0000-0000-0000-000000000001` ·
+> Datos fijos del proyecto: repo `darjav95dev-master/domio` · dominio `wedomio.com` /
+> `dev.wedomio.com` · tenant público `00000000-0000-0000-0000-000000000001` ·
 > imágenes `ghcr.io/darjav95dev-master/domio-{web,tools}`.
 
 ---
@@ -32,7 +32,7 @@ G (GitHub CD) ── en paralelo, habilita deploy automático ──────
 
 | # | Qué | Dónde | Coste | Notas |
 |---|-----|-------|-------|-------|
-| A1 | Registrar **domio.com** | Cloudflare Registrar o Namecheap | ~10 €/año | Si lo compras en Cloudflare, la Fase B2 se salta (ya está dentro) |
+| A1 | Registrar **wedomio.com** | Cloudflare Registrar o Namecheap | ~10 €/año | Si lo compras en Cloudflare, la Fase B2 se salta (ya está dentro) |
 | A2 | Cuenta **Cloudflare** Free | cloudflare.com | 0 € | Aquí viven DNS, R2 y Turnstile |
 | A3 | **VPS Hetzner Cloud CX22** | console.hetzner.cloud | ~4,5 €/mes | Ubuntu 24.04, 2 vCPU / 4 GB. Apúntate la **IP pública** |
 | A4 | **Resend** | resend.com | 0 € (3k/mes) | Email transaccional |
@@ -46,21 +46,21 @@ G (GitHub CD) ── en paralelo, habilita deploy automático ──────
 
 ## Fase B — Dominio + DNS + servicios de Cloudflare 👤
 
-🎯 Que `domio.com` y `dev.domio.com` apunten a tu VPS y el TLS esté en modo correcto.
+🎯 Que `wedomio.com` y `dev.wedomio.com` apunten a tu VPS y el TLS esté en modo correcto.
 ⛔ Requisito previo: A1, A2, A3 (necesitas la IP del VPS).
 
-**B1.** Cloudflare → *Add a site* → `domio.com`, plan **Free**.
+**B1.** Cloudflare → *Add a site* → `wedomio.com`, plan **Free**.
 **B2.** (Solo si compraste el dominio fuera de Cloudflare) En tu registrador, cambia los *nameservers* por los dos que te muestra Cloudflare. → Propagación: minutos a 24 h.
 **B3.** Cloudflare → **DNS → Records**, con `IP_VPS` = IP de A3:
 
 | Tipo | Nombre | Contenido | Proxy status |
 |------|--------|-----------|--------------|
-| A | `@` (domio.com) | `IP_VPS` | 🟠 Proxied |
+| A | `@` (wedomio.com) | `IP_VPS` | 🟠 Proxied |
 | A | `dev` | `IP_VPS` | 🟠 Proxied |
 
 **B4.** Cloudflare → **SSL/TLS → Overview → Full (Strict)**.
-**B5.** **R2** (Cloudflare → R2): crea buckets `domio-prod` y `domio-dev`. En cada uno → *Settings → Public access* → conecta dominio `cdn.domio.com` (prod) y `cdn-dev.domio.com` (dev); Cloudflare te creará esos CNAME solo.
-**B6.** **Turnstile** (Cloudflare → Turnstile → *Add site*): dominio `domio.com` → te da **Site Key** (pública) y **Secret Key**. Guárdalas para Fase D/G.
+**B5.** **R2** (Cloudflare → R2): crea buckets `domio-prod` y `domio-dev`. En cada uno → *Settings → Public access* → conecta dominio `cdn.wedomio.com` (prod) y `cdn-dev.wedomio.com` (dev); Cloudflare te creará esos CNAME solo.
+**B6.** **Turnstile** (Cloudflare → Turnstile → *Add site*): dominio `wedomio.com` → te da **Site Key** (pública) y **Secret Key**. Guárdalas para Fase D/G.
 
 👀 Qué deberías ver: en Cloudflare, el dominio en estado **Active** (no "Pending nameservers").
 🔧 Si sigue "Pending": los nameservers del registrador aún no propagaron; espera y recarga.
@@ -136,8 +136,8 @@ Luego **edita `.env.production` y `.env.development`** y sustituye cada `RELLENA
 | `R2_ACCOUNT_ID` | Cloudflare → R2 → *(arriba a la derecha)* "Account ID" |
 | `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` | Cloudflare → R2 → **Manage R2 API Tokens** → *Create API token* (permiso **Object Read & Write**) → copia ambos (el secret solo se muestra una vez) |
 | `R2_BUCKET` | El nombre que creaste: `domio-prod` (prod) / `domio-dev` (dev) — ya viene puesto |
-| `R2_PUBLIC_URL` | El dominio público del bucket: `https://cdn.domio.com` — ya viene puesto |
-| `RESEND_API_KEY` | resend.com → **API Keys** → *Create API Key*. Además: **Domains → Add domain `domio.com`** y añade los registros DNS que te dé (SPF/DKIM) en Cloudflare, o los emails no se entregan |
+| `R2_PUBLIC_URL` | El dominio público del bucket: `https://cdn.wedomio.com` — ya viene puesto |
+| `RESEND_API_KEY` | resend.com → **API Keys** → *Create API Key*. Además: **Domains → Add domain `wedomio.com`** y añade los registros DNS que te dé (SPF/DKIM) en Cloudflare, o los emails no se entregan |
 | `SENTRY_DSN` | sentry.io → tu proyecto `domio` → **Settings → Client Keys (DSN)** → copia el DSN |
 | `RATE_LIMIT_STORE_URL` + `RATE_LIMIT_STORE_TOKEN` | Upstash → tu base Redis → pestaña **REST API** → `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` (el cliente usa HTTP REST, por eso es la URL REST, no la de conexión TCP) |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare → Turnstile → tu site → **Site Key** (es pública) |
@@ -172,7 +172,7 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u darjav95dev-master --password-stdin
 
 docker build --target runner \
   --build-arg NEXT_PUBLIC_APP_ENV=production \
-  --build-arg NEXT_PUBLIC_SITE_URL=https://domio.com \
+  --build-arg NEXT_PUBLIC_SITE_URL=https://wedomio.com \
   --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY=<tu-site-key> \
   -t ghcr.io/darjav95dev-master/domio-web:latest .
 docker build --target tools -t ghcr.io/darjav95dev-master/domio-tools:latest .
@@ -244,7 +244,7 @@ GitHub → repo `domio` → **Settings → Environments** → crea **`production
 | Secret | `SSH_KEY` | *(contenido completo de `~/.ssh/domio_deploy`, la clave privada, con `-----BEGIN...` y `-----END...`)* |
 | Secret | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | *(Site Key de Turnstile)* |
 | Variable | `NEXT_PUBLIC_APP_ENV` | `production` |
-| Variable | `NEXT_PUBLIC_SITE_URL` | `https://domio.com` |
+| Variable | `NEXT_PUBLIC_SITE_URL` | `https://wedomio.com` |
 
 **Environment `development`:**
 
@@ -255,7 +255,7 @@ GitHub → repo `domio` → **Settings → Environments** → crea **`production
 | Secret | `SSH_KEY` | *(la misma clave privada `~/.ssh/domio_deploy`)* |
 | Secret | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | *(Site Key de Turnstile — puede ser la misma)* |
 | Variable | `NEXT_PUBLIC_APP_ENV` | `development` |
-| Variable | `NEXT_PUBLIC_SITE_URL` | `https://dev.domio.com` |
+| Variable | `NEXT_PUBLIC_SITE_URL` | `https://dev.wedomio.com` |
 
 > **No hace falta crear `GITHUB_TOKEN`**: GitHub lo inyecta solo (el workflow ya
 > pide permiso `packages: write`). Las claves de R2/Resend/Sentry/Upstash **no van
@@ -278,18 +278,18 @@ GitHub → repo `domio` → **Settings → Environments** → crea **`production
 
 **H1. Health checks:**
 ```bash
-curl -s https://domio.com/api/health       # → {"status":"ok","env":"production"}
-curl -s https://dev.domio.com/api/health    # → {"status":"ok","env":"development"}
+curl -s https://wedomio.com/api/health       # → {"status":"ok","env":"production"}
+curl -s https://dev.wedomio.com/api/health    # → {"status":"ok","env":"development"}
 ```
 
 **H2. Smoke tests manuales** (en el navegador):
-- [ ] `https://domio.com` — home carga.
-- [ ] Catálogo lista las 9 promociones con imágenes (servidas desde `cdn.domio.com`).
+- [ ] `https://wedomio.com` — home carga.
+- [ ] Catálogo lista las 9 promociones con imágenes (servidas desde `cdn.wedomio.com`).
 - [ ] Detalle de un inmueble abre y muestra el mapa.
 - [ ] Formulario de contacto → se crea el lead → llega el email (worker + Resend).
 - [ ] `/panel/login` — entra con un usuario admin; edita una promoción; sube una imagen (va a R2).
-- [ ] API pública: `curl https://domio.com/api/v1/promociones` con una API key responde; al exceder el límite devuelve `429` (confirma que Upstash está activo).
-- [ ] `https://domio.com/sitemap.xml` y `/robots.txt` correctos.
+- [ ] API pública: `curl https://wedomio.com/api/v1/promociones` con una API key responde; al exceder el límite devuelve `429` (confirma que Upstash está activo).
+- [ ] `https://wedomio.com/sitemap.xml` y `/robots.txt` correctos.
 
 **H3. Backup automático** (cron en el VPS, como `deploy`):
 ```bash
@@ -316,7 +316,7 @@ Si la migración fue destructiva (contract), restaura el `pg_dump` previo de `ba
 
 | Concepto | Coste |
 |----------|-------|
-| Dominio domio.com | ~10 €/año |
+| Dominio wedomio.com | ~10 €/año |
 | VPS Hetzner CX22 | ~4,5 €/mes |
 | Cloudflare / R2 / Resend / Sentry / Upstash / Turnstile | 0 € (free tier) |
 | **Total** | **~5 €/mes + 10 €/año** |

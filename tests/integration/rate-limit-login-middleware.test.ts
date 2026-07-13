@@ -33,7 +33,7 @@ vi.mock("next-auth/jwt", () => ({
 // ---------------------------------------------------------------------------
 import { middleware } from "../../middleware";
 
-const CREDENTIALS_URL = "https://domio.com/api/auth/callback/credentials";
+const CREDENTIALS_URL = "https://wedomio.com/api/auth/callback/credentials";
 
 describe("login rate limiting in middleware", () => {
   beforeEach(() => {
@@ -98,7 +98,7 @@ describe("login rate limiting in middleware", () => {
 
   it("does NOT check rate limit on POST requests to other paths", async () => {
     const request = new NextRequest(
-      new Request("https://domio.com/api/auth/callback/session", {
+      new Request("https://wedomio.com/api/auth/callback/session", {
         method: "POST",
       }),
     );
@@ -110,7 +110,7 @@ describe("login rate limiting in middleware", () => {
 
   it("does NOT check rate limit on POST requests to non-auth paths", async () => {
     const request = new NextRequest(
-      new Request("https://domio.com/api/internal/promociones", {
+      new Request("https://wedomio.com/api/internal/promociones", {
         method: "POST",
       }),
     );
@@ -124,7 +124,7 @@ describe("login rate limiting in middleware", () => {
     mockCheckLoginRateLimit.mockResolvedValue(null);
 
     const request = new NextRequest(
-      new Request("https://domio.com/panel/catalogo", {
+      new Request("https://wedomio.com/panel/catalogo", {
         method: "GET",
       }),
     );

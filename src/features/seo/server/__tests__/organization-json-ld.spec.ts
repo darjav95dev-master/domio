@@ -5,10 +5,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 const TENANT_NAME = "Domio";
 const MODULE_PATH = "../organization-json-ld";
-const SITE_URL = "https://domio.com";
-const LOGO_URL = "https://domio.com/logo.png";
+const SITE_URL = "https://wedomio.com";
+const LOGO_URL = "https://wedomio.com/logo.png";
 const PHONE = "+34-922-123-456";
-const EMAIL = "info@domio.com";
+const EMAIL = "info@wedomio.com";
 const ADDRESS = "Calle Principal 1, 38001 Santa Cruz de Tenerife";
 
 const CONFIG_WITH_LOGO: Record<string, unknown> = { logo: LOGO_URL };

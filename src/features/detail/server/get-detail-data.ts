@@ -230,7 +230,7 @@ export function buildStructuredData(
     "@type": "RealEstateListing",
     name: detail.name,
     description,
-    url: `https://domio.com/inmuebles/${detail.slug}`,
+    url: `https://wedomio.com/inmuebles/${detail.slug}`,
     image: images.length > 0 ? images : undefined,
     offers: {
       "@type": "Offer",

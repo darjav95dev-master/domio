@@ -31,7 +31,7 @@ const mockPromocionRow = {
 const mockAgentRow = {
   id: AGENT_ID,
   name: "María López",
-  email: "maria@domio.com",
+  email: "maria@wedomio.com",
 };
 
 // ---------------------------------------------------------------------------

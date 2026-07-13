@@ -19,7 +19,7 @@ const mockOnUpdated = vi.fn();
 const defaultUser = {
   id: "user-1",
   tenantId: "t-1",
-  email: "user@domio.com",
+  email: "user@wedomio.com",
   name: "Test User",
   role: "AGENT" as const,
   isActive: true,
@@ -67,7 +67,7 @@ describe("UserActions", () => {
     expect(nameInput.value).toBe("Test User");
 
     const emailInput = screen.getByLabelText("Email") as HTMLInputElement;
-    expect(emailInput.value).toBe("user@domio.com");
+    expect(emailInput.value).toBe("user@wedomio.com");
   });
 
   it("calls updateUserAction on edit submit", async () => {
@@ -84,7 +84,7 @@ describe("UserActions", () => {
     await waitFor(() => {
       expect(mockUpdateUserAction).toHaveBeenCalledWith("user-1", {
         name: "Updated Name",
-        email: "user@domio.com",
+        email: "user@wedomio.com",
         role: "AGENT",
       });
     });

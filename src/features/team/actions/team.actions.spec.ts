@@ -55,7 +55,7 @@ const operatorSession = {
 const mockUserRow: UserRow = {
   id: "user-123",
   tenantId: "tenant-1",
-  email: "agent@domio.com",
+  email: "agent@wedomio.com",
   name: "Test Agent",
   role: "AGENT",
   isActive: true,

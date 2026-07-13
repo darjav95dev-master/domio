@@ -88,7 +88,7 @@ describe("POST /api/v1/leads/institutional — auth before rate-limit ordering",
       withTransaction: vi.fn(),
     });
 
-    const request = new Request("https://domio.com/api/v1/leads/institutional", {
+    const request = new Request("https://wedomio.com/api/v1/leads/institutional", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -129,7 +129,7 @@ describe("POST /api/v1/leads/institutional — auth before rate-limit ordering",
       new ContextResolutionError("Missing API key", 401),
     );
 
-    const request = new Request("https://domio.com/api/v1/leads/institutional", {
+    const request = new Request("https://wedomio.com/api/v1/leads/institutional", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

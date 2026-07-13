@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 const PROMO_NAME = "Residencial Las Américas";
 const PROMO_SLUG = "piso-en-venta-en-santa-cruz-3hab-a4c9";
-const SITE_URL = "https://domio.com";
+const SITE_URL = "https://wedomio.com";
 const MODULE_PATH = "../breadcrumb-json-ld";
 
 // ---------------------------------------------------------------------------

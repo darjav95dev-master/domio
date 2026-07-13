@@ -43,8 +43,8 @@ DEV_PG=$(openssl rand -base64 24 | tr -dc A-Za-z0-9 | head -c 24)
 
 # ── deploy/env.proxy — dominios ──
 cat > deploy/env.proxy <<'EOF'
-PROD_DOMAIN=domio.com
-DEV_DOMAIN=dev.domio.com
+PROD_DOMAIN=wedomio.com
+DEV_DOMAIN=dev.wedomio.com
 EOF
 
 # ── deploy/env.prod / deploy/env.dev — variables de deploy ──
@@ -76,19 +76,19 @@ NEXT_PUBLIC_APP_ENV=production
 DATABASE_URL=postgresql://domio:$PROD_PG@postgres:5432/domio
 PUBLIC_TENANT_ID=00000000-0000-0000-0000-000000000001
 AUTH_SECRET=$(openssl rand -base64 32)
-AUTH_URL=https://domio.com
+AUTH_URL=https://wedomio.com
 R2_ACCOUNT_ID=RELLENAR
 R2_ACCESS_KEY_ID=RELLENAR
 R2_SECRET_ACCESS_KEY=RELLENAR
 R2_BUCKET=domio-prod
-R2_PUBLIC_URL=https://cdn.domio.com
+R2_PUBLIC_URL=https://cdn.wedomio.com
 RESEND_API_KEY=RELLENAR
 SENTRY_DSN=RELLENAR
 RATE_LIMIT_STORE_URL=RELLENAR
 RATE_LIMIT_STORE_TOKEN=RELLENAR
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=RELLENAR
 TURNSTILE_SECRET_KEY=RELLENAR
-NEXT_PUBLIC_SITE_URL=https://domio.com
+NEXT_PUBLIC_SITE_URL=https://wedomio.com
 EOF
 
 # ── .env.development — igual, dominio dev ──
@@ -98,19 +98,19 @@ NEXT_PUBLIC_APP_ENV=development
 DATABASE_URL=postgresql://domio:$DEV_PG@postgres:5432/domio
 PUBLIC_TENANT_ID=00000000-0000-0000-0000-000000000001
 AUTH_SECRET=$(openssl rand -base64 32)
-AUTH_URL=https://dev.domio.com
+AUTH_URL=https://dev.wedomio.com
 R2_ACCOUNT_ID=RELLENAR
 R2_ACCESS_KEY_ID=RELLENAR
 R2_SECRET_ACCESS_KEY=RELLENAR
 R2_BUCKET=domio-dev
-R2_PUBLIC_URL=https://cdn-dev.domio.com
+R2_PUBLIC_URL=https://cdn-dev.wedomio.com
 RESEND_API_KEY=RELLENAR
 SENTRY_DSN=RELLENAR
 RATE_LIMIT_STORE_URL=RELLENAR
 RATE_LIMIT_STORE_TOKEN=RELLENAR
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=RELLENAR
 TURNSTILE_SECRET_KEY=RELLENAR
-NEXT_PUBLIC_SITE_URL=https://dev.domio.com
+NEXT_PUBLIC_SITE_URL=https://dev.wedomio.com
 EOF
 
 chmod 600 .env.production .env.development deploy/env.*
@@ -166,12 +166,12 @@ Las imágenes se etiquetan por `sha`/tag. Para volver atrás, fija `IMAGE_TAG` a
 tag anterior en `deploy/env.prod` y `make -f deploy/Makefile prod-up`. Si la
 migración fue *contract* (destructiva), restaura el `pg_dump` previo.
 
-## Publicar en domio.com (dominio + DNS + SSL)
+## Publicar en wedomio.com (dominio + DNS + SSL)
 
-El **código ya apunta a domio.com** (Caddyfile, `AUTH_URL`, `NEXT_PUBLIC_SITE_URL`).
+El **código ya apunta a wedomio.com** (Caddyfile, `AUTH_URL`, `NEXT_PUBLIC_SITE_URL`).
 Falta la parte de infraestructura, que se hace una sola vez:
 
-1. **Registrar `domio.com`** en un registrador (Cloudflare Registrar, Namecheep,
+1. **Registrar `wedomio.com`** en un registrador (Cloudflare Registrar, Namecheep,
    Donvoin…). *(Esto es una compra/alta de cuenta: la haces tú.)*
 2. **Añadir el dominio a Cloudflare** (plan Free) y apuntar los *nameservers* del
    registrador a los que te dé Cloudflare.
@@ -179,7 +179,7 @@ Falta la parte de infraestructura, que se hace una sola vez:
 
    | Tipo | Nombre | Contenido | Proxy |
    |------|--------|-----------|-------|
-   | A | `domio.com` (`@`) | `IP_DEL_VPS` | ✅ Proxied |
+   | A | `wedomio.com` (`@`) | `IP_DEL_VPS` | ✅ Proxied |
    | A | `dev`   | `IP_DEL_VPS` | ✅ Proxied |
    | A | `cdn`   | (endpoint público de R2) | según R2 |
 
@@ -187,12 +187,12 @@ Falta la parte de infraestructura, que se hace una sola vez:
    de origen (Let's Encrypt) automáticamente al arrancar `proxy-up`.
 5. **Abrir puertos en el VPS**: 80, 443 y 22 (firewall).
 6. Levantar `proxy-up` + `prod-up`. Caddy resuelve el certificado y en unos
-   minutos `https://domio.com` responde.
+   minutos `https://wedomio.com` responde.
 
 Verificación:
 ```bash
-curl -s https://domio.com/api/health      # → {"status":"ok","env":"production"}
-curl -s https://dev.domio.com/api/health   # → {"status":"ok","env":"development"}
+curl -s https://wedomio.com/api/health      # → {"status":"ok","env":"production"}
+curl -s https://dev.wedomio.com/api/health   # → {"status":"ok","env":"development"}
 ```
 
 > Lo que **no puedo hacer por ti**: comprar el dominio, crear la cuenta de

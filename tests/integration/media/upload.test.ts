@@ -56,7 +56,7 @@ vi.mock("@/infrastructure/db/client", () => {
   };
 });
 
-const UPLOAD_URL = "https://panel.domio.com/api/internal/media/upload";
+const UPLOAD_URL = "https://panel.wedomio.com/api/internal/media/upload";
 const VALID_OWNER_ID = "a4c9f123-4567-89ab-cdef-0123456789ab";
 
 function createRequest(formData: FormData) {

@@ -841,7 +841,7 @@ const GLOBAL_CONTENT_BLOCKS_SEED = [
         {
           titulo: "Condiciones de uso",
           contenido:
-            "El acceso y uso del portal domio.com atribuye la condición de usuario e implica la aceptación plena y sin reservas de todas las condiciones dispuestas en el presente aviso legal. El usuario se compromete a hacer un uso adecuado de los contenidos y servicios ofrecidos, con carácter enunciativo pero no limitativo, a no emplearlos para incurrir en actividades ilícitas, contrarias a la buena fe y al orden público.",
+            "El acceso y uso del portal wedomio.com atribuye la condición de usuario e implica la aceptación plena y sin reservas de todas las condiciones dispuestas en el presente aviso legal. El usuario se compromete a hacer un uso adecuado de los contenidos y servicios ofrecidos, con carácter enunciativo pero no limitativo, a no emplearlos para incurrir en actividades ilícitas, contrarias a la buena fe y al orden público.",
         },
         {
           titulo: "Propiedad intelectual",

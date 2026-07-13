@@ -4,7 +4,7 @@ import { getSiteUrl } from "../site-url";
 // Store original env so we can restore between tests
 const ORIGINAL_ENV = process.env;
 
-const TEST_SITE_URL = "https://domio.com";
+const TEST_SITE_URL = "https://wedomio.com";
 const LOCAL_FALLBACK = "http://localhost:3000";
 
 describe("getSiteUrl", () => {

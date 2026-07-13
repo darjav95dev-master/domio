@@ -9,14 +9,14 @@ import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
 
 // ─── Constants ────────────────────────────────────────────────────────
 
-const BACKOFFICE_URL = "https://panel.domio.com/leads/123";
-const RESET_URL = "https://panel.domio.com/reset/abc123";
-const SETUP_URL = "https://panel.domio.com/setup/abc123";
+const BACKOFFICE_URL = "https://panel.wedomio.com/leads/123";
+const RESET_URL = "https://panel.wedomio.com/reset/abc123";
+const SETUP_URL = "https://panel.wedomio.com/setup/abc123";
 
 const AGENT_NAME = "Ana García";
 const LEAD_NAME = "Carlos López";
 const PROMOTION_NAME = "Residencial Marina";
-const CONTACT_EMAIL = "info@domio.com";
+const CONTACT_EMAIL = "info@wedomio.com";
 const INVITEE_NAME = "Pedro Martínez";
 const INVITEE_ROLE = "AGENT";
 const EXPIRY_MINUTES = 30;

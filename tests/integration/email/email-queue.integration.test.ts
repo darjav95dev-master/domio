@@ -15,7 +15,7 @@ import * as schema from "@/infrastructure/db/schema";
 // ─── Constants (avoid sonarjs/no-duplicate-string) ──────────────────────
 const STATUS_PENDING = "PENDING" as const;
 const BASE_TIME_STR = "2026-07-08T12:00:00Z";
-const AGENT_EMAIL = "agent@domio.com";
+const AGENT_EMAIL = "agent@wedomio.com";
 
 // ─── In-memory email queue store ──────────────────────────────────────────
 // Simulates the email_queue table so that EmailService.enqueue writes rows
@@ -116,7 +116,7 @@ const realTemplateRegistry = { getTemplate };
 
 // ─── Valid payloads (matching template schemas) ───────────────────────────
 
-const BACKOFFICE_URL = "https://panel.domio.com/leads/123";
+const BACKOFFICE_URL = "https://panel.wedomio.com/leads/123";
 
 const leadAssignedPayload = {
   agentName: "Ana García",
@@ -254,7 +254,7 @@ describe("Email queue integration: enqueue -> process -> SENT/FAILED", () => {
         nextAttemptAt: new Date(BASE_TIME_STR),
       });
       const rowRetry1 = store.insert({
-        toEmail: "retry1@domio.com",
+        toEmail: "retry1@wedomio.com",
         template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
         payload: leadAssignedPayload,
         status: STATUS_PENDING,
@@ -262,7 +262,7 @@ describe("Email queue integration: enqueue -> process -> SENT/FAILED", () => {
         nextAttemptAt: new Date(BASE_TIME_STR),
       });
       const rowRetry2 = store.insert({
-        toEmail: "retry2@domio.com",
+        toEmail: "retry2@wedomio.com",
         template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
         payload: leadAssignedPayload,
         status: STATUS_PENDING,
@@ -270,7 +270,7 @@ describe("Email queue integration: enqueue -> process -> SENT/FAILED", () => {
         nextAttemptAt: new Date(BASE_TIME_STR),
       });
       const rowFresh = store.insert({
-        toEmail: "fresh@domio.com",
+        toEmail: "fresh@wedomio.com",
         template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
         payload: leadAssignedPayload,
         status: STATUS_PENDING,
@@ -416,7 +416,7 @@ describe("Email queue integration: enqueue -> process -> SENT/FAILED", () => {
 
       // Enqueue a fresh email
       await service.enqueue({
-        toEmail: "fresh@domio.com",
+        toEmail: "fresh@wedomio.com",
         template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
         payload: leadAssignedPayload,
       });
@@ -504,12 +504,12 @@ describe("Email queue integration: enqueue -> process -> SENT/FAILED", () => {
       const service = new EmailService(repository);
 
       await service.enqueue({
-        toEmail: "template-test@domio.com",
+        toEmail: "template-test@wedomio.com",
         template: EMAIL_TEMPLATE_NAMES.LEAD_CONFIRMATION,
         payload: {
           leadName: "Test Lead",
           promotionName: "Test Promotion",
-          contactEmail: "info@domio.com",
+          contactEmail: "info@wedomio.com",
         },
       });
 
@@ -520,7 +520,7 @@ describe("Email queue integration: enqueue -> process -> SENT/FAILED", () => {
       // Verify the Resend client received content from the real template
       expect(mockResendClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: "template-test@domio.com",
+          to: "template-test@wedomio.com",
           subject: expect.stringContaining("recibido"),
           html: expect.stringContaining("Test Lead"),
           text: expect.stringContaining("Test Promotion"),

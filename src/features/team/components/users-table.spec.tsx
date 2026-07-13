@@ -19,7 +19,7 @@ const mockUsers: UserResponse[] = [
   {
     id: "1",
     tenantId: "t-1",
-    email: "admin@domio.com",
+    email: "admin@wedomio.com",
     name: "Admin User",
     role: "ADMIN",
     isActive: true,
@@ -29,7 +29,7 @@ const mockUsers: UserResponse[] = [
   {
     id: "2",
     tenantId: "t-1",
-    email: "agent@domio.com",
+    email: "agent@wedomio.com",
     name: "Agent User",
     role: "AGENT",
     isActive: true,
@@ -39,7 +39,7 @@ const mockUsers: UserResponse[] = [
   {
     id: "3",
     tenantId: "t-1",
-    email: "inactive@domio.com",
+    email: "inactive@wedomio.com",
     name: "Inactive User",
     role: "OPERATOR",
     isActive: false,

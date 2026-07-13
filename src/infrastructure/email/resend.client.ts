@@ -9,7 +9,7 @@ import type {
   SendResult,
 } from "@/infrastructure/email/types";
 
-const DEFAULT_FROM = "noreply@domio.com";
+const DEFAULT_FROM = "noreply@wedomio.com";
 
 export class ResendClientImpl implements ResendClient {
   private readonly client: Resend;

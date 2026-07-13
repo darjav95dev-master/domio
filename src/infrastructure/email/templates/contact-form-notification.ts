@@ -35,7 +35,7 @@ function renderHtml(payload: ContactFormNotificationPayload): string {
             <td style="padding: 8px 0; color: #333; font-size: 15px; white-space: pre-wrap;">${escapeHtml(payload.message)}</td>
           </tr>
         </table>
-        <p style="color: #999; font-size: 13px; margin-top: 24px;">Este mensaje fue enviado desde el formulario de contacto de domio.com.</p>
+        <p style="color: #999; font-size: 13px; margin-top: 24px;">Este mensaje fue enviado desde el formulario de contacto de wedomio.com.</p>
       </td>
     </tr>
   </table>
@@ -56,7 +56,7 @@ function renderText(payload: ContactFormNotificationPayload): string {
     payload.message,
     "",
     "---",
-    "Este mensaje fue enviado desde el formulario de contacto de domio.com.",
+    "Este mensaje fue enviado desde el formulario de contacto de wedomio.com.",
   ].join("\n");
 }
 

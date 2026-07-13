@@ -43,7 +43,7 @@ describe("buildPageMetadata", () => {
   });
 
   it("builds alternates.canonical using getSiteUrl plus the path", async () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://domio.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://wedomio.com";
     const { buildPageMetadata } = await import("../build-page-metadata");
 
     const result = await buildPageMetadata({
@@ -53,7 +53,7 @@ describe("buildPageMetadata", () => {
     });
 
     expect(result.alternates?.canonical).toBe(
-      "https://domio.com/portafolio",
+      "https://wedomio.com/portafolio",
     );
   });
 
@@ -83,7 +83,7 @@ describe("buildPageMetadata", () => {
   });
 
   it("includes openGraph.url derived from site URL and path", async () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://domio.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://wedomio.com";
     const { buildPageMetadata } = await import("../build-page-metadata");
 
     const result = await buildPageMetadata({
@@ -93,7 +93,7 @@ describe("buildPageMetadata", () => {
     });
 
     expect(result.openGraph?.url).toBe(
-      "https://domio.com/inmuebles/piso-en-santa-cruz",
+      "https://wedomio.com/inmuebles/piso-en-santa-cruz",
     );
   });
 
@@ -104,7 +104,7 @@ describe("buildPageMetadata", () => {
       title: "Detail",
       description: "Detail page",
       path: "/inmuebles/piso-en-santa-cruz",
-      ogImage: "https://media.domio.com/promociones/cover-123.jpg",
+      ogImage: "https://media.wedomio.com/promociones/cover-123.jpg",
     });
 
     const images = result.openGraph?.images;
@@ -113,12 +113,12 @@ describe("buildPageMetadata", () => {
     // images can be a string or array — normalise for assertion
     const imageList = Array.isArray(images) ? images : [images];
     expect(imageList[0]).toBe(
-      "https://media.domio.com/promociones/cover-123.jpg",
+      "https://media.wedomio.com/promociones/cover-123.jpg",
     );
   });
 
   it("includes default OG image fallback when ogImage is not provided", async () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://domio.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://wedomio.com";
     const { buildPageMetadata } = await import("../build-page-metadata");
 
     const result = await buildPageMetadata({
@@ -131,7 +131,7 @@ describe("buildPageMetadata", () => {
     expect(images).toBeDefined();
 
     const imageList = Array.isArray(images) ? images : [images];
-    expect(imageList[0]).toBe("https://domio.com/og-default.jpg");
+    expect(imageList[0]).toBe("https://wedomio.com/og-default.jpg");
   });
 
   it("sets twitter.card to summary_large_image", async () => {
@@ -168,7 +168,7 @@ describe("buildPageMetadata", () => {
       title: "Detail",
       description: "Detail page",
       path: "/inmuebles/piso-en-santa-cruz",
-      ogImage: "https://media.domio.com/promociones/cover-123.jpg",
+      ogImage: "https://media.wedomio.com/promociones/cover-123.jpg",
     });
 
     // Twitter images should match the OG image
@@ -176,7 +176,7 @@ describe("buildPageMetadata", () => {
     expect(twImages).toBeDefined();
     const twImageList = Array.isArray(twImages) ? twImages : [twImages];
     expect(twImageList[0]).toBe(
-      "https://media.domio.com/promociones/cover-123.jpg",
+      "https://media.wedomio.com/promociones/cover-123.jpg",
     );
   });
 
@@ -221,7 +221,7 @@ describe("buildPageMetadata", () => {
   });
 
   it("strips trailing slash from site URL for canonical construction", async () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://domio.com/";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://wedomio.com/";
     const { buildPageMetadata } = await import("../build-page-metadata");
 
     const result = await buildPageMetadata({
@@ -230,7 +230,7 @@ describe("buildPageMetadata", () => {
       path: "/sobre",
     });
 
-    expect(result.alternates?.canonical).toBe("https://domio.com/sobre");
+    expect(result.alternates?.canonical).toBe("https://wedomio.com/sobre");
   });
 
   it("includes openGraph.title and openGraph.description matching input", async () => {
@@ -252,11 +252,11 @@ describe("buildPageMetadata", () => {
     const { getOrganizationData } = await import("../get-organization-data");
 
     vi.mocked(getOrganizationData).mockResolvedValueOnce({
-      tenant: { name: "Domio", config: { defaultOgImage: "https://cdn.domio.com/og-tenant.jpg" } },
+      tenant: { name: "Domio", config: { defaultOgImage: "https://cdn.wedomio.com/og-tenant.jpg" } },
       contact: null,
     });
 
-    process.env.NEXT_PUBLIC_SITE_URL = "https://domio.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://wedomio.com";
     const { buildPageMetadata } = await import("../build-page-metadata");
 
     const result = await buildPageMetadata({
@@ -268,6 +268,6 @@ describe("buildPageMetadata", () => {
     const images = result.openGraph?.images;
     expect(images).toBeDefined();
     const imageList = Array.isArray(images) ? images : [images];
-    expect(imageList[0]).toBe("https://cdn.domio.com/og-tenant.jpg");
+    expect(imageList[0]).toBe("https://cdn.wedomio.com/og-tenant.jpg");
   });
 });

@@ -45,7 +45,7 @@ describe("submitContactForm", () => {
     // Default: rate limit allowed, contact config with email
     mockCheckContactRateLimit.mockResolvedValue({ allowed: true });
     mockGetContactPageData.mockResolvedValue({
-      contactConfig: { email: "info@domio.com" },
+      contactConfig: { email: "info@wedomio.com" },
     });
     mockEnqueue.mockResolvedValue(undefined);
   });
@@ -102,7 +102,7 @@ describe("submitContactForm", () => {
     await submitContactForm(null, formData);
 
     expect(mockEnqueue).toHaveBeenCalledWith({
-      toEmail: "info@domio.com",
+      toEmail: "info@wedomio.com",
       template: "contact-form-notification",
       payload: {
         name: "Ana López",
