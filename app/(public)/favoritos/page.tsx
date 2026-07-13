@@ -4,6 +4,9 @@ import { toCatalogItem } from "@/features/catalog/server/to-catalog-item";
 import { FavoritesView } from "@/features/favorites/FavoritesView";
 import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 
+// Lee el catálogo (BBDD) en cada request; no se prerenderiza en build (sin DB).
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   const meta = await buildPageMetadata({
     title: "Favoritos | Domio",

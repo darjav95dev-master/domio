@@ -10,6 +10,8 @@ import { cn } from "@/shared/utils/cn";
 import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 import { toCatalogItem } from "@/features/catalog/server/to-catalog-item";
 
+// Lee el catálogo (BBDD) en cada request; no se prerenderiza en build (sin DB).
+export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
 // Metadata

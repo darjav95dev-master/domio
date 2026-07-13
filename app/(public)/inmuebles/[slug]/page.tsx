@@ -25,6 +25,9 @@ import { getContactConfig } from "@/features/engagement/server/get-contact-confi
 import { buildBreadcrumbJsonLd } from "@/features/seo/server/breadcrumb-json-ld";
 import { PROPERTY_TYPE_LABELS } from "@/shared/constants/domain-labels";
 
+// Lee el inmueble (BBDD) en cada request; no se prerenderiza en build (sin DB).
+export const dynamic = "force-dynamic";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
