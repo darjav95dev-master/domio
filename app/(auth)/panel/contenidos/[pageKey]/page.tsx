@@ -14,21 +14,21 @@ import type { PageKey } from "@/shared/types/content.types";
 // Constants
 // ---------------------------------------------------------------------------
 
-const VALID_PAGES: PageKey[] = [
+const VALID_PAGES = new Set<PageKey>([
   "home",
   "sobre",
   "equipo",
   "aviso-legal",
   "privacidad",
   "cookies",
-];
+]);
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  params: Promise<{ pageKey: string }>;
+  readonly params: Promise<{ readonly pageKey: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ export default async function PageKeyContentPage({ params }: PageProps) {
   // ── Validate pageKey ───────────────────────────────────────────────
   const { pageKey } = await params;
 
-  if (!VALID_PAGES.includes(pageKey as PageKey)) {
+  if (!VALID_PAGES.has(pageKey as PageKey)) {
     notFound();
   }
 
