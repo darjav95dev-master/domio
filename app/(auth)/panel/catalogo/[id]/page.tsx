@@ -21,6 +21,7 @@ import {
   MediaGallery,
   type MediaAssetItem,
 } from "@/features/promociones/components/media-gallery";
+import { PromocionDeleteButton } from "@/features/promociones/components/promocion-delete-button";
 
 /**
  * Loads media assets for a promotion and maps them into gallery/plan arrays.
@@ -339,6 +340,14 @@ export default async function EditPromocionPage({
         initialGalleryAssets={galleryAssets}
         initialPlanAssets={planAssets}
       />
+
+      {/* Delete section — ADMIN and OPERATOR only */}
+      {session.role !== "AGENT" && (
+        <PromocionDeleteButton
+          promocionId={id}
+          promocionName={raw.name}
+        />
+      )}
     </div>
   );
 }

@@ -101,8 +101,8 @@ describe("getContactPageData", () => {
     expect(result.contactConfig).not.toBeNull();
     expect(result.contactConfig!.phone).toBe("+34 922 123 456");
     expect(result.contactConfig!.email).toBe("info@domio.com");
-    expect(result.contactConfig!.officeLat).toBe(28.4636);
-    expect(result.contactConfig!.officeLng).toBe(-16.2518);
+    expect(result.contactConfig!.officeLat).toBeCloseTo(28.4636, 10);
+    expect(result.contactConfig!.officeLng).toBeCloseTo(-16.2518, 10);
     expect(mockGetTenantId).toHaveBeenCalled();
     expect(mockWithTransaction).toHaveBeenCalled();
   });

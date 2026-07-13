@@ -71,8 +71,8 @@ function sanitizeHtmlAttrs(html: string): string {
           return allowedAttrSet.has(attrName);
         }
 
-        // Tags without explicit allowlist: only keep style and class attributes
-        return attrName === "style" || attrName === "class";
+        // Tags without explicit allowlist: only keep class attribute (style removed — CSS injection risk)
+        return attrName === "class";
       })
       .join(" ");
 

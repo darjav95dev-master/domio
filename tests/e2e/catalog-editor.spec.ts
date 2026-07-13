@@ -11,7 +11,6 @@ import { InmuebleDetailPage } from "./pages/InmuebleDetailPage";
 // ---------------------------------------------------------------------------
 
 const OPERATOR_EMAIL = "operador1@domio.dev";
-// eslint-disable-next-line sonarjs/no-hardcoded-passwords -- demo password from seed (scripts/seed.ts)
 const OPERATOR_PASSWORD = "Domio2026!";
 const OPERATOR_NAME = "Laura Rodríguez";
 

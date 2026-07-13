@@ -15,7 +15,6 @@ import { LeadDetailPage } from "./pages/LeadDetailPage";
 // ---------------------------------------------------------------------------
 
 const ADMIN_EMAIL = "admin@domio.dev";
-// eslint-disable-next-line sonarjs/no-hardcoded-passwords -- test credential matching seed
 const ADMIN_PASSWORD = "Domio2026!";
 
 const NEW_AGENT = {

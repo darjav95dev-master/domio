@@ -202,8 +202,8 @@ describe("buildStructuredData", () => {
 
     expect(result!.geo).toBeDefined();
     expect(result!.geo!["@type"]).toBe("GeoCoordinates");
-    expect(result!.geo!.latitude).toBe(28.1);
-    expect(result!.geo!.longitude).toBe(-16.5);
+    expect(result!.geo!.latitude).toBeCloseTo(28.1, 10);
+    expect(result!.geo!.longitude).toBeCloseTo(-16.5, 10);
   });
 
   it("DOES NOT include exact geo coordinates when mapPrivacyMode is AREA", () => {

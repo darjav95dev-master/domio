@@ -72,7 +72,7 @@ describe("contentBlockSchema", () => {
       expect(result.success).toBe(false);
     });
 
-    it("strips event handler attributes from HTML", () => {
+    it("strips event handler and style attributes from HTML", () => {
       const result = contentBlockSchema.safeParse({
         blockType: B_DESC,
         payload: {
@@ -82,7 +82,8 @@ describe("contentBlockSchema", () => {
       expect(result.success).toBe(true);
       if (result.success && result.data.blockType === B_DESC) {
         expect(result.data.payload.text).not.toContain("onclick");
-        expect(result.data.payload.text).toContain("style");
+        // style is no longer allowed (CSS injection risk — MED-02)
+        expect(result.data.payload.text).not.toContain("style");
       }
     });
 
@@ -109,7 +110,6 @@ describe("contentBlockSchema", () => {
       });
       expect(result.success).toBe(true);
       if (result.success && result.data.blockType === B_DESC) {
-        // eslint-disable-next-line sonarjs/code-eval
         expect(result.data.payload.text).not.toContain("javascript:");
         expect(result.data.payload.text).toContain(">click</a>");
         // href should be removed, remaining <a> has no attributes

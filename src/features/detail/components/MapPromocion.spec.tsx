@@ -131,8 +131,8 @@ describe("MapPromocion", () => {
     expect(mapConstructorArgs).not.toBeNull();
     const center = mapConstructorArgs!.center as [number, number];
     // Exact coordinates used
-    expect(center[0]).toBe(EXACT_LNG);
-    expect(center[1]).toBe(EXACT_LAT);
+    expect(center[0]).toBeCloseTo(EXACT_LNG, 10);
+    expect(center[1]).toBeCloseTo(EXACT_LAT, 10);
   });
 
   it("uses approximate coordinates when mode is AREA", () => {
@@ -147,11 +147,11 @@ describe("MapPromocion", () => {
     expect(mapConstructorArgs).not.toBeNull();
     const center = mapConstructorArgs!.center as [number, number];
     // AREA mode uses approximate coordinates
-    expect(center[0]).toBe(APPROX_LNG);
-    expect(center[1]).toBe(APPROX_LAT);
+    expect(center[0]).toBeCloseTo(APPROX_LNG, 10);
+    expect(center[1]).toBeCloseTo(APPROX_LAT, 10);
     // Verify exact coordinates are NOT used
-    expect(center[0]).not.toBe(EXACT_LNG);
-    expect(center[1]).not.toBe(EXACT_LAT);
+    expect(center[0]).not.toBeCloseTo(EXACT_LNG, 3);
+    expect(center[1]).not.toBeCloseTo(EXACT_LAT, 3);
   });
 
   it("has larger zoom in EXACT mode (15) than AREA mode (13)", () => {

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/utils/cn";
 import { Button } from "@/shared/components/button";
+import { TurnstileWidget } from "@/shared/components/TurnstileWidget";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -39,9 +40,11 @@ export function ContactForm() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const handleSubmit = async (formData: FormData) => {
     setError(null);
+    formData.set("turnstileToken", turnstileToken ?? "");
     startTransition(async () => {
       try {
         const { createLeadAction } = await import(
@@ -186,6 +189,9 @@ export function ContactForm() {
           </div>
         </div>
       </div>
+
+      {/* ── Turnstile CAPTCHA ──────────────────────────────────── */}
+      <TurnstileWidget onToken={setTurnstileToken} />
 
       {/* ── Submit ─────────────────────────────────────────────── */}
       <Button

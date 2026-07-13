@@ -14,7 +14,6 @@ import { LeadDetailPage } from "./pages/LeadDetailPage";
 
 const AGENT1_EMAIL = "agente1@domio.dev";
 const AGENT2_EMAIL = "agente2@domio.dev";
-// eslint-disable-next-line sonarjs/no-hardcoded-passwords -- demo password from seed (scripts/seed.ts)
 const DEMO_PASSWORD = "Domio2026!";
 const AGENT1_NAME = "Ana García";
 

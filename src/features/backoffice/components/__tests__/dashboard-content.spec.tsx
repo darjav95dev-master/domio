@@ -110,7 +110,7 @@ describe("DashboardContent", () => {
 
       const labels = screen.getAllByText("Leads no leídos");
       // One is the visible label, the other is sr-only section heading
-      expect(labels.length).toBe(2);
+      expect(labels).toHaveLength(2);
     });
 
     it("shows empty message when count is 0", () => {

@@ -358,7 +358,7 @@ describe("LeadActions", () => {
       expect(lines[0]).toBe(
         "ID,Nombre,Email,Teléfono,Estado,Source,Canal,Promoción ID,Agente Asignado,Mensaje,Creado,Actualizado",
       );
-      expect(lines.length).toBe(2); // header + 1 data row
+      expect(lines).toHaveLength(2); // header + 1 data row
     });
 
     it("escapes fields with commas or quotes", async () => {

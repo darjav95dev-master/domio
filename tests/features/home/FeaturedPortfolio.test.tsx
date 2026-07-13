@@ -102,7 +102,7 @@ describe("FeaturedPortfolio", () => {
     render(<FeaturedPortfolio promociones={mockPromociones} />);
     // Two properties in Adeje, so getAllByText
     const adejeElements = screen.getAllByText("Adeje, Tenerife");
-    expect(adejeElements.length).toBe(2);
+    expect(adejeElements).toHaveLength(2);
     expect(screen.getByText("La Laguna, Tenerife")).toBeInTheDocument();
   });
 

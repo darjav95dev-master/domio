@@ -45,7 +45,7 @@ export interface RealEstateListingJsonLd {
 // ---------------------------------------------------------------------------
 
 function stripHtml(value: string): string {
-  // eslint-disable-next-line sonarjs/slow-regex -- Standard HTML tag stripping, no nested quantifiers
+  // eslint-disable-next-line sonarjs/super-linear-regex -- Standard HTML tag stripping, bounded character class
   return value.replace(/<[^>]*>/g, "");
 }
 

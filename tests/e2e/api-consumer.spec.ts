@@ -177,7 +177,7 @@ test.describe("Consumidor API — recorrido completo", () => {
 
     // Seed has exactly 4 portfolio+PUBLISHED promotions
     expect(body.total).toBe(4);
-    expect(body.items.length).toBe(4);
+    expect(body.items).toHaveLength(4);
 
     // Verify no external promotions leaked in
     const items: Array<{ id: string; slug: string }> = body.items;
@@ -197,7 +197,7 @@ test.describe("Consumidor API — recorrido completo", () => {
 
     expect(page1.status()).toBe(200);
     const body1 = await page1.json();
-    expect(body1.items.length).toBe(2);
+    expect(body1.items).toHaveLength(2);
     // total reflects the full unfiltered count
     expect(body1.total).toBeGreaterThanOrEqual(4);
     // cursor is present when there are more items
@@ -228,7 +228,7 @@ test.describe("Consumidor API — recorrido completo", () => {
     });
 
     const fullBody = await fullList.json();
-    expect(fullBody.items.length).toBe(4);
+    expect(fullBody.items).toHaveLength(4);
     expect(fullBody.nextCursor).toBeNull(); // no more pages
   });
 

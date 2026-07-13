@@ -112,7 +112,6 @@ export async function resetDatabase(): Promise<void> {
         body: new URLSearchParams({
           csrfToken,
           email: "admin@domio.dev",
-          // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- test credential matching seed
           password: "Domio2026!",
           callbackUrl: "/panel",
           json: "true",

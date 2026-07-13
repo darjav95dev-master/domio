@@ -9,8 +9,8 @@ describe("extractIpFromHeaders", () => {
     expect(extractIpFromHeaders(headers)).toBe(TEST_IP);
   });
 
-  it("takes the first IP from a comma-separated x-forwarded-for", () => {
-    const headers = new Headers({ "x-forwarded-for": `${TEST_IP}, 198.51.100.7, 10.0.0.1` });
+  it("takes the last IP from a comma-separated x-forwarded-for (real client behind proxy)", () => {
+    const headers = new Headers({ "x-forwarded-for": `198.51.100.7, 10.0.0.1, ${TEST_IP}` });
     expect(extractIpFromHeaders(headers)).toBe(TEST_IP);
   });
 

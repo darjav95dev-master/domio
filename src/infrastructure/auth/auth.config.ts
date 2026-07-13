@@ -88,6 +88,27 @@ export const authConfig: NextAuthOptions = {
         token.tenant_id = customUser.tenant_id;
         token.role = customUser.role;
         token.name = customUser.name;
+        // Record the time of last isActive verification (initial login counts as verified)
+        token.lastVerifiedAt = Date.now();
+      } else if (token.user_id) {
+        // ponytail: check isActive at most every 5 min to catch deactivated users
+        const VERIFY_INTERVAL_MS = 5 * 60 * 1_000;
+        const lastVerifiedAt = (token.lastVerifiedAt as number | undefined) ?? 0;
+        if (Date.now() - lastVerifiedAt > VERIFY_INTERVAL_MS) {
+          const { eq } = await import("drizzle-orm");
+          const { db } = await import("@/infrastructure/db/client");
+          const { users } = await import("@/infrastructure/db/schema");
+          const [dbUser] = await db
+            .select({ isActive: users.isActive })
+            .from(users)
+            .where(eq(users.id, token.user_id as string))
+            .limit(1);
+          if (!dbUser?.isActive) {
+            // ponytail: NextAuth v4 types don't declare null but runtime supports it to destroy the session
+            return null as unknown as import("next-auth/jwt").JWT;
+          }
+          token.lastVerifiedAt = Date.now();
+        }
       }
       return token;
     },

@@ -183,7 +183,6 @@ describe("sanitizeEvent", () => {
   });
 
   it("filters nested secrets recursively", () => {
-    // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- test data, not real password
     const pwd = "secret123";
     const result = sanitizeEvent({
       contexts: {

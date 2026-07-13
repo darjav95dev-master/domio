@@ -20,11 +20,9 @@ describe("createSentryConfig", () => {
     expect(config.beforeSend).toBeDefined();
 
     // test data for scrubber verification
-    /* eslint-disable sonarjs/no-hardcoded-passwords */
     const event = {
       extra: { password: "secret", normalField: "hello" },
     } as unknown as ErrorEvent;
-    /* eslint-enable sonarjs/no-hardcoded-passwords */
     const result = config.beforeSend(event, {} as ErrorEvent);
     expect((result as unknown as Record<string, unknown>).extra).toBeDefined();
     const extra = (result as unknown as { extra: Record<string, unknown> }).extra;

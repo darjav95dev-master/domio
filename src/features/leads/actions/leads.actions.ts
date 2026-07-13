@@ -7,6 +7,9 @@ import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { LeadRepository } from "@/infrastructure/db/repositories/lead.repository";
 import { LeadReadMarkRepository } from "@/infrastructure/db/repositories/lead-read-mark.repository";
 import { leads, consentRecords } from "@/infrastructure/db/schema";
+import { verifyTurnstileToken } from "@/shared/utils/turnstile";
+import { extractIpFromHeaders } from "@/shared/utils/extract-ip";
+import { checkIpRateLimit } from "@/infrastructure/rate-limiting/ip-rate-limit";
 import {
   leadFiltersSchema,
   leadPaginationSchema,
@@ -227,7 +230,28 @@ export async function exportLeadsCsvAction(filters: LeadFilters = {}) {
  * Si el consentimiento falta o es invalido, la transaccion no se completa.
  */
 export async function createLeadAction(formData: FormData) {
-  // 1. Parse and validate input
+  // 1. Verify Turnstile CAPTCHA
+  const turnstileToken = formData.get("turnstileToken") as string | null;
+  const turnstileResult = await verifyTurnstileToken(turnstileToken);
+  if (!turnstileResult.success) {
+    return {
+      success: false as const,
+      error: turnstileResult.error ?? "Error de verificación de seguridad.",
+    };
+  }
+
+  // 2. Rate limiting by IP
+  const headersList = await headers();
+  const ip = extractIpFromHeaders(headersList);
+  const rateResult = await checkIpRateLimit(ip, "contact");
+  if (!rateResult.allowed) {
+    return {
+      success: false as const,
+      error: "Demasiados intentos. Intenta de nuevo más tarde.",
+    };
+  }
+
+  // 3. Parse and validate input
   const raw = {
     promocionId: formData.get("promocionId") as string,
     source: formData.get("source") as string,
@@ -252,9 +276,7 @@ export async function createLeadAction(formData: FormData) {
 
   const data = parsed.data;
 
-  // 2. Get IP and user-agent from request headers
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") ?? headersList.get("x-real-ip") ?? undefined;
+  // 4. Get user-agent from request headers
   const userAgent = headersList.get("user-agent") ?? undefined;
 
   // 3. Create lead + consent record in the same transaction (atomico)

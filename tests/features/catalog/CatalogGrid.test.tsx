@@ -118,7 +118,7 @@ describe("CatalogGrid", () => {
     // 12 skeleton cards in the grid
     const grid = container.querySelector(".grid");
     const skeletonCards = grid?.children ?? [];
-    expect(skeletonCards.length).toBe(12);
+    expect(skeletonCards).toHaveLength(12);
   });
 
   it("includes existing search params in pagination href", () => {
