@@ -17,9 +17,12 @@ set -euo pipefail
 
 PROJECT="${1:?Falta <project> (p.ej. domio-prod o domio-dev)}"
 DUMP="${2:?Falta la ruta al dump --data-only}"
-COMPOSE="docker compose -p ${PROJECT} -f deploy/docker-compose.app.yml"
+# domio-prod → deploy/env.prod · domio-dev → deploy/env.dev
+ENVFILE="deploy/env.${PROJECT#domio-}"
+COMPOSE="docker compose -p ${PROJECT} --env-file ${ENVFILE} -f deploy/docker-compose.app.yml"
 
-[ -f "$DUMP" ] || { echo "No existe el dump: $DUMP" >&2; exit 1; }
+[ -f "$DUMP" ]    || { echo "No existe el dump: $DUMP" >&2; exit 1; }
+[ -f "$ENVFILE" ] || { echo "No existe el env de deploy: $ENVFILE" >&2; exit 1; }
 
 echo "▶ [$PROJECT] Esperando a que Postgres esté sano…"
 until $COMPOSE ps postgres | grep -q healthy; do sleep 2; done

@@ -25,13 +25,13 @@ prod-migrate:          ## Migraciones en producción
 	docker compose -p domio-prod --env-file deploy/env.prod $(APP) run --rm tools pnpm db:migrate
 
 logs-%:                ## make -f deploy/Makefile logs-prod  (o logs-dev)
-	docker compose -p domio-$* $(APP) logs -f --tail=100
+	docker compose -p domio-$* --env-file deploy/env.$* $(APP) logs -f --tail=100
 
 down-%:                ## Parar un stack: down-dev / down-prod
-	docker compose -p domio-$* $(APP) down
+	docker compose -p domio-$* --env-file deploy/env.$* $(APP) down
 
 backup:                ## pg_dump de producción → backups/
 	@mkdir -p backups
-	docker compose -p domio-prod $(APP) exec -T postgres \
+	docker compose -p domio-prod --env-file deploy/env.prod $(APP) exec -T postgres \
 	  pg_dump -U domio -d domio -Fc > backups/prod_$$(date +%Y%m%d_%H%M).dump
 	@echo "OK → backups/"
