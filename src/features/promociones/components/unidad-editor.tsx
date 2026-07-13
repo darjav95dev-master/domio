@@ -2,6 +2,7 @@
 
 import { cn } from "@/shared/utils/cn";
 import { UNIT_STATUSES } from "@/shared/constants/db-enums";
+import { LABEL_STYLE, SELECT_STYLE } from "@/shared/styles/backoffice-form";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,11 +32,6 @@ const UNIT_STATUS_LABELS: Record<string, string> = {
   SOLD: "Vendida",
   RENTED: "Alquilada",
 };
-
-const LABEL_STYLE =
-  "font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle";
-
-const SELECT_STYLE = "appearance-none cursor-pointer";
 
 const INPUT_BASE =
   "rounded-control border bg-bg-surface px-4 py-2.5 font-sans text-sm text-fg-default placeholder:text-fg-subtle transition-colors duration-standard ease-standard hover:border-border-strong focus:border-accent-default";

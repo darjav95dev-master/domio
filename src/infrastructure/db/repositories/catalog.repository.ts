@@ -1,4 +1,4 @@
-import { eq, and, desc, count, or, lt, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, count, or, lt, sql, inArray, gte, lte } from "drizzle-orm";
 import {
   promociones,
   tipologias,
@@ -158,12 +158,14 @@ export class CatalogRepository extends TenantAwareRepository {
 
   /**
    * Builds the WHERE conditions for the public catalog from filters.
-   * Extracted from findPublicWithCursor to keep that method's complexity low.
+   * Only includes conditions on `promociones` columns.
+   * Tipología filters (bedrooms, bathrooms, price, amenities) are handled
+   * via a single JOIN subquery — see buildTipologiaFilter().
    */
   private buildPublicConditions(
     filters: PublicCatalogFilters,
-  ): (ReturnType<typeof eq> | ReturnType<typeof sql>)[] {
-    const conditions: (ReturnType<typeof eq> | ReturnType<typeof sql>)[] = [
+  ): ReturnType<typeof eq>[] {
+    const conditions: ReturnType<typeof eq>[] = [
       eq(promociones.tenantId, this.ctx.getTenantId()),
       eq(promociones.status, "PUBLISHED"),
     ];
@@ -181,36 +183,59 @@ export class CatalogRepository extends TenantAwareRepository {
         eq(promociones.constructionStatus, filters.constructionStatus),
       );
 
-    if (filters.bedrooms) {
-      conditions.push(
-        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bedrooms >= ${filters.bedrooms})`,
-      );
-    }
-    if (filters.bathrooms) {
-      conditions.push(
-        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.bathrooms >= ${filters.bathrooms})`,
-      );
-    }
-    if (filters.priceMin) {
-      conditions.push(
-        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale >= ${filters.priceMin})`,
-      );
-    }
-    if (filters.priceMax) {
-      conditions.push(
-        sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.reference_price_sale <= ${filters.priceMax})`,
-      );
-    }
+    return conditions;
+  }
+
+  /**
+   * Returns true when any tipología filter is active (bedrooms, bathrooms,
+   * price range, or amenities). Used to decide whether to add the tipologia JOIN.
+   */
+  private hasTipologiaFilters(filters: PublicCatalogFilters): boolean {
+    return !!(
+      filters.bedrooms ||
+      filters.bathrooms ||
+      filters.priceMin ||
+      filters.priceMax ||
+      (filters.amenities && filters.amenities.length > 0)
+    );
+  }
+
+  /**
+   * Builds a materialised subquery on `tipologias` that pre-filters to
+   * promocion IDs matching the given tipología filters. The result is
+   * inner-joined to the main query when tipología filters are active,
+   * replacing the N correlated EXISTS subqueries with a single scan.
+   */
+  private buildTipologiaFilter(
+    tx: Transaction,
+    filters: PublicCatalogFilters,
+  ) {
+    const tipologiaConditions: (ReturnType<typeof gte> | ReturnType<typeof lte> | ReturnType<typeof sql>)[] = [];
+
+    if (filters.bedrooms)
+      tipologiaConditions.push(gte(tipologias.bedrooms, filters.bedrooms));
+    if (filters.bathrooms)
+      tipologiaConditions.push(gte(tipologias.bathrooms, filters.bathrooms));
+    if (filters.priceMin)
+      tipologiaConditions.push(gte(tipologias.referencePriceSale, filters.priceMin));
+    if (filters.priceMax)
+      tipologiaConditions.push(lte(tipologias.referencePriceSale, filters.priceMax));
+
     if (filters.amenities && filters.amenities.length > 0) {
       for (const amenity of filters.amenities) {
         const amenityJson = JSON.stringify([amenity]);
-        conditions.push(
-          sql`EXISTS (SELECT 1 FROM tipologias t WHERE t.promocion_id = ${promociones.id} AND t.tenant_id = ${promociones.tenantId} AND t.amenities @> ${amenityJson}::jsonb)`,
+        tipologiaConditions.push(
+          sql`${tipologias.amenities} @> ${amenityJson}::jsonb`,
         );
       }
     }
 
-    return conditions;
+    return tx
+      .select({ promocionId: tipologias.promocionId })
+      .from(tipologias)
+      .where(and(...tipologiaConditions))
+      .groupBy(tipologias.promocionId)
+      .as("tipologia_filter");
   }
 
   async findPublicWithCursor(
@@ -226,13 +251,25 @@ export class CatalogRepository extends TenantAwareRepository {
       const sort = options?.sort ?? "published";
 
       const whereClause = and(...this.buildPublicConditions(filters));
+      const tipologiaFilter = this.hasTipologiaFilters(filters)
+        ? this.buildTipologiaFilter(tx, filters)
+        : null;
 
       let total = 0;
       if (!options?.cursor) {
-        const [totalRow] = await tx
+        let countQuery = tx
           .select({ count: count() })
           .from(promociones)
-          .where(whereClause);
+          .$dynamic();
+
+        if (tipologiaFilter) {
+          countQuery = countQuery.innerJoin(
+            tipologiaFilter,
+            eq(tipologiaFilter.promocionId, promociones.id),
+          );
+        }
+
+        const [totalRow] = await countQuery.where(whereClause);
 
         total = Number(totalRow?.count ?? 0);
         if (total === 0) {
@@ -242,12 +279,12 @@ export class CatalogRepository extends TenantAwareRepository {
 
       if (sort === "price_asc" || sort === "price_desc") {
         return this.fetchPublicWithPriceSort(
-          tx, whereClause, filters, sort, limit, options?.cursor, total,
+          tx, whereClause, tipologiaFilter, sort, limit, options?.cursor, total,
         );
       }
 
       return this.fetchPublicWithPublishedSort(
-        tx, whereClause, limit, options?.cursor, total,
+        tx, whereClause, tipologiaFilter, limit, options?.cursor, total,
       );
     });
   }
@@ -258,6 +295,7 @@ export class CatalogRepository extends TenantAwareRepository {
   private async fetchPublicWithPublishedSort(
     tx: Transaction,
     whereClause: ReturnType<typeof and>,
+    tipologiaFilter: ReturnType<typeof this.buildTipologiaFilter> | null,
     limit: number,
     cursor: string | undefined,
     total: number,
@@ -275,10 +313,20 @@ export class CatalogRepository extends TenantAwareRepository {
       );
     }
 
-    const items = await tx
+    let query = tx
       .select(PROMOCION_SELECT_COLUMNS)
       .from(promociones)
       .leftJoin(users, eq(promociones.assignedAgentId, users.id))
+      .$dynamic();
+
+    if (tipologiaFilter) {
+      query = query.innerJoin(
+        tipologiaFilter,
+        eq(tipologiaFilter.promocionId, promociones.id),
+      );
+    }
+
+    const items = await query
       .where(and(whereClause, ...conditions))
       .orderBy(desc(promociones.createdAt), desc(promociones.id))
       .limit(limit + 1);
@@ -301,7 +349,7 @@ export class CatalogRepository extends TenantAwareRepository {
   private async fetchPublicWithPriceSort(
     tx: Transaction,
     whereClause: ReturnType<typeof and>,
-    _filters: PublicCatalogFilters,
+    tipologiaFilter: ReturnType<typeof this.buildTipologiaFilter> | null,
     sort: CatalogSortOption,
     limit: number,
     cursor: string | undefined,
@@ -351,11 +399,21 @@ export class CatalogRepository extends TenantAwareRepository {
       ? and(whereClause, cursorClause)
       : whereClause;
 
-    const rows = await tx
+    let priceQuery = tx
       .select(PROMOCION_SELECT_COLUMNS)
       .from(promociones)
       .leftJoin(users, eq(promociones.assignedAgentId, users.id))
       .leftJoin(priceAgg, eq(priceAgg.promocionId, promociones.id))
+      .$dynamic();
+
+    if (tipologiaFilter) {
+      priceQuery = priceQuery.innerJoin(
+        tipologiaFilter,
+        eq(tipologiaFilter.promocionId, promociones.id),
+      );
+    }
+
+    const rows = await priceQuery
       .where(fullWhere)
       .orderBy(orderExpr)
       .limit(limit + 1);
@@ -390,6 +448,48 @@ export class CatalogRepository extends TenantAwareRepository {
    * bedrooms/bathrooms across its tipologías. Two small keyed queries — kept
    * out of the paginated query to avoid disturbing its cursor logic.
    */
+  /**
+   * Fetches published portfolio promociones by their IDs.
+   * Used by the favorites client-side flow: the client sends only the saved IDs.
+   * Returns an empty array if ids is empty or no matching PUBLISHED records exist.
+   */
+  async findPublicByIds(ids: string[]): Promise<Array<PromocionListRow & CatalogCardExtras>> {
+    if (ids.length === 0) return [];
+
+    const tenantId = this.ctx.getTenantId();
+
+    const items = await this.ctx.withTransaction(async (tx) => {
+      return tx
+        .select(PROMOCION_SELECT_COLUMNS)
+        .from(promociones)
+        .leftJoin(users, eq(promociones.assignedAgentId, users.id))
+        .where(
+          and(
+            eq(promociones.tenantId, tenantId),
+            eq(promociones.status, "PUBLISHED"),
+            eq(promociones.kind, "portfolio"),
+            inArray(promociones.id, ids),
+          ),
+        );
+    });
+
+    if (items.length === 0) return [];
+
+    const extras = await this.findCardExtras(items.map((i) => i.id));
+
+    return items.map((item) => {
+      const e = extras.get(item.id);
+      return {
+        ...item,
+        coverR2Key: e?.coverR2Key ?? null,
+        coverAlt: e?.coverAlt ?? null,
+        priceFrom: e?.priceFrom ?? null,
+        bedrooms: e?.bedrooms ?? null,
+        bathrooms: e?.bathrooms ?? null,
+      };
+    });
+  }
+
   async findCardExtras(
     promocionIds: string[],
   ): Promise<Map<string, CatalogCardExtras>> {

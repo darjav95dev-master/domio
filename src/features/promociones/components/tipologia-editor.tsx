@@ -8,6 +8,7 @@ import {
   UnidadEditor,
   type UnidadEditorItem,
 } from "./unidad-editor";
+import { LABEL_STYLE, SELECT_STYLE } from "@/shared/styles/backoffice-form";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,11 +57,6 @@ const ENERGY_CERT_LABELS: Record<string, string> = {
   EN_TRAMITE: "En trámite",
 };
 
-const LABEL_STYLE =
-  "font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle";
-
-const SELECT_STYLE = "appearance-none cursor-pointer";
-
 const INPUT_BASE =
   "rounded-control border bg-bg-surface px-4 py-2.5 font-sans text-sm text-fg-default placeholder:text-fg-subtle transition-colors duration-standard ease-standard hover:border-border-strong focus:border-accent-default";
 
@@ -68,10 +64,8 @@ const INPUT_BASE =
 // Helpers
 // ---------------------------------------------------------------------------
 
-let tempIdCounter = 0;
 function nextTempId(): string {
-  tempIdCounter += 1;
-  return `tipologia-temp-${tempIdCounter}-${Date.now()}`;
+  return `tipologia-temp-${crypto.randomUUID()}`;
 }
 
 function defaultTipologia(): TipologiaEditorItem {

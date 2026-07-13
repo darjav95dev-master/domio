@@ -286,7 +286,7 @@ export function sanitizeForClient(
 
 import { unstable_cache } from "next/cache";
 import { PublicContext } from "@/infrastructure/tenant/PublicContext";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionDetailRepository } from "@/infrastructure/db/repositories/promocion-detail.repository";
 import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
 
 export interface PromocionDetailResult {
@@ -303,7 +303,7 @@ async function fetchPromocionDetail(
   slug: string,
   ctx: TenantContext,
 ): Promise<PromocionDetailResult | null> {
-  const repo = new PromocionRepository(ctx);
+  const repo = new PromocionDetailRepository(ctx);
 
   const detail = await repo.findDetailBySlug(slug);
 

@@ -238,7 +238,9 @@ describe("PromocionRepository — findPublicWithCursor", () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
       const repo = new CatalogRepository(ctx);
 
-      setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
+      // Tipologia filters use a subquery JOIN: tx.select() is called once to
+      // build the subquery (consuming one slot), then count, then items.
+      setupMockTx(mockWithTx, [[], makeCountResult(1), [makePromo({ id: "p1" })]]);
 
       const result = await repo.findPublicWithCursor({ priceMin: 100000 });
 
@@ -249,7 +251,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
       const repo = new CatalogRepository(ctx);
 
-      setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
+      setupMockTx(mockWithTx, [[], makeCountResult(1), [makePromo({ id: "p1" })]]);
 
       const result = await repo.findPublicWithCursor({ priceMax: 500000 });
 
@@ -260,7 +262,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
       const repo = new CatalogRepository(ctx);
 
-      setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
+      setupMockTx(mockWithTx, [[], makeCountResult(1), [makePromo({ id: "p1" })]]);
 
       const result = await repo.findPublicWithCursor({ bedrooms: 3 });
 
@@ -271,7 +273,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
       const repo = new CatalogRepository(ctx);
 
-      setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
+      setupMockTx(mockWithTx, [[], makeCountResult(1), [makePromo({ id: "p1" })]]);
 
       const result = await repo.findPublicWithCursor({ bathrooms: 2 });
 
@@ -282,7 +284,7 @@ describe("PromocionRepository — findPublicWithCursor", () => {
       const { ctx, mockWithTx } = createMockPublicCtx();
       const repo = new CatalogRepository(ctx);
 
-      setupMockTx(mockWithTx, [makeCountResult(1), [makePromo({ id: "p1" })]]);
+      setupMockTx(mockWithTx, [[], makeCountResult(1), [makePromo({ id: "p1" })]]);
 
       const result = await repo.findPublicWithCursor({
         amenities: ["ascensor", "terraza"],

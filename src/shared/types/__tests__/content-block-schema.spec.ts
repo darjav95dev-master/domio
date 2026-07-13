@@ -71,6 +71,79 @@ describe("contentBlockSchema", () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it("strips event handler attributes from HTML", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          text: '<p onclick="alert(1)" style="color:red">Texto</p>',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        expect(result.data.payload.text).not.toContain("onclick");
+        expect(result.data.payload.text).toContain("style");
+      }
+    });
+
+    it("strips onmouseover and other event attributes", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          text: '<b onmouseover="evil()" class="foo">texto</b>',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        expect(result.data.payload.text).not.toContain("onmouseover");
+        expect(result.data.payload.text).toContain("class");
+      }
+    });
+
+    it("strips javascript: URLs from href attributes", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          text: '<a href="javascript:alert(1)">click</a>',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        // eslint-disable-next-line sonarjs/code-eval
+        expect(result.data.payload.text).not.toContain("javascript:");
+        expect(result.data.payload.text).toContain(">click</a>");
+        // href should be removed, remaining <a> has no attributes
+        expect(result.data.payload.text).toBe("<a>click</a>");
+      }
+    });
+
+    it("strips data: URLs from href attributes", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          text: '<a href="data:text/plain,hello">link</a>',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        expect(result.data.payload.text).not.toContain("data:");
+        expect(result.data.payload.text).toBe("<a>link</a>");
+      }
+    });
+
+    it("keeps valid href attributes on <a> tags", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          text: '<a href="https://example.com" target="_blank">link</a>',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        expect(result.data.payload.text).toContain("href=");
+        expect(result.data.payload.text).toContain("https://example.com");
+      }
+    });
   });
 
   // -------------------------------------------------------------------------

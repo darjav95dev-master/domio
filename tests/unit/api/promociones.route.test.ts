@@ -15,7 +15,7 @@ const mockSession = vi.hoisted(() => ({
   >(),
 }));
 
-const mockFindAll = vi.fn();
+const mockFindAllWithCursor = vi.fn();
 const mockCreate = vi.fn();
 
 const mockRepository = vi.hoisted(() => ({
@@ -84,31 +84,29 @@ const mockPromocionRow = {
 describe("GET /api/internal/promociones", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindAll.mockReset();
+    mockFindAllWithCursor.mockReset();
   });
 
-  it("returns 200 with paginated results when session is valid", async () => {
+  it("returns 200 with cursor-paginated results when session is valid", async () => {
     mockSession.getServerSession.mockResolvedValue(validSession);
 
-    const mockFindAllImpl = mockFindAll.mockResolvedValue({
+    const mockImpl = mockFindAllWithCursor.mockResolvedValue({
       items: [mockPromocionRow],
+      nextCursor: null,
       total: 1,
     });
     mockRepository.PromocionRepository.mockImplementation(() => ({
-      findAll: mockFindAllImpl,
+      findAllWithCursor: mockImpl,
     }));
 
-    const request = new Request(
-      `${BASE_URL}?page=1&limit=50`,
-    );
+    const request = new Request(`${BASE_URL}?limit=50`);
     const response = await GET(request);
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body).toHaveProperty("items");
     expect(body).toHaveProperty("total");
-    expect(body).toHaveProperty("page", 1);
-    expect(body).toHaveProperty("limit", 50);
+    expect(body).toHaveProperty("nextCursor");
     expect(body.items).toHaveLength(1);
     expect(body.total).toBe(1);
   });
@@ -124,23 +122,24 @@ describe("GET /api/internal/promociones", () => {
     expect(body.error).toBe("Unauthenticated");
   });
 
-  it("passes query params as filters to findAll", async () => {
+  it("passes query params as filters to findAllWithCursor", async () => {
     mockSession.getServerSession.mockResolvedValue(validSession);
 
-    const mockFindAllImpl = mockFindAll.mockResolvedValue({
+    const mockImpl = mockFindAllWithCursor.mockResolvedValue({
       items: [],
+      nextCursor: null,
       total: 0,
     });
     mockRepository.PromocionRepository.mockImplementation(() => ({
-      findAll: mockFindAllImpl,
+      findAllWithCursor: mockImpl,
     }));
 
     const request = new Request(
-      `${BASE_URL}?status=PUBLISHED&kind=portfolio&island=Tenerife&municipality=Santa+Cruz&assignedAgentId=agent-1&constructionStatus=READY&page=2&limit=25`,
+      `${BASE_URL}?status=PUBLISHED&kind=portfolio&island=Tenerife&municipality=Santa+Cruz&assignedAgentId=agent-1&constructionStatus=READY&limit=25`,
     );
     await GET(request);
 
-    expect(mockFindAllImpl).toHaveBeenCalledWith(
+    expect(mockImpl).toHaveBeenCalledWith(
       {
         status: "PUBLISHED",
         kind: "portfolio",
@@ -149,24 +148,21 @@ describe("GET /api/internal/promociones", () => {
         assignedAgentId: "agent-1",
         constructionStatus: "READY",
       },
-      2,
-      25,
+      expect.objectContaining({ limit: 25 }),
     );
   });
 
   it("returns 500 with Internal server error when repository throws", async () => {
     mockSession.getServerSession.mockResolvedValue(validSession);
 
-    const mockFindAllImpl = mockFindAll.mockRejectedValue(
+    const mockImpl = mockFindAllWithCursor.mockRejectedValue(
       new Error("DB error"),
     );
     mockRepository.PromocionRepository.mockImplementation(() => ({
-      findAll: mockFindAllImpl,
+      findAllWithCursor: mockImpl,
     }));
 
-    const request = new Request(
-      BASE_URL,
-    );
+    const request = new Request(BASE_URL);
     const response = await GET(request);
     const body = await response.json();
 

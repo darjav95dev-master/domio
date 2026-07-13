@@ -8,6 +8,7 @@ import {
   CONSTRUCTION_STATUS_LABELS,
 } from "@/shared/constants/domain-labels";
 import { PROMOCION_STATUSES, CONSTRUCTION_STATUSES } from "@/shared/constants/db-enums";
+import { LABEL_STYLE, SELECT_STYLE } from "@/shared/styles/backoffice-form";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -26,13 +27,6 @@ const FILTER_FIELDS = [
   "municipality",
   "constructionStatus",
 ] as const;
-
-/** Shared label style for all filter controls. */
-const LABEL_STYLE =
-  "font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle";
-
-/** Shared class for native select elements. */
-const SELECT_STYLE = "appearance-none cursor-pointer";
 
 // ---------------------------------------------------------------------------
 // Component

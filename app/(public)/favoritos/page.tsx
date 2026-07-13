@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { getCatalogData } from "@/features/catalog/server/get-catalog-data";
-import { toCatalogItem } from "@/features/catalog/server/to-catalog-item";
 import { FavoritesView } from "@/features/favorites/FavoritesView";
 import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 
@@ -14,12 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { ...meta, robots: { index: false, follow: true } };
 }
 
-export default async function FavoritosPage() {
-  // Favorites live in the browser; ship the full published catalog and let the
-  // client filter it. Small catalog → one query beats a per-id endpoint.
-  const data = await getCatalogData({ limit: 100, sort: "published" });
-  const items = data.items.map(toCatalogItem);
-
+export default function FavoritosPage() {
   return (
     <div className="min-h-screen">
       <section className="bg-bg-canvas pb-10 pt-[120px]">
@@ -35,7 +28,7 @@ export default async function FavoritosPage() {
 
       <section className="bg-bg-canvas pb-20">
         <div className="mx-auto max-w-[1200px] px-6 md:px-12 xl:px-14">
-          <FavoritesView items={items} />
+          <FavoritesView />
         </div>
       </section>
     </div>

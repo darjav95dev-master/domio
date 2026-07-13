@@ -29,6 +29,12 @@ export interface CatalogListProps {
   limit: number;
   /** Current search params string (e.g. "?status=PUBLISHED&kind=portfolio") */
   currentParams: string;
+  /** Cursor-based pagination: next cursor value for "Siguiente" link */
+  nextCursor?: string | null;
+  /** Cursor-based pagination: href for "Anterior" link (first page if null) */
+  prevHref?: string | null;
+  /** Cursor-based pagination: href for "Siguiente" link */
+  nextHref?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,35 +94,63 @@ interface PaginationProps {
   page: number;
   limit: number;
   currentParams: string;
+  nextCursor?: string | null;
+  prevHref?: string | null;
+  nextHref?: string | null;
 }
 
-function Pagination({ total, page, limit, currentParams }: PaginationProps) {
+const NAV_BTN_BASE = "rounded-pill border-[1.5px] px-4 py-2 font-sans text-sm font-medium transition-colors duration-deliberate ease-standard";
+const NAV_BTN_DISABLED = "pointer-events-none border-border-default text-fg-subtle opacity-50";
+const NAV_BTN_ENABLED = "border-fg-default text-fg-default hover:bg-fg-default hover:text-bg-canvas";
+
+function CursorPagination({ total, nextHref, prevHref }: { total: number; nextHref?: string | null; prevHref?: string | null }) {
+  return (
+    <nav aria-label="Paginación" className="mt-6 flex items-center justify-center gap-4">
+      <Link
+        href={prevHref ?? "?"}
+        aria-disabled={!prevHref}
+        tabIndex={!prevHref ? -1 : undefined}
+        className={cn(NAV_BTN_BASE, !prevHref ? NAV_BTN_DISABLED : NAV_BTN_ENABLED)}
+      >
+        Anterior
+      </Link>
+      <span className="font-mono text-[11px] tracking-[0.04em] tabular-nums text-fg-subtle">
+        {total} resultado{total !== 1 ? "s" : ""}
+      </span>
+      <Link
+        href={nextHref ?? "#"}
+        aria-disabled={!nextHref}
+        tabIndex={!nextHref ? -1 : undefined}
+        className={cn(NAV_BTN_BASE, !nextHref ? NAV_BTN_DISABLED : NAV_BTN_ENABLED)}
+      >
+        Siguiente
+      </Link>
+    </nav>
+  );
+}
+
+function Pagination({ total, page, limit, currentParams, nextCursor, prevHref, nextHref }: PaginationProps) {
+  if (nextCursor !== undefined) {
+    return <CursorPagination total={total} prevHref={prevHref} nextHref={nextHref} />;
+  }
+
+  // Legacy offset-based pagination mode
   const totalPages = Math.ceil(total / limit);
   if (totalPages <= 1) return null;
 
-  // Build prev/next URLs preserving current filter params
   const baseParams = new URLSearchParams(currentParams.replace(/^\?/, ""));
-
-  const prevParams = new URLSearchParams(baseParams);
-  prevParams.set("page", String(page - 1));
-  const prevHref = `?${prevParams.toString()}`;
-
-  const nextParams = new URLSearchParams(baseParams);
-  nextParams.set("page", String(page + 1));
-  const nextHref = `?${nextParams.toString()}`;
+  const prevP = new URLSearchParams(baseParams);
+  prevP.set("page", String(page - 1));
+  const nextP = new URLSearchParams(baseParams);
+  nextP.set("page", String(page + 1));
 
   return (
     <nav aria-label="Paginación" className="mt-6 flex items-center justify-center gap-4">
       <Link
-        href={prevHref}
+        href={`?${prevP.toString()}`}
         aria-disabled={page <= 1}
         tabIndex={page <= 1 ? -1 : undefined}
-        className={cn(
-          "rounded-pill border-[1.5px] px-4 py-2 font-sans text-sm font-medium transition-colors duration-deliberate ease-standard",
-          page <= 1
-            ? "pointer-events-none border-border-default text-fg-subtle opacity-50"
-            : "border-fg-default text-fg-default hover:bg-fg-default hover:text-bg-canvas",
-        )}
+        className={cn(NAV_BTN_BASE, page <= 1 ? NAV_BTN_DISABLED : NAV_BTN_ENABLED)}
       >
         Anterior
       </Link>
@@ -126,15 +160,10 @@ function Pagination({ total, page, limit, currentParams }: PaginationProps) {
       </span>
 
       <Link
-        href={nextHref}
+        href={`?${nextP.toString()}`}
         aria-disabled={page >= totalPages}
         tabIndex={page >= totalPages ? -1 : undefined}
-        className={cn(
-          "rounded-pill border-[1.5px] px-4 py-2 font-sans text-sm font-medium transition-colors duration-deliberate ease-standard",
-          page >= totalPages
-            ? "pointer-events-none border-border-default text-fg-subtle opacity-50"
-            : "border-fg-default text-fg-default hover:bg-fg-default hover:text-bg-canvas",
-        )}
+        className={cn(NAV_BTN_BASE, page >= totalPages ? NAV_BTN_DISABLED : NAV_BTN_ENABLED)}
       >
         Siguiente
       </Link>
@@ -164,6 +193,9 @@ export function CatalogList({
   page,
   limit,
   currentParams,
+  nextCursor,
+  prevHref,
+  nextHref,
 }: CatalogListProps) {
   return (
     <section aria-label="Listado de promociones">
@@ -296,6 +328,9 @@ export function CatalogList({
             page={page}
             limit={limit}
             currentParams={currentParams}
+            nextCursor={nextCursor}
+            prevHref={prevHref}
+            nextHref={nextHref}
           />
         </>
       )}

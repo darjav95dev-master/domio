@@ -10,16 +10,12 @@ import {
   PROMOTION_STATUS_LABELS,
   CONSTRUCTION_STATUS_LABELS,
 } from "@/shared/constants/domain-labels";
+import type { ConstructionWarning } from "@/shared/utils/construction-warning";
+import { LABEL_STYLE, SELECT_STYLE } from "@/shared/styles/backoffice-form";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export interface ConstructionWarning {
-  type: "CONSTRUCTION_WARNING";
-  message: string;
-  entregaEstimada: string;
-}
 
 export interface CommercialStatusSectionValues {
   status: string;
@@ -41,11 +37,6 @@ export interface CommercialStatusSectionProps {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const LABEL_STYLE =
-  "font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle";
-
-const SELECT_STYLE = "appearance-none cursor-pointer";
 
 const INPUT_BASE =
   "rounded-control border bg-bg-surface px-4 py-3 font-sans text-base text-fg-default transition-colors duration-standard ease-standard hover:border-border-strong focus:border-accent-default";
@@ -75,7 +66,10 @@ export function PromocionSectionCommercialStatus({
   const [dismissed, setDismissed] = useState(false);
 
   const handleChange = useCallback(
-    (field: keyof CommercialStatusSectionValues, value: string) => {
+    <K extends keyof CommercialStatusSectionValues>(
+      field: K,
+      value: CommercialStatusSectionValues[K],
+    ) => {
       onChange({ ...values, [field]: value });
     },
     [values, onChange],
@@ -196,7 +190,7 @@ export function PromocionSectionCommercialStatus({
             onChange={(e) =>
               handleChange(
                 "constructionStatus",
-                e.target.value || null as unknown as string,
+                e.target.value || null,
               )
             }
             aria-invalid={Boolean(errors.constructionStatus)}

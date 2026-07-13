@@ -7,6 +7,12 @@ import {
   PROPERTY_TYPE_LABELS,
   OPERATION_TYPE_LABELS,
 } from "@/shared/constants/domain-labels";
+import {
+  LABEL_STYLE,
+  SELECT_STYLE,
+  ERROR_STYLE,
+  DANGER_BORDER,
+} from "@/shared/styles/backoffice-form";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,16 +47,8 @@ const KIND_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "external", label: "Captación externa" },
 ];
 
-const LABEL_STYLE =
-  "font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle";
-
-const SELECT_STYLE = "appearance-none cursor-pointer";
-
 const INPUT_BASE =
   "rounded-control border bg-bg-surface px-4 py-3 font-sans text-base text-fg-default placeholder:text-fg-subtle transition-colors duration-standard ease-standard hover:border-border-strong focus:border-accent-default";
-
-const ERROR_STYLE = "font-sans text-sm text-status-danger-default";
-const DANGER_BORDER = "border-status-danger-default";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -72,7 +70,10 @@ export function PromocionSectionIdentity({
   errors = {},
   onChange,
 }: IdentitySectionProps) {
-  const handleChange = (field: keyof IdentitySectionValues, value: string) => {
+  const handleChange = <K extends keyof IdentitySectionValues>(
+    field: K,
+    value: IdentitySectionValues[K],
+  ) => {
     onChange({ ...values, [field]: value });
   };
 
@@ -107,7 +108,7 @@ export function PromocionSectionIdentity({
             onChange={(e) =>
               handleChange(
                 "propertyType",
-                e.target.value || null as unknown as string,
+                e.target.value || null,
               )
             }
             aria-invalid={Boolean(errors.propertyType)}
@@ -150,7 +151,7 @@ export function PromocionSectionIdentity({
             onChange={(e) =>
               handleChange(
                 "operation",
-                e.target.value || null as unknown as string,
+                e.target.value || null,
               )
             }
             aria-invalid={Boolean(errors.operation)}

@@ -17,14 +17,6 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 
-/**
- * Converts a dnd-kit transform to a CSS transform string.
- * Avoids the dependency on @dnd-kit/utilities.
- */
-function transformToString(transform: { x: number; y: number; scaleX: number; scaleY: number } | null): string {
-  if (!transform) return "";
-  return `translate3d(${transform.x}px, ${transform.y}px, 0) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`;
-}
 import { cn } from "@/shared/utils/cn";
 import { Button } from "@/shared/components/button";
 import { contentBlockSchema } from "@/shared/types/content-block-schema";
@@ -45,6 +37,15 @@ import { BlockFormUbicacion } from "./block-form-ubicacion";
 import type { UbicacionPayload } from "./block-form-ubicacion";
 import { BlockFormPlazos } from "./block-form-plazos";
 import type { PlazosPayload } from "./block-form-plazos";
+
+/**
+ * Converts a dnd-kit transform to a CSS transform string.
+ * Avoids the dependency on @dnd-kit/utilities.
+ */
+function transformToString(transform: { x: number; y: number; scaleX: number; scaleY: number } | null): string {
+  if (!transform) return "";
+  return `translate3d(${transform.x}px, ${transform.y}px, 0) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -218,10 +219,10 @@ function SortableBlock({
       <div className="p-4">
         <BlockFormForType
           blockType={block.blockType}
-          payload={block.payload}
+          payload={block.payload as BlockFormPayload}
           errors={fieldErrors[block.id] ?? {}}
           disabled={savingId === block.id || isSaving}
-          onChange={(newPayload) => onPayloadChange(block.id, newPayload)}
+          onChange={(newPayload) => onPayloadChange(block.id, newPayload as Record<string, unknown>)}
         />
       </div>
     </div>
@@ -232,12 +233,19 @@ function SortableBlock({
 // BlockFormForType — renders the correct form based on block type
 // ---------------------------------------------------------------------------
 
+type BlockFormPayload =
+  | DescripcionPayload
+  | CalidadesPayload
+  | ZonasPayload
+  | UbicacionPayload
+  | PlazosPayload;
+
 interface BlockFormForTypeProps {
   blockType: ContentBlockType;
-  payload: Record<string, unknown>;
+  payload: BlockFormPayload;
   errors: Record<string, string>;
   disabled: boolean;
-  onChange: (payload: Record<string, unknown>) => void;
+  onChange: (payload: BlockFormPayload) => void;
 }
 
 function BlockFormForType({
@@ -251,56 +259,46 @@ function BlockFormForType({
     case "DESCRIPCION_GENERAL":
       return (
         <BlockFormDescripcion
-          value={payload as unknown as DescripcionPayload}
+          value={payload as DescripcionPayload}
           errors={errors}
           disabled={disabled}
-          onChange={
-            (newPayload: DescripcionPayload) => onChange(newPayload as unknown as Record<string, unknown>)
-          }
+          onChange={(newPayload) => onChange(newPayload)}
         />
       );
     case "MEMORIA_CALIDADES":
       return (
         <BlockFormCalidades
-          value={payload as unknown as CalidadesPayload}
+          value={payload as CalidadesPayload}
           errors={errors}
           disabled={disabled}
-          onChange={
-            (newPayload: CalidadesPayload) => onChange(newPayload as unknown as Record<string, unknown>)
-          }
+          onChange={(newPayload) => onChange(newPayload)}
         />
       );
     case "ZONAS_COMUNES":
       return (
         <BlockFormZonas
-          value={payload as unknown as ZonasPayload}
+          value={payload as ZonasPayload}
           errors={errors}
           disabled={disabled}
-          onChange={
-            (newPayload: ZonasPayload) => onChange(newPayload as unknown as Record<string, unknown>)
-          }
+          onChange={(newPayload) => onChange(newPayload)}
         />
       );
     case "UBICACION_SERVICIOS":
       return (
         <BlockFormUbicacion
-          value={payload as unknown as UbicacionPayload}
+          value={payload as UbicacionPayload}
           errors={errors}
           disabled={disabled}
-          onChange={
-            (newPayload: UbicacionPayload) => onChange(newPayload as unknown as Record<string, unknown>)
-          }
+          onChange={(newPayload) => onChange(newPayload)}
         />
       );
     case "PLAZOS_GARANTIAS":
       return (
         <BlockFormPlazos
-          value={payload as unknown as PlazosPayload}
+          value={payload as PlazosPayload}
           errors={errors}
           disabled={disabled}
-          onChange={
-            (newPayload: PlazosPayload) => onChange(newPayload as unknown as Record<string, unknown>)
-          }
+          onChange={(newPayload) => onChange(newPayload)}
         />
       );
     default:

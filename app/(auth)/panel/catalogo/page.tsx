@@ -65,7 +65,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   // ── Parse filters ──────────────────────────────────────────────────────
-  const filters: Parameters<PromocionRepository["findAll"]>[0] = {};
+  const filters: Parameters<PromocionRepository["findAllWithCursor"]>[0] = {};
 
   const status = paramValue(params, "status");
   if (status) filters.status = status as PromocionStatus;
@@ -84,9 +84,8 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     filters.constructionStatus = constructionStatus as ConstructionStatus;
 
   // ── Parse pagination ───────────────────────────────────────────────────
-  const page = paramInt(params, "page", 1);
   const limit = paramInt(params, "limit", 20);
-
+  const cursor = paramValue(params, "cursor");
   // ── Fetch data ─────────────────────────────────────────────────────────
   const ctx = new AuthenticatedContext(
     session.tenantId,
@@ -95,10 +94,14 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   );
   const repo = new PromocionRepository(ctx);
 
-  const { items, total } = await repo.findAll(filters, page, limit);
+  // Always use cursor-based pagination. Absence of cursor = first page (cursor = "").
+  const result = await repo.findAllWithCursor(filters, {
+    cursor: cursor ?? "",
+    limit,
+  });
 
-  // ── Map to CatalogListItem ─────────────────────────────────────────────
-  const catalogItems = items.map((item) => ({
+  // Map to CatalogListItem
+  const catalogItems = result.items.map((item) => ({
     id: item.id,
     name: item.name,
     propertyType: item.propertyType,
@@ -109,16 +112,56 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     assignedAgentName: item.assignedAgentName,
   }));
 
-  // ── Build currentParams string for pagination ──────────────────────────
-  const qs = new URLSearchParams();
+  return (
+    <CursorCatalogPage
+      catalogItems={catalogItems}
+      total={result.total}
+      nextCursor={result.nextCursor}
+      params={params}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cursor-based catalog page
+// ---------------------------------------------------------------------------
+
+async function CursorCatalogPage({
+  catalogItems,
+  total,
+  nextCursor,
+  params,
+}: {
+  catalogItems: Array<{
+    id: string;
+    name: string;
+    propertyType: string | null;
+    operation: string | null;
+    status: string;
+    kind: string;
+    municipality: string | null;
+    assignedAgentName: string | null;
+  }>;
+  total: number;
+  nextCursor: string | null;
+  params: Record<string, string | string[] | undefined>;
+}) {
+  // Build current params for nav links
+  const baseParams = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (typeof value === "string" && value.length > 0) {
-      qs.set(key, value);
+    if (typeof value === "string" && value.length > 0 && key !== "cursor" && key !== "prev") {
+      baseParams.set(key, value);
     }
   }
-  const currentParams = qs.toString();
+  const limit = baseParams.get("limit") ?? "20";
+  baseParams.set("limit", limit);
+  const baseQs = baseParams.toString();
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  const prevHref = baseQs.length > 0 ? `?${baseQs}` : "?";
+  const nextHref = nextCursor
+    ? `?${baseParams.toString()}&cursor=${encodeURIComponent(nextCursor)}&prev=1`
+    : null;
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -141,10 +184,14 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
       <CatalogList
         items={catalogItems}
         total={total}
-        page={page}
-        limit={limit}
-        currentParams={currentParams}
+        page={1}
+        limit={Number(limit)}
+        currentParams=""
+        nextCursor={nextCursor}
+        prevHref={prevHref}
+        nextHref={nextHref}
       />
     </div>
   );
 }
+

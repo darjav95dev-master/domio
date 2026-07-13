@@ -2,6 +2,7 @@
 
 import { cn } from "@/shared/utils/cn";
 import { MAP_PRIVACY_MODES } from "@/shared/constants/db-enums";
+import { LABEL_STYLE } from "@/shared/styles/backoffice-form";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,9 +32,6 @@ export interface LocationSectionProps {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const LABEL_STYLE =
-  "font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle";
 
 const INPUT_BASE =
   "rounded-control border bg-bg-surface px-4 py-3 font-sans text-base text-fg-default placeholder:text-fg-subtle transition-colors duration-standard ease-standard hover:border-border-strong focus:border-accent-default";

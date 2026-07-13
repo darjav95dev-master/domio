@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/shared/utils/cn";
+import { LABEL_STYLE, SELECT_STYLE } from "@/shared/styles/backoffice-form";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,11 +31,6 @@ export interface AgentSectionProps {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const LABEL_STYLE =
-  "font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle";
-
-const SELECT_STYLE = "appearance-none cursor-pointer";
 
 const INPUT_BASE =
   "rounded-control border bg-bg-surface px-4 py-3 font-sans text-base text-fg-default transition-colors duration-standard ease-standard hover:border-border-strong focus:border-accent-default";

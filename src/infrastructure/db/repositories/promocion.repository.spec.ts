@@ -79,8 +79,8 @@ const baseUnidadRow = {
 // PromocionRepository
 // ---------------------------------------------------------------------------
 describe("PromocionRepository", () => {
-  describe("findAll", () => {
-    it("returns all promociones for the tenant with default pagination", async () => {
+  describe("findAllWithCursor", () => {
+    it("returns all promociones for the tenant on first page (no cursor)", async () => {
       const { ctx, mockWithTx } = createMockAuthCtx({
         tenantId: TENANT_ID,
         role: "ADMIN",
@@ -90,39 +90,39 @@ describe("PromocionRepository", () => {
         { ...basePromocionRow, id: "p1" },
         { ...basePromocionRow, id: "p2" },
       ];
-      // findAll makes two sequential queries: items + count
-      setupMockTransaction(mockWithTx, [items, [{ count: "2" }]]);
+      // findAllWithCursor (no cursor): count query + items query
+      setupMockTransaction(mockWithTx, [[{ count: "2" }], items]);
 
-        const result = await repo.findAll({}, 1, 10);
+      const result = await repo.findAllWithCursor({}, { limit: 10 });
 
-        expect(result.items).toHaveLength(2);
-        expect(result.total).toBe(2);
-        expect(result.items[0]?.id).toBe("p1");
-        expect(result.items[1]?.id).toBe("p2");
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(2);
+      expect(result.items[0]?.id).toBe("p1");
+      expect(result.items[1]?.id).toBe("p2");
+    });
+
+    it("includes assignedAgentName from users join", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        role: "ADMIN",
       });
+      const repo = new PromocionRepository(ctx);
+      const items = [
+        {
+          ...basePromocionRow,
+          assignedAgentId: "agent-1",
+          assignedAgentName: "Juan Pérez",
+        },
+      ];
+      setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      it("includes assignedAgentName from users join", async () => {
-        const { ctx, mockWithTx } = createMockAuthCtx({
-          tenantId: TENANT_ID,
-          role: "ADMIN",
-        });
-        const repo = new PromocionRepository(ctx);
-        const items = [
-          {
-            ...basePromocionRow,
-            assignedAgentId: "agent-1",
-            assignedAgentName: "Juan Pérez",
-          },
-        ];
-        setupMockTransaction(mockWithTx, [items, [{ count: "1" }]]);
+      const result = await repo.findAllWithCursor({}, { limit: 10 });
 
-        const result = await repo.findAll({}, 1, 10);
-
-        expect(result.items).toHaveLength(1);
-        expect(
-          (result.items[0] as Record<string, unknown>)?.assignedAgentName,
-        ).toBe("Juan Pérez");
-      });
+      expect(result.items).toHaveLength(1);
+      expect(
+        (result.items[0] as Record<string, unknown>)?.assignedAgentName,
+      ).toBe("Juan Pérez");
+    });
 
     it("applies status filter when provided", async () => {
       const { ctx, mockWithTx } = createMockAuthCtx({
@@ -131,9 +131,9 @@ describe("PromocionRepository", () => {
       });
       const repo = new PromocionRepository(ctx);
       const items = [{ ...basePromocionRow, status: "PUBLISHED" }];
-      setupMockTransaction(mockWithTx, [items, [{ count: "1" }]]);
+      setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAll({ status: "PUBLISHED" }, 1, 10);
+      const result = await repo.findAllWithCursor({ status: "PUBLISHED" }, { limit: 10 });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0]?.status).toBe("PUBLISHED");
@@ -152,12 +152,11 @@ describe("PromocionRepository", () => {
           constructionStatus: "IN_CONSTRUCTION",
         },
       ];
-      setupMockTransaction(mockWithTx, [items, [{ count: "1" }]]);
+      setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAll(
+      const result = await repo.findAllWithCursor(
         { kind: "portfolio", constructionStatus: "IN_CONSTRUCTION" },
-        1,
-        10,
+        { limit: 10 },
       );
 
       expect(result.items).toHaveLength(1);
@@ -170,12 +169,11 @@ describe("PromocionRepository", () => {
       });
       const repo = new PromocionRepository(ctx);
       const items = [{ ...basePromocionRow }];
-      setupMockTransaction(mockWithTx, [items, [{ count: "1" }]]);
+      setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAll(
+      const result = await repo.findAllWithCursor(
         { island: "Tenerife", municipality: "Adeje" },
-        1,
-        10,
+        { limit: 10 },
       );
 
       expect(result.items).toHaveLength(1);
@@ -190,29 +188,29 @@ describe("PromocionRepository", () => {
       const items = [
         { ...basePromocionRow, assignedAgentId: "agent-1" },
       ];
-      setupMockTransaction(mockWithTx, [items, [{ count: "1" }]]);
+      setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAll(
+      const result = await repo.findAllWithCursor(
         { assignedAgentId: "agent-1" },
-        1,
-        10,
+        { limit: 10 },
       );
 
       expect(result.items).toHaveLength(1);
     });
 
-    it("applies page and limit for pagination", async () => {
+    it("returns empty result when no items exist", async () => {
       const { ctx, mockWithTx } = createMockAuthCtx({
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
       const repo = new PromocionRepository(ctx);
-      setupMockTransaction(mockWithTx, [[], [{ count: "0" }]]);
+      setupMockTransaction(mockWithTx, [[{ count: "0" }]]);
 
-      const result = await repo.findAll({}, 2, 5);
+      const result = await repo.findAllWithCursor({}, { limit: 5 });
 
       expect(result.items).toHaveLength(0);
       expect(result.total).toBe(0);
+      expect(result.nextCursor).toBeNull();
     });
 
     describe("AGENT role scope", () => {
@@ -226,9 +224,9 @@ describe("PromocionRepository", () => {
         const items = [
           { ...basePromocionRow, assignedAgentId: "agent-1" },
         ];
-        setupMockTransaction(mockWithTx, [items, [{ count: "1" }]]);
+        setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-        const result = await repo.findAll({}, 1, 10);
+        const result = await repo.findAllWithCursor({}, { limit: 10 });
 
         expect(result.items).toHaveLength(1);
       });
@@ -243,13 +241,12 @@ describe("PromocionRepository", () => {
         const items = [
           { ...basePromocionRow, assignedAgentId: "agent-1" },
         ];
-        setupMockTransaction(mockWithTx, [items, [{ count: "1" }]]);
+        setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
         // Even though we pass a different agent ID, the AGENT's own ID takes precedence
-        const result = await repo.findAll(
+        const result = await repo.findAllWithCursor(
           { assignedAgentId: "other-agent" },
-          1,
-          10,
+          { limit: 10 },
         );
 
         expect(result.items).toHaveLength(1);
@@ -650,130 +647,5 @@ describe("PromocionRepository", () => {
     });
   });
 
-  describe("findDetailBySlug", () => {
-    const SLUG = "piso-en-venta-en-santa-cruz-3hab-a4c9";
-
-    const contentBlockRows = [
-      {
-        id: "block-1",
-        tenantId: TENANT_ID,
-        promocionId: PROMOCION_ID,
-        blockType: "DESCRIPCION_GENERAL",
-        payload: { text: "<p>Descripción general</p>" },
-        sortOrder: 0,
-        updatedBy: null,
-        updatedAt: NOW,
-      },
-      {
-        id: "block-2",
-        tenantId: TENANT_ID,
-        promocionId: PROMOCION_ID,
-        blockType: "UBICACION_SERVICIOS",
-        payload: {
-          items: [
-            { service: "Colegio", distance: "300 m" },
-          ],
-        },
-        sortOrder: 1,
-        updatedBy: null,
-        updatedAt: NOW,
-      },
-    ];
-
-    const mediaAssetRows = [
-      {
-        id: "asset-1",
-        tenantId: TENANT_ID,
-        ownerType: "PROMOCION",
-        ownerId: PROMOCION_ID,
-        kind: "IMAGE_GALLERY",
-        r2Key: "promo-1/hero.jpg",
-        mimeType: "image/jpeg",
-        sizeBytes: 2048000,
-        altText: "Fachada del edificio",
-        sortOrder: 0,
-        isCover: true,
-        createdAt: NOW,
-      },
-    ];
-
-    it("returns full promocion detail with all relations", async () => {
-      const { ctx, mockWithTx } = createMockAuthCtx({
-        tenantId: TENANT_ID,
-        role: "ADMIN",
-      });
-      const repo = new PromocionRepository(ctx);
-
-      const promocionRow = {
-        ...basePromocionRow,
-        slug: SLUG,
-        status: "PUBLISHED",
-        assignedAgentName: null,
-      };
-
-      // 5 sequential queries: promocion, tipologias, unidades, contentBlocks, mediaAssets
-      setupMockTransaction(mockWithTx, [
-        [promocionRow],
-        [baseTipologiaRow],
-        [baseUnidadRow],
-        contentBlockRows,
-        mediaAssetRows,
-      ]);
-
-      const result = await repo.findDetailBySlug(SLUG);
-
-      expect(result).not.toBeNull();
-      expect(result!.slug).toBe(SLUG);
-      expect(result!.status).toBe("PUBLISHED");
-      expect(result!.tipologias).toHaveLength(1);
-      expect(result!.tipologias[0]!.unidades).toHaveLength(1);
-      expect(result!.contentBlocks).toHaveLength(2);
-      expect(result!.mediaAssets).toHaveLength(1);
-      expect(result!.mediaAssets[0]!.kind).toBe("IMAGE_GALLERY");
-    });
-
-    it("returns null when slug does not exist", async () => {
-      const { ctx, mockWithTx } = createMockAuthCtx({
-        tenantId: TENANT_ID,
-        role: "ADMIN",
-      });
-      const repo = new PromocionRepository(ctx);
-
-      setupMockTransaction(mockWithTx, [[]]);
-
-      const result = await repo.findDetailBySlug("nonexistent-slug");
-
-      expect(result).toBeNull();
-    });
-
-    it("returns empty arrays when no tipologias, blocks or assets exist", async () => {
-      const { ctx, mockWithTx } = createMockAuthCtx({
-        tenantId: TENANT_ID,
-        role: "ADMIN",
-      });
-      const repo = new PromocionRepository(ctx);
-
-      const promocionRow = {
-        ...basePromocionRow,
-        slug: SLUG,
-        status: "PUBLISHED",
-        assignedAgentName: null,
-      };
-
-      // promocion found, but empty tipologias → no unidades query, then empty blocks, empty assets
-      setupMockTransaction(mockWithTx, [
-        [promocionRow],
-        [], // empty tipologias
-        [], // empty content blocks
-        [], // empty media assets
-      ]);
-
-      const result = await repo.findDetailBySlug(SLUG);
-
-      expect(result).not.toBeNull();
-      expect(result!.tipologias).toEqual([]);
-      expect(result!.contentBlocks).toEqual([]);
-      expect(result!.mediaAssets).toEqual([]);
-    });
-  });
 });
+// findDetailBySlug tests have been moved to promocion-detail.repository.spec.ts

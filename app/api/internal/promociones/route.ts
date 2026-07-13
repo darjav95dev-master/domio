@@ -1,16 +1,15 @@
 import { type NextRequest } from "next/server";
 import { requireAuth } from "@/infrastructure/auth/require-auth";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionRepository, type CursorResult } from "@/infrastructure/db/repositories/promocion.repository";
 import { PromocionCreateSchema } from "@/shared/schemas/promocion.schema";
 import {
   DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
 } from "@/shared/constants/domain-config";
 import type { PromocionFilters } from "@/infrastructure/db/repositories/promocion.repository";
 
 // ---------------------------------------------------------------------------
 // GET /api/internal/promociones
-// Listado paginado con filtros
+// Listado paginado con cursor o con offset (legacy)
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -45,23 +44,23 @@ export async function GET(request: NextRequest): Promise<Response> {
         constructionStatus as PromocionFilters["constructionStatus"];
     }
 
-    // Pagination with defaults
-    let page = Number(url.searchParams.get("page")) || 1;
-    let limit = Number(url.searchParams.get("limit")) || DEFAULT_PAGE_SIZE;
+    // Cursor-based pagination
+    const cursor = url.searchParams.get("cursor");
+    const limitParam = url.searchParams.get("limit");
+    const limit = limitParam
+      ? Math.min(Math.max(1, Number(limitParam)), 100)
+      : DEFAULT_PAGE_SIZE;
 
-    // Clamp page and limit
-    if (page < 1) page = 1;
-    if (limit < 1) limit = DEFAULT_PAGE_SIZE;
-    if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
-
-    const result = await repository.findAll(filters, page, limit);
+    const result: CursorResult = await repository.findAllWithCursor(filters, {
+      cursor: cursor ?? "",
+      limit,
+    });
 
     return Response.json(
       {
         items: result.items,
+        nextCursor: result.nextCursor,
         total: result.total,
-        page,
-        limit,
       },
       { status: 200 },
     );

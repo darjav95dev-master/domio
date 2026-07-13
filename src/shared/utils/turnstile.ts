@@ -5,6 +5,8 @@
  * The secret key is read from the TURNSTILE_SECRET_KEY environment variable.
  */
 
+import { logger } from "@/shared/utils/logger";
+
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export interface TurnstileVerifyResult {
@@ -33,6 +35,7 @@ export async function verifyTurnstileToken(
       return { success: true };
     }
 
+    logger.error("TURNSTILE_SECRET_KEY is not set in production environment.");
     return {
       success: false,
       error: "CAPTCHA no configurado. Contacta con el administrador.",

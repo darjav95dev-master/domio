@@ -1,10 +1,8 @@
-import { eq, and, inArray, desc, count } from "drizzle-orm";
+import { eq, and, inArray, desc, count, lt, or } from "drizzle-orm";
 import {
   promociones,
   tipologias,
   unidades,
-  promocionContentBlocks,
-  mediaAssets,
   users,
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
@@ -62,8 +60,9 @@ export interface PromocionFilters {
   constructionStatus?: ConstructionStatus;
 }
 
-import { PaginatedResult } from "@/shared/types/pagination";
+import { DEFAULT_PAGE_SIZE } from "@/shared/constants/domain-config";
 import type { TipologiaPayloadFull as TipologiaPayload } from "@/shared/types/tipologia-schema";
+import { encodeCursor, decodeCursor } from "@/infrastructure/db/repositories/cursor-encoder";
 
 /**
  * Full detail for the public detail page.
@@ -182,66 +181,106 @@ export class PromocionRepository extends TenantAwareRepository {
     this.authCtx = ctx.type === "authenticated" ? (ctx as AuthenticatedContext) : null;
   }
 
-  async findAll(
+  // ── Cursor-based pagination (replaces OFFSET for the backoffice catalog) ──
+
+  /** Field mapping for history comparison (shared between update and history). */
+  private static readonly HISTORY_FIELDS: Array<{ key: string; fieldName: string }> = [
+    { key: "name", fieldName: "name" },
+    { key: "kind", fieldName: "kind" },
+    { key: "status", fieldName: "status" },
+    { key: "operation", fieldName: "operation" },
+    { key: "propertyType", fieldName: "propertyType" },
+    { key: "constructionStatus", fieldName: "constructionStatus" },
+    { key: "island", fieldName: "island" },
+    { key: "municipality", fieldName: "municipality" },
+    { key: "address", fieldName: "address" },
+    { key: "location", fieldName: "location" },
+    { key: "locationApprox", fieldName: "locationApprox" },
+    { key: "mapPrivacyMode", fieldName: "mapPrivacyMode" },
+    { key: "seoTitle", fieldName: "seoTitle" },
+    { key: "seoDescription", fieldName: "seoDescription" },
+    { key: "assignedAgentId", fieldName: "assignedAgentId" },
+    { key: "slug", fieldName: "slug" },
+    { key: "draftPayload", fieldName: "draftPayload" },
+  ];
+
+  private buildFilterConditions(filters: PromocionFilters): ReturnType<typeof eq>[] {
+    const conditions: ReturnType<typeof eq>[] = [
+      eq(promociones.tenantId, this.ctx.getTenantId()),
+    ];
+    if (filters.status) conditions.push(eq(promociones.status, filters.status));
+    if (filters.kind) conditions.push(eq(promociones.kind, filters.kind));
+    if (filters.island) conditions.push(eq(promociones.island, filters.island));
+    if (filters.municipality) conditions.push(eq(promociones.municipality, filters.municipality));
+    if (filters.constructionStatus) conditions.push(eq(promociones.constructionStatus, filters.constructionStatus));
+    if (!this.authCtx) throw new Error("Este método requiere contexto autenticado");
+    if (this.authCtx.role === "AGENT") {
+      conditions.push(eq(promociones.assignedAgentId, this.authCtx.userId));
+    } else if (filters.assignedAgentId) {
+      conditions.push(eq(promociones.assignedAgentId, filters.assignedAgentId));
+    }
+    return conditions;
+  }
+
+  async findAllWithCursor(
     filters: PromocionFilters,
-    page: number,
-    limit: number,
-  ): Promise<PaginatedResult<PromocionListRow>> {
+    options: { cursor?: string; limit?: number } = {},
+  ): Promise<CursorResult> {
     return this.withTransaction(async (tx) => {
-      const conditions: ReturnType<typeof eq>[] = [
-        eq(promociones.tenantId, this.ctx.getTenantId()),
-      ];
+      const limit = Math.min(Math.max(1, options.limit ?? DEFAULT_PAGE_SIZE), 100);
+      const whereClause = and(...this.buildFilterConditions(filters));
 
-      if (filters.status) {
-        conditions.push(eq(promociones.status, filters.status));
+      // Calculate total only on first page
+      let total = 0;
+      if (!options.cursor) {
+        const [totalRow] = await tx
+          .select({ count: count() })
+          .from(promociones)
+          .where(whereClause);
+        total = Number(totalRow?.count ?? 0);
+        if (total === 0) {
+          return { items: [], nextCursor: null, total: 0 };
+        }
       }
-      if (filters.kind) {
-        conditions.push(eq(promociones.kind, filters.kind));
-      }
-      if (filters.island) {
-        conditions.push(eq(promociones.island, filters.island));
-      }
-      if (filters.municipality) {
-        conditions.push(eq(promociones.municipality, filters.municipality));
-      }
-      if (filters.constructionStatus) {
-        conditions.push(
-          eq(promociones.constructionStatus, filters.constructionStatus),
+
+      // Apply cursor: fetch items after the cursor position
+      const cursorConditions: ReturnType<typeof or>[] = [];
+      if (options.cursor) {
+        const { sortKey, id } = decodeCursor(options.cursor);
+        const cursorDate = new Date(sortKey);
+        cursorConditions.push(
+          or(
+            lt(promociones.updatedAt, cursorDate),
+            and(
+              eq(promociones.updatedAt, cursorDate),
+              lt(promociones.id, id),
+            ),
+          ),
         );
       }
 
-      // AGENT role: always filter by assignedAgentId = current user
-      if (this.authCtx!.role === "AGENT") {
-        conditions.push(
-          eq(promociones.assignedAgentId, this.authCtx!.userId),
-        );
-      } else if (filters.assignedAgentId) {
-        // For ADMIN/OPERATOR, use the explicit filter if provided
-        conditions.push(
-          eq(promociones.assignedAgentId, filters.assignedAgentId),
-        );
-      }
-
-      const whereClause = and(...conditions);
-      const offset = (page - 1) * limit;
+      const fullWhere = cursorConditions.length > 0
+        ? and(whereClause, ...cursorConditions)
+        : whereClause;
 
       const items = await tx
-  .select(PROMOCION_SELECT_COLUMNS)
+        .select(PROMOCION_SELECT_COLUMNS)
         .from(promociones)
         .leftJoin(users, eq(promociones.assignedAgentId, users.id))
-        .where(whereClause)
-        .orderBy(desc(promociones.updatedAt))
-        .limit(limit)
-        .offset(offset);
+        .where(fullWhere)
+        .orderBy(desc(promociones.updatedAt), desc(promociones.id))
+        .limit(limit + 1);
 
-      const totalResult = await tx
-        .select({ count: count() })
-        .from(promociones)
-        .where(whereClause);
+      const hasMore = items.length > limit;
+      const pageItems = hasMore ? items.slice(0, limit) : items;
 
-      const total = Number(totalResult[0]?.count ?? 0);
+      let nextCursor: string | null = null;
+      if (hasMore && pageItems.length > 0) {
+        const last = pageItems[pageItems.length - 1]!;
+        nextCursor = encodeCursor(last.updatedAt.toISOString(), last.id);
+      }
 
-      return { items, total };
+      return { items: pageItems, nextCursor, total };
     });
   }
 
@@ -268,59 +307,6 @@ export class PromocionRepository extends TenantAwareRepository {
         ...promocion,
         assignedAgentName: promocion.assignedAgentName ?? null,
         tipologias: tipologiasWithUnidades,
-      };
-    });
-  }
-
-  async findDetailBySlug(slug: string): Promise<PromocionDetail | null> {
-    return this.withTransaction(async (tx) => {
-      const [promocion] = await tx
-        .select(PROMOCION_SELECT_COLUMNS)
-        .from(promociones)
-        .leftJoin(users, eq(promociones.assignedAgentId, users.id))
-        .where(
-          and(
-            eq(promociones.slug, slug),
-            eq(promociones.tenantId, this.ctx.getTenantId()),
-          ),
-        );
-
-      if (!promocion) return null;
-
-      const tipologiasWithUnidades = await this.assembleTipologias(
-        tx,
-        promocion.id,
-      );
-
-      const contentBlocks = await tx
-        .select()
-        .from(promocionContentBlocks)
-        .where(
-          and(
-            eq(promocionContentBlocks.promocionId, promocion.id),
-            eq(promocionContentBlocks.tenantId, this.ctx.getTenantId()),
-          ),
-        )
-        .orderBy(promocionContentBlocks.sortOrder);
-
-      const assets = await tx
-        .select()
-        .from(mediaAssets)
-        .where(
-          and(
-            eq(mediaAssets.ownerId, promocion.id),
-            eq(mediaAssets.ownerType, "PROMOCION"),
-            eq(mediaAssets.tenantId, this.ctx.getTenantId()),
-          ),
-        )
-        .orderBy(mediaAssets.sortOrder);
-
-      return {
-        ...promocion,
-        assignedAgentName: promocion.assignedAgentName ?? null,
-        tipologias: tipologiasWithUnidades,
-        contentBlocks,
-        mediaAssets: assets,
       };
     });
   }
@@ -365,8 +351,6 @@ export class PromocionRepository extends TenantAwareRepository {
       unidades: unidadesByTipologiaId.get(t.id) ?? [],
     }));
   }
-
-
 
   async create(
     data: { name: string; kind: string },
@@ -414,43 +398,11 @@ export class PromocionRepository extends TenantAwareRepository {
         throw new Error(`Promoción with id ${id} not found`);
       }
 
-      // Build update set — only include provided fields
-      const updateData: Record<string, unknown> = {};
-      const fieldsToCompare: Array<{
-        key: string;
-        fieldName: string;
-      }> = [
-        { key: "name", fieldName: "name" },
-        { key: "kind", fieldName: "kind" },
-        { key: "status", fieldName: "status" },
-        { key: "operation", fieldName: "operation" },
-        { key: "propertyType", fieldName: "propertyType" },
-        { key: "constructionStatus", fieldName: "constructionStatus" },
-        { key: "island", fieldName: "island" },
-        { key: "municipality", fieldName: "municipality" },
-        { key: "address", fieldName: "address" },
-        { key: "location", fieldName: "location" },
-        { key: "locationApprox", fieldName: "locationApprox" },
-        { key: "mapPrivacyMode", fieldName: "mapPrivacyMode" },
-        { key: "seoTitle", fieldName: "seoTitle" },
-        { key: "seoDescription", fieldName: "seoDescription" },
-        { key: "assignedAgentId", fieldName: "assignedAgentId" },
-        { key: "slug", fieldName: "slug" },
-        { key: "draftPayload", fieldName: "draftPayload" },
-      ];
+      // Build update set from provided fields
+      const updateData = this.buildUpdateData(data);
 
-      for (const { key, fieldName } of fieldsToCompare) {
-        if (key in data) {
-          const val = data[key as keyof PromocionUpdateData];
-          updateData[fieldName] = val;
-        }
-      }
-
-      // Skip DB update if no promoción fields changed
-      const hasPromocionUpdates = Object.keys(updateData).length > 0;
-
-      if (hasPromocionUpdates) {
-        // Perform the update
+      // Perform DB update if any promoción fields changed
+      if (Object.keys(updateData).length > 0) {
         const [updated] = await tx
           .update(promociones)
           .set(updateData as Partial<typeof promociones.$inferInsert>)
@@ -466,29 +418,18 @@ export class PromocionRepository extends TenantAwareRepository {
           throw new Error(`Failed to update promoción with id ${id}`);
         }
 
-        // Exclude internal fields (slug, draftPayload) from history recording
-        const historyFields = fieldsToCompare.filter(
-          (f) => f.key !== "slug" && f.key !== "draftPayload",
-        );
-        const historyRepo = new PromocionHistoryRepository(this.ctx);
-        await historyRepo.recordFieldChanges(
-          tx,
-          id,
-          current,
-          historyFields,
-          data as unknown as Record<string, unknown>,
-          updateData,
-          this.authCtx!.userId,
-        );
+        // Record audit history
+        await this.recordHistory(tx, id, current, data, updateData);
       }
 
-      // Sync tipologías if provided (creates, updates, deletes)
+      // Sync tipologías if provided
       if (data.tipologias !== undefined) {
-        const syncService = new TipologiaSyncService(this.ctx, this.authCtx!);
+        const auth = this.requireAuth();
+        const syncService = new TipologiaSyncService(this.ctx, auth);
         await syncService.syncInTx(tx, id, data.tipologias);
       }
 
-      // Re-fetch the current state if we need to return it
+      // Re-fetch to return fresh data
       const [result] = await tx
         .select()
         .from(promociones)
@@ -505,6 +446,55 @@ export class PromocionRepository extends TenantAwareRepository {
 
       return result;
     });
+  }
+
+  /**
+   * Builds an update map from PromocionUpdateData, only including fields
+   * that are present in the input.
+   */
+  private buildUpdateData(data: PromocionUpdateData): Record<string, unknown> {
+    const updateData: Record<string, unknown> = {};
+    for (const { key, fieldName } of PromocionRepository.HISTORY_FIELDS) {
+      if (key in data) {
+        updateData[fieldName] = data[key as keyof PromocionUpdateData];
+      }
+    }
+    return updateData;
+  }
+
+  /**
+   * Records field-level history for changed promoción fields.
+   * Excludes internal fields (slug, draftPayload) from history.
+   */
+  private async recordHistory(
+    tx: Transaction,
+    id: string,
+    current: typeof promociones.$inferSelect,
+    data: PromocionUpdateData,
+    updateData: Record<string, unknown>,
+  ): Promise<void> {
+    const auth = this.requireAuth();
+    const historyFields = PromocionRepository.HISTORY_FIELDS.filter(
+      (f) => f.key !== "slug" && f.key !== "draftPayload",
+    );
+    const historyRepo = new PromocionHistoryRepository(this.ctx);
+    await historyRepo.recordFieldChanges(
+      tx,
+      id,
+      current as unknown as Record<string, unknown>,
+      historyFields,
+      data as unknown as Record<string, unknown>,
+      updateData,
+      auth.userId,
+    );
+  }
+
+  /** Ensures auth context is available, throwing if not. */
+  private requireAuth(): AuthenticatedContext {
+    if (!this.authCtx) {
+      throw new Error("Authentication required for this operation");
+    }
+    return this.authCtx;
   }
 
   async updateDraft(
@@ -556,7 +546,14 @@ export class PromocionRepository extends TenantAwareRepository {
 
 type PromocionRow = typeof promociones.$inferSelect;
 
-/** Row returned by findAll — includes assignedAgentName from users join. */
+/** Row returned by findAllWithCursor — includes assignedAgentName from users join. */
 export type PromocionListRow = PromocionRow & {
   assignedAgentName: string | null;
 };
+
+/** Row returned by findAllWithCursor — cursor-based pagination result. */
+export interface CursorResult {
+  items: PromocionListRow[];
+  nextCursor: string | null;
+  total: number;
+}

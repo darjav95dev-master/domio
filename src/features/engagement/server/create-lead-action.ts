@@ -8,7 +8,6 @@ import {
   users,
   leads,
   consentRecords,
-  emailQueue,
 } from "@/infrastructure/db/schema";
 import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { contactFormSchema } from "../schemas/contact-form.schema";
@@ -16,6 +15,9 @@ import { checkIpRateLimit } from "@/infrastructure/rate-limiting/ip-rate-limit";
 import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
 import { BACKOFFICE_LEADS_URL } from "@/shared/constants/tenant-hosts";
 import { verifyTurnstileToken } from "@/shared/utils/turnstile";
+import { RGPD_CONSENT_TEXT_LEAD } from "@/shared/constants/consent-texts";
+import { EmailRepository } from "@/infrastructure/email/email.repository";
+import { EmailService } from "@/infrastructure/email/email.service";
 import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
 import type { ContactFormInput } from "../schemas/contact-form.schema";
 
@@ -108,6 +110,8 @@ export async function createLeadService(
   ip: string,
   userAgent: string | null = null,
 ): Promise<ActionResult> {
+  const emailService = new EmailService(new EmailRepository());
+
   return ctx.withTransaction(async (tx) => {
     // 1. Fetch promocion to get name and assigned agent
     const [promocion] = await tx
@@ -178,34 +182,39 @@ export async function createLeadService(
       tenantId: ctx.getTenantId(),
       leadId: lead.id,
       legalBasis: "RGPD: consentimiento explícito del interesado",
-      textAccepted:
-        "He leído y acepto la política de privacidad y el tratamiento de mis datos para recibir información comercial.",
+      textAccepted: RGPD_CONSENT_TEXT_LEAD,
       ip,
       userAgent,
     });
 
     // 5. Enqueue confirmation email to the lead
-    await tx.insert(emailQueue).values({
-      toEmail: data.email,
-      template: EMAIL_TEMPLATE_NAMES.LEAD_CONFIRMATION,
-      payload: {
-        leadName: data.name,
-        promotionName: promocion.name,
-        contactEmail: agent.email,
+    await emailService.enqueue(
+      {
+        toEmail: data.email,
+        template: EMAIL_TEMPLATE_NAMES.LEAD_CONFIRMATION,
+        payload: {
+          leadName: data.name,
+          promotionName: promocion.name,
+          contactEmail: agent.email,
+        },
       },
-    });
+      tx,
+    );
 
     // 6. Enqueue notification email to the assigned agent
-    await tx.insert(emailQueue).values({
-      toEmail: agent.email,
-      template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
-      payload: {
-        agentName: agent.name,
-        leadName: data.name,
-        promotionName: promocion.name,
-        backofficeUrl: `${BACKOFFICE_LEADS_URL}/${lead.id}`,
+    await emailService.enqueue(
+      {
+        toEmail: agent.email,
+        template: EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT,
+        payload: {
+          agentName: agent.name,
+          leadName: data.name,
+          promotionName: promocion.name,
+          backofficeUrl: `${BACKOFFICE_LEADS_URL}/${lead.id}`,
+        },
       },
-    });
+      tx,
+    );
 
     return {
       success: true,
