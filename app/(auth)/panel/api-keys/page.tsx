@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/infrastructure/auth/session";
 import { ApiKeysPageClient } from "@/features/api-keys/components/api-keys-page-client";
