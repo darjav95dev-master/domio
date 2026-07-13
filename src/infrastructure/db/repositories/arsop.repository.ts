@@ -10,6 +10,7 @@ import {
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
 import { MediaService } from "@/infrastructure/media/media.service";
 import type { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
+import { csvLine } from "@/shared/utils/csv";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,30 +30,6 @@ export interface ArsopRequestRow {
 // ---------------------------------------------------------------------------
 // CSV helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Escapa un valor para CSV: si contiene comas, comillas dobles o saltos de
- * linea, lo envuelve entre comillas dobles y escapa las comillas internas.
- */
-function csvField(value: unknown): string {
-  const str = value == null ? "" : String(value);
-  if (
-    str.includes(",") ||
-    str.includes('"') ||
-    str.includes("\n") ||
-    str.includes("\r")
-  ) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-/**
- * Genera una linea CSV (CRLF) a partir de los valores proporcionados.
- */
-function csvLine(...fields: unknown[]): string {
-  return fields.map(csvField).join(",") + "\r\n";
-}
 
 /**
  * Genera el contenido CSV completo para la exportacion ARSOP de un lead.

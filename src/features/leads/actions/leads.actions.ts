@@ -1,11 +1,9 @@
 "use server";
 
-import { headers } from "next/headers";
 import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
-import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { LeadRepository } from "@/infrastructure/db/repositories/lead.repository";
-import { leads, consentRecords } from "@/infrastructure/db/schema";
+import { LeadReadMarkRepository } from "@/infrastructure/db/repositories/lead-read-mark.repository";
 import {
   leadFiltersSchema,
   leadPaginationSchema,
@@ -13,9 +11,9 @@ import {
   leadStatusTransitionSchema,
   leadReassignSchema,
 } from "@/shared/types/lead-schema";
-import { leadCreationSchema } from "@/shared/types/lead-creation-schema";
 import type { LeadFilters } from "@/shared/types/lead-schema";
 import type { LeadStatus } from "@/shared/constants/db-enums";
+import { escapeCsvField } from "@/shared/utils/csv";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,6 +34,22 @@ async function createContextAndRepo(): Promise<{
   );
   const repo = new LeadRepository(ctx);
   return { session, ctx, repo };
+}
+
+async function createReadMarkRepo(): Promise<{
+  session: import("@/infrastructure/auth/session").ServerSession;
+  readMarkRepo: LeadReadMarkRepository;
+}> {
+  const session = await getServerSession();
+  if (!session) throw new Error("Permission denied");
+
+  const ctx = new AuthenticatedContext(
+    session.tenantId,
+    session.userId,
+    session.role,
+  );
+  const readMarkRepo = new LeadReadMarkRepository(ctx);
+  return { session, readMarkRepo };
 }
 
 // ---------------------------------------------------------------------------
@@ -59,9 +73,9 @@ export async function getLeadsAction(
 // ---------------------------------------------------------------------------
 
 export async function getUnreadCountAction(): Promise<number> {
-  const { session, repo } = await createContextAndRepo();
+  const { session, readMarkRepo } = await createReadMarkRepo();
 
-  return repo.getUnreadCount(session.userId);
+  return readMarkRepo.getUnreadCount(session.userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,9 +110,9 @@ export async function addNoteAction(leadId: string, text: string) {
 // ---------------------------------------------------------------------------
 
 export async function markAsReadAction(leadId: string) {
-  const { session, repo } = await createContextAndRepo();
+  const { session, readMarkRepo } = await createReadMarkRepo();
 
-  return repo.markAsRead(leadId, session.userId);
+  return readMarkRepo.markAsRead(leadId, session.userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,100 +213,22 @@ export async function exportLeadsCsvAction(filters: LeadFilters = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// T008 — createLeadAction: crea un lead desde formulario publico con
-//         consentimiento RGPD en una sola transaccion
+// Re-export: createLeadAction (backward compatibility for contact-form.tsx)
 // ---------------------------------------------------------------------------
+// La implementación canónica vive en engagement/server/create-lead-action.ts
+// y acepta un objeto tipado (CreateLeadInput). Este wrapper adapta FormData
+// para mantener compatibilidad con contact-form.tsx que pasa FormData directo.
+import { createLeadAction as createLeadActionTyped } from "@/features/engagement/server/create-lead-action";
 
-/**
- * Crea un lead con su registro de consentimiento RGPD asociado.
- * Usa PublicContext (sin autenticacion) porque es un formulario publico.
- * Si el consentimiento falta o es invalido, la transaccion no se completa.
- */
 export async function createLeadAction(formData: FormData) {
-  // 1. Parse and validate input
-  const raw = {
-    promocionId: formData.get("promocionId") as string,
-    source: formData.get("source") as string,
-    channel: formData.get("channel") as string | null,
-    name: formData.get("name") as string,
-    email: formData.get("email") as string,
-    phone: formData.get("phone") as string | null,
-    message: formData.get("message") as string | null,
-    consentLegalBasis: formData.get("consentLegalBasis") as string,
-    consentTextAccepted: formData.get("consentTextAccepted") as string,
-  };
-
-  const parsed = leadCreationSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return {
-      success: false as const,
-      error: "El consentimiento RGPD es obligatorio",
-      details: parsed.error.flatten().fieldErrors,
-    };
-  }
-
-  const data = parsed.data;
-
-  // 2. Get IP and user-agent from request headers
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") ?? headersList.get("x-real-ip") ?? undefined;
-  const userAgent = headersList.get("user-agent") ?? undefined;
-
-  // 3. Create lead + consent record in the same transaction (atomico)
-  const ctx = new PublicContext();
-  const result = await ctx.withTransaction(async (tx) => {
-    const [lead] = await tx
-      .insert(leads)
-      .values({
-        tenantId: ctx.getTenantId(),
-        promocionId: data.promocionId,
-        tipologiaId: data.tipologiaId ?? null,
-        source: data.source,
-        channel: data.channel ?? null,
-        name: data.name,
-        email: data.email,
-        phone: data.phone ?? null,
-        message: data.message ?? null,
-      })
-      .returning();
-
-    if (!lead) {
-      throw new Error("Failed to create lead");
-    }
-
-    const [consent] = await tx
-      .insert(consentRecords)
-      .values({
-        tenantId: ctx.getTenantId(),
-        leadId: lead.id,
-        legalBasis: data.consentLegalBasis,
-        textAccepted: data.consentTextAccepted,
-        ip: ip ?? null,
-        userAgent: userAgent ?? null,
-      })
-      .returning();
-
-    if (!consent) {
-      throw new Error("Failed to create consent record");
-    }
-
-    return { leadId: lead.id, consentId: consent.id };
+  return createLeadActionTyped({
+    name: (formData.get("name") as string) ?? "",
+    email: (formData.get("email") as string) ?? "",
+    message: (formData.get("message") as string) ?? "",
+    consent: true,
+    phone: (formData.get("phone") as string) || undefined,
+    promocionId: (formData.get("promocionId") as string) ?? "00000000-0000-0000-0000-000000000000",
+    turnstileToken: (formData.get("turnstileToken") as string) || undefined,
   });
-
-  return {
-    success: true as const,
-    ...result,
-  };
 }
 
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
-function escapeCsvField(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
-import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionCursorQuery } from "@/infrastructure/db/repositories/promocion-cursor.query";
 import { CatalogFilters } from "@/features/promociones/components/catalog-filters";
 import { CatalogList } from "@/features/promociones/components/catalog-list";
 import type {
@@ -65,7 +65,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   // ── Parse filters ──────────────────────────────────────────────────────
-  const filters: Parameters<PromocionRepository["findAllWithCursor"]>[0] = {};
+  const filters: Parameters<PromocionCursorQuery["findAllWithCursor"]>[0] = {};
 
   const status = paramValue(params, "status");
   if (status) filters.status = status as PromocionStatus;
@@ -92,10 +92,10 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     session.userId,
     session.role,
   );
-  const repo = new PromocionRepository(ctx);
+  const cursorQuery = new PromocionCursorQuery(ctx);
 
   // Always use cursor-based pagination. Absence of cursor = first page (cursor = "").
-  const result = await repo.findAllWithCursor(filters, {
+  const result = await cursorQuery.findAllWithCursor(filters, {
     cursor: cursor ?? "",
     limit,
   });

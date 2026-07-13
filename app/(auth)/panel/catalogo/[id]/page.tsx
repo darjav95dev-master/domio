@@ -5,69 +5,22 @@ import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
 import { PromocionContentBlockRepository } from "@/infrastructure/db/repositories/promocion-content-block.repository";
-import { db } from "@/infrastructure/db/client";
 import { users } from "@/infrastructure/db/schema/users";
 import { mediaAssets } from "@/infrastructure/db/schema/media-assets";
 import { getPublicMediaUrl } from "@/infrastructure/media/public-url";
 import { validateMediaForPublish } from "@/features/promociones/actions/media.actions";
 import { logger } from "@/shared/utils/logger";
-import {
-  PromocionForm,
-  type PromocionFormData,
-} from "@/features/promociones/components/promocion-form";
+import { PromocionForm } from "@/features/promociones/components/promocion-form";
+import type { PromocionFormData } from "@/features/promociones/hooks/use-promocion-form";
 import { BlocksEditor } from "@/features/promociones/components/blocks-editor";
 import type { BlockEditorItem } from "@/features/promociones/components/blocks-editor";
 import type { TipologiaEditorItem } from "@/features/promociones/components/tipologia-editor";
 import type { AgentOption } from "@/features/promociones/components/promocion-section-agent";
-import type { ConstructionWarning } from "@/features/promociones/components/promocion-section-commercial-status";
+import { computeConstructionWarning, type ConstructionWarning } from "@/shared/utils/construction-warning";
 import {
   MediaGallery,
   type MediaAssetItem,
 } from "@/features/promociones/components/media-gallery";
-
-/**
- * Computes a soft warning when construction_status contradicts
- * the entrega_estimada from the PLAZOS_GARANTIAS content block.
- * Extracted to reduce cognitive complexity of the page component.
- */
-function computeWarning(
-  constructionStatus: string | null,
-  blockPayload: Record<string, unknown> | null,
-): ConstructionWarning | null {
-  if (!constructionStatus || !blockPayload?.entrega_estimada) return null;
-
-  const dateStr = String(blockPayload.entrega_estimada);
-  const entregaEstimada = new Date(dateStr);
-  if (Number.isNaN(entregaEstimada.getTime())) return null;
-
-  const now = new Date();
-  const formattedDate = entregaEstimada.toISOString().slice(0, 10);
-  const isPast = entregaEstimada < now;
-  const isFuture = entregaEstimada > now;
-
-  if (constructionStatus === "ON_PLAN" && isPast) {
-    return {
-      type: "CONSTRUCTION_WARNING",
-      message: `Marcado como sobre plano pero la fecha de entrega (${formattedDate}) ya ha pasado`,
-      entregaEstimada: formattedDate,
-    };
-  }
-  if (constructionStatus === "READY" && isFuture) {
-    return {
-      type: "CONSTRUCTION_WARNING",
-      message: `Marcado como terminado pero la fecha de entrega (${formattedDate}) está en el futuro`,
-      entregaEstimada: formattedDate,
-    };
-  }
-  if (constructionStatus === "IN_CONSTRUCTION" && isPast) {
-    return {
-      type: "CONSTRUCTION_WARNING",
-      message: `Marcado como en construcción pero la fecha de entrega (${formattedDate}) ya ha pasado`,
-      entregaEstimada: formattedDate,
-    };
-  }
-  return null;
-}
 
 /**
  * Loads media assets for a promotion and maps them into gallery/plan arrays.
@@ -85,7 +38,12 @@ async function loadMediaAssets(
       return tx
         .select()
         .from(mediaAssets)
-        .where(eq(mediaAssets.ownerId, ownerId))
+        .where(
+          and(
+            eq(mediaAssets.ownerId, ownerId),
+            eq(mediaAssets.tenantId, tenantId),
+          ),
+        )
         .orderBy(mediaAssets.sortOrder);
     });
 
@@ -202,7 +160,7 @@ export default async function EditPromocionPage({
       "PLAZOS_GARANTIAS",
     );
     const payload = blockPayload as Record<string, unknown> | null;
-    constructionWarning = computeWarning(raw.constructionStatus, payload);
+    constructionWarning = computeConstructionWarning(raw.constructionStatus, payload);
   } catch {
     // Non-blocking — warning is optional, fail silently
   }
@@ -307,16 +265,18 @@ export default async function EditPromocionPage({
 
   // ── Fetch agents from DB ──────────────────────────────────────────────
 
-  const agentsList: AgentOption[] = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-    })
-    .from(users)
-    .where(
-      and(eq(users.tenantId, session.tenantId), eq(users.role, "AGENT")),
-    );
+  const agentsList: AgentOption[] = await authCtx.withTransaction(async (tx) => {
+    return tx
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+      })
+      .from(users)
+      .where(
+        and(eq(users.tenantId, session.tenantId), eq(users.role, "AGENT")),
+      );
+  });
 
   // ── Render ────────────────────────────────────────────────────────────
 

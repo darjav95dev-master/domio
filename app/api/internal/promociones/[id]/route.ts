@@ -4,10 +4,9 @@ import { requireAuth } from "@/infrastructure/auth/require-auth";
 import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
 import { PromocionContentBlockRepository } from "@/infrastructure/db/repositories/promocion-content-block.repository";
 import { PromocionWithTipologiasUpdateSchema } from "@/shared/schemas/promocion.schema";
-import { generateSlug } from "@/infrastructure/slug/generate-slug";
-import { validateMediaForPublish } from "@/features/promociones/actions/media.actions";
-import type { PromocionWithRelations } from "@/infrastructure/db/repositories/promocion.repository";
-import type { PromocionUpdatePayload } from "@/shared/schemas/promocion.schema";
+import { logger } from "@/shared/utils/logger";
+import { computeConstructionWarning } from "@/shared/utils/construction-warning";
+import { PromocionPublishService } from "@/features/promociones/server/promocion-publish.service";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -16,241 +15,6 @@ import type { PromocionUpdatePayload } from "@/shared/schemas/promocion.schema";
 const ERR_NOT_FOUND = "Promoción not found";
 const ERR_INTERNAL = "Internal server error";
 const ERR_FORBIDDEN = "Forbidden";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface ConstructionWarning {
-  type: "CONSTRUCTION_WARNING";
-  message: string;
-  entregaEstimada: string;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Computes a soft warning when construction_status contradicts the
- * entrega_estimada from the PLAZOS_GARANTIAS content block.
- *
- * Rule (architecture.md §7.19): constructionStatus is authoritative.
- * The warning is non-blocking — the operator has the final word.
- */
-function computeConstructionWarning(
-  constructionStatus: string | null,
-  blockPayload: Record<string, unknown> | null,
-): ConstructionWarning | null {
-  if (!constructionStatus || !blockPayload?.entrega_estimada) {
-    return null;
-  }
-
-  const rawDate = blockPayload.entrega_estimada;
-  const dateStr = typeof rawDate === "string" ? rawDate : "";
-  if (!dateStr) return null;
-
-  const entregaEstimada = new Date(dateStr);
-  if (Number.isNaN(entregaEstimada.getTime())) return null;
-
-  const now = new Date();
-  const isPast = entregaEstimada < now;
-  const isFuture = entregaEstimada > now;
-  const formattedDate = entregaEstimada.toISOString().slice(0, 10);
-
-  if (constructionStatus === "ON_PLAN" && isPast) {
-    return {
-      type: "CONSTRUCTION_WARNING" as const,
-      message: `Marcado como sobre plano pero la fecha de entrega (${formattedDate}) ya ha pasado`,
-      entregaEstimada: formattedDate,
-    };
-  }
-
-  if (constructionStatus === "READY" && isFuture) {
-    return {
-      type: "CONSTRUCTION_WARNING" as const,
-      message: `Marcado como terminado pero la fecha de entrega (${formattedDate}) está en el futuro`,
-      entregaEstimada: formattedDate,
-    };
-  }
-
-  if (constructionStatus === "IN_CONSTRUCTION" && isPast) {
-    return {
-      type: "CONSTRUCTION_WARNING" as const,
-      message: `Marcado como en construcción pero la fecha de entrega (${formattedDate}) ya ha pasado`,
-      entregaEstimada: formattedDate,
-    };
-  }
-
-  return null;
-}
-
-/**
- * Returns the last 4 characters of a UUID to use as short identifier in the slug.
- */
-function shortId(id: string): string {
-  return id.slice(-4);
-}
-
-/**
- * Gets the number of bedrooms from the first tipologia, or 0 if none exist
- * (which produces "estudio" in the slug).
- */
-function getFirstTipologiaBedrooms(
-  tipologias: Array<{ bedrooms: number | null }>,
-): number {
-  if (tipologias.length === 0) return 0;
-  return tipologias[0]?.bedrooms ?? 0;
-}
-
-/**
- * Prepares the update data for a PATCH request:
- *   - Merges draftPayload if publishing from draft
- *   - Generates slug if publishing for the first time
- *
- * Extracted to reduce cognitive complexity of the PATCH handler.
- */
-interface PrepareUpdateParams {
-  parsedData: PromocionUpdatePayload;
-  current: PromocionWithRelations;
-  id: string;
-  isPublishing: boolean;
-}
-
-interface PreparedUpdate {
-  data: Record<string, unknown>;
-  resultingSlug: string | null;
-}
-
-function prepareUpdateData(params: PrepareUpdateParams): PreparedUpdate {
-  const { parsedData, current, id, isPublishing } = params;
-
-  const updateData: Record<string, unknown> = {
-    ...parsedData,
-  };
-
-  // If publishing from draft, merge draftPayload fields
-  if (isPublishing && current.draftPayload) {
-    for (const [key, value] of Object.entries(current.draftPayload)) {
-      if (!(key in updateData)) {
-        updateData[key] = value;
-      }
-    }
-    updateData.draftPayload = null;
-  }
-
-  // Generate slug if publishing for the first time
-  let newSlug: string | null = null;
-  if (isPublishing && !current.slug) {
-    const propertyType =
-      (updateData.propertyType as string) ?? current.propertyType ?? "";
-    const operation =
-      (updateData.operation as string) ?? current.operation ?? "";
-    const municipality =
-      (updateData.municipality as string) ?? current.municipality ?? "";
-    const bedrooms = getFirstTipologiaBedrooms(current.tipologias);
-    const slugId = shortId(id);
-
-    newSlug = generateSlug(
-      propertyType,
-      operation,
-      municipality,
-      bedrooms,
-      slugId,
-    );
-
-    updateData.slug = newSlug;
-  }
-
-  // Determine the resulting slug (after update) for revalidation
-  const resultingSlug = newSlug ?? current.slug;
-
-  return { data: updateData, resultingSlug };
-}
-
-/**
- * Checks whether the PATCH is a publish action and if so, verifies that
- * the promotion has valid media assets (at least one gallery image, all
- * images and plans have alt_text). Returns a 422 Response with
- * code "MEDIA_INVALID" if media is invalid, or null to proceed.
- *
- * FR-009 / FR-010: Media validation on publish.
- */
-async function validateMediaOnPublish(
-  promocionId: string,
-  _parsedData: PromocionUpdatePayload,
-  _current: PromocionWithRelations,
-  isPublishing: boolean,
-): Promise<Response | null> {
-  if (!isPublishing) return null;
-
-  const mediaValidation = await validateMediaForPublish(promocionId);
-
-  if (mediaValidation.valid) return null;
-
-  return Response.json(
-    {
-      code: "MEDIA_INVALID",
-      message:
-        "Hay medios con datos inválidos. Corrígelos antes de publicar.",
-      details: mediaValidation.errors,
-    },
-    { status: 422 },
-  );
-}
-
-/**
- * Creates a validation error response with field-level details.
- */
-function validationErrorResponse(
-  issues: Array<{ path: ReadonlyArray<string | number | symbol>; message: string }>,
-): Response {
-  return Response.json(
-    {
-      error: "Validation failed",
-      details: issues.map((issue) => ({
-        field: issue.path.join("."),
-        message: issue.message,
-      })),
-    },
-    { status: 400 },
-  );
-}
-
-/**
- * Checks whether the PATCH is a publish action and if so, verifies that
- * all content blocks have valid payloads. Returns a 422 Response with
- * code "BLOCKS_INVALID" if any block is invalid, or null to proceed.
- *
- * Extracted to reduce cognitive complexity of the PATCH handler (FR-008).
- */
-async function validateBlocksOnPublish(
-  contentBlockRepo: PromocionContentBlockRepository,
-  promocionId: string,
-  _parsedData: PromocionUpdatePayload,
-  _current: PromocionWithRelations,
-  isPublishing: boolean,
-): Promise<Response | null> {
-  if (!isPublishing) return null;
-
-  const blockValidation = await contentBlockRepo.validateBlocksForPublish(promocionId);
-
-  if (blockValidation.valid) return null;
-
-  return Response.json(
-    {
-      code: "BLOCKS_INVALID",
-      message:
-        "Hay bloques editoriales con datos inválidos. Corrígelos antes de publicar.",
-      details: blockValidation.errors.map((e) => ({
-        blockId: e.blockId,
-        blockType: e.blockType,
-        issues: e.issues,
-      })),
-    },
-    { status: 422 },
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Route handlers
@@ -308,7 +72,8 @@ export async function GET(
       },
       { status: 200 },
     );
-  } catch {
+  } catch (error) {
+    logger.error("GET promocion error", error);
     return Response.json(
       { error: ERR_INTERNAL },
       { status: 500 },
@@ -316,33 +81,27 @@ export async function GET(
   }
 }
 
-/** Converts a { lng, lat } object (or null) to a PostGIS [lng, lat] tuple. */
-function toLngLatTuple(
-  loc: { lng: number; lat: number } | null,
-): [number, number] | null {
-  return loc === null ? null : [loc.lng, loc.lat];
-}
-
 /**
- * Rewrites `location` / `locationApprox` on the update payload in place,
- * converting { lng, lat } objects to PostGIS [lng, lat] tuples. Only touches
- * fields that are present. Extracted to keep PATCH's complexity low.
+ * Creates a validation error response with field-level details.
  */
-function convertLocationFields(data: Record<string, unknown>): void {
-  if (data.location !== undefined) {
-    data.location = toLngLatTuple(data.location as { lng: number; lat: number } | null);
-  }
-  if (data.locationApprox !== undefined) {
-    data.locationApprox = toLngLatTuple(
-      data.locationApprox as { lng: number; lat: number } | null,
-    );
-  }
+function validationErrorResponse(
+  issues: Array<{ path: ReadonlyArray<string | number | symbol>; message: string }>,
+): Response {
+  return Response.json(
+    {
+      error: "Validation failed",
+      details: issues.map((issue) => ({
+        field: issue.path.join("."),
+        message: issue.message,
+      })),
+    },
+    { status: 400 },
+  );
 }
 
 /**
  * PATCH /api/internal/promociones/[id]
- * Updates a promoción. Handles slug generation on first publish,
- * draftPayload application, location conversion, and ISR revalidation.
+ * Updates a promoción. Delegates business logic to PromocionPublishService.
  */
 export async function PATCH(
   request: NextRequest,
@@ -355,11 +114,13 @@ export async function PATCH(
     const { id } = await params;
 
     const repository = new PromocionRepository(auth.ctx);
+    const contentBlockRepo = new PromocionContentBlockRepository(auth.ctx);
+    const publishService = new PromocionPublishService(
+      repository,
+      contentBlockRepo,
+    );
 
     // Parse and validate body
-    // Uses PromocionWithTipologiasUpdateSchema so that optional tipologias
-    // data passes through validation. Persistence of tipologias is handled
-    // by the PATCH handler's repository logic.
     const body = await request.json();
     const parsed = PromocionWithTipologiasUpdateSchema.safeParse(body);
 
@@ -385,32 +146,45 @@ export async function PATCH(
     }
 
     // Convert location fields from { lng, lat } to PostGIS [lng, lat] tuples
-    convertLocationFields(parsed.data as Record<string, unknown>);
+    publishService.convertLocationFields(parsed.data as Record<string, unknown>);
 
     const isPublishing =
       parsed.data.status === "PUBLISHED" && current.status !== "PUBLISHED";
 
-    const { data: updateData, resultingSlug } = prepareUpdateData({
-      parsedData: parsed.data,
+    const { data: updateData, resultingSlug } = publishService.prepareUpdateData(
+      parsed.data,
       current,
       id,
       isPublishing,
-    });
-
-    // FR-008: Re-check block validation on publish — the server component
-    // computes publishBlocked on page-load, but the operator may have edited
-    // blocks client-side since then, making the initial check stale.
-    const contentBlockRepo = new PromocionContentBlockRepository(auth.ctx);
-    const blockResponse = await validateBlocksOnPublish(
-      contentBlockRepo, id, parsed.data, current, isPublishing,
     );
-    if (blockResponse) return blockResponse;
+
+    // FR-008: Re-check block validation on publish
+    const blockErrors = await publishService.validateBlocksOnPublish(id, isPublishing);
+    if (blockErrors) {
+      return Response.json(
+        {
+          code: "BLOCKS_INVALID",
+          message:
+            "Hay bloques editoriales con datos inválidos. Corrígelos antes de publicar.",
+          details: blockErrors,
+        },
+        { status: 422 },
+      );
+    }
 
     // FR-009 / FR-010: Reject publish if media assets are invalid
-    const mediaResponse = await validateMediaOnPublish(
-      id, parsed.data, current, isPublishing,
-    );
-    if (mediaResponse) return mediaResponse;
+    const mediaErrors = await publishService.validateMediaOnPublish(id, isPublishing);
+    if (mediaErrors) {
+      return Response.json(
+        {
+          code: "MEDIA_INVALID",
+          message:
+            "Hay medios con datos inválidos. Corrígelos antes de publicar.",
+          details: mediaErrors,
+        },
+        { status: 422 },
+      );
+    }
 
     const updated = await repository.update(
       id,
@@ -424,7 +198,8 @@ export async function PATCH(
     }
 
     return Response.json(updated, { status: 200 });
-  } catch {
+  } catch (error) {
+    logger.error("PATCH promocion error", error);
     return Response.json(
       { error: ERR_INTERNAL },
       { status: 500 },
@@ -473,7 +248,8 @@ export async function DELETE(
     }
 
     return new Response(null, { status: 204 });
-  } catch {
+  } catch (error) {
+    logger.error("DELETE promocion error", error);
     return Response.json(
       { error: ERR_INTERNAL },
       { status: 500 },

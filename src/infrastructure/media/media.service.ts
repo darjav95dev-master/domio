@@ -1,7 +1,7 @@
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { MediaAsset } from "../db/schema/media-assets";
 import { mediaAssets } from "../db/schema/media-assets";
 import type { TenantContext } from "../tenant/TenantContext";
@@ -150,18 +150,24 @@ export class MediaService {
         );
       }
 
-      for (const [i, assetId] of orderedAssetIds.entries()) {
-        await tx
-          .update(mediaAssets)
-          .set({ sortOrder: i })
-          .where(
-            and(
-              eq(mediaAssets.id, assetId),
-              eq(mediaAssets.ownerId, ownerId),
-              eq(mediaAssets.tenantId, tenantId),
-            ),
-          );
-      }
+      // Batch UPDATE usando CASE expression (un solo UPDATE)
+      const caseExpr = sql`(CASE ${mediaAssets.id}
+        ${sql.join(
+          orderedAssetIds.map((_id, i) => sql`WHEN ${_id} THEN ${i}`),
+          sql` `,
+        )}
+        END)::integer`;
+
+      await tx
+        .update(mediaAssets)
+        .set({ sortOrder: caseExpr })
+        .where(
+          and(
+            inArray(mediaAssets.id, orderedAssetIds),
+            eq(mediaAssets.ownerId, ownerId),
+            eq(mediaAssets.tenantId, tenantId),
+          ),
+        );
     });
   }
 

@@ -6,7 +6,6 @@ import {
   leadReadMarks,
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
-import { validateStatusTransition } from "@/shared/types/lead-schema";
 import type { LeadStatus, UserRole, LeadSource, LeadChannel } from "@/shared/constants/db-enums";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
@@ -66,13 +65,6 @@ export interface LeadHistoryRow {
   toStatus: string;
   authorId: string;
   createdAt: Date;
-}
-
-export interface LeadReadMarkRow {
-  tenantId: string;
-  leadId: string;
-  userId: string;
-  readAt: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -239,12 +231,7 @@ export class LeadRepository extends TenantAwareRepository {
         throw new Error(`Lead with id ${id} not found`);
       }
 
-      // 3. Validate state transition (T006)
-      validateStatusTransition(
-        current.status as LeadStatus,
-        newStatus,
-      );
-
+      // 3. Update lead status (state transition validated by caller action)
       // 4. Update lead status (re-build where without the JOIN-friendly conditions)
       const updateConditions: ReturnType<typeof eq>[] = [
         eq(leads.id, id),
@@ -320,64 +307,6 @@ export class LeadRepository extends TenantAwareRepository {
       }
 
       return note;
-    });
-  }
-
-  // -----------------------------------------------------------------------
-  // markAsRead — INSERT on conflict UPDATE (upsert by composite PK)
-  // -----------------------------------------------------------------------
-
-  async markAsRead(
-    leadId: string,
-    userId: string,
-  ): Promise<LeadReadMarkRow> {
-    return this.withTransaction(async (tx) => {
-      const [mark] = await tx
-        .insert(leadReadMarks)
-        .values({
-          tenantId: this.ctx.getTenantId(),
-          leadId,
-          userId,
-          readAt: sql`now()`,
-        })
-        .onConflictDoUpdate({
-          target: [leadReadMarks.leadId, leadReadMarks.userId],
-          set: {
-            readAt: sql`now()`,
-          },
-        })
-        .returning();
-
-      if (!mark) {
-        throw new Error("Failed to mark lead as read");
-      }
-
-      return mark;
-    });
-  }
-
-  // -----------------------------------------------------------------------
-  // getUnreadCount — leads assigned to user without a read mark
-  // -----------------------------------------------------------------------
-
-  async getUnreadCount(userId: string): Promise<number> {
-    return this.withTransaction(async (tx) => {
-      const [result] = await tx
-        .select({ count: count() })
-        .from(leads)
-        .where(
-          and(
-            eq(leads.tenantId, this.ctx.getTenantId()),
-            eq(leads.assignedAgentId, userId),
-            sql`${leads.id} NOT IN (
-              SELECT ${leadReadMarks.leadId}
-              FROM ${leadReadMarks}
-              WHERE ${leadReadMarks.userId} = ${userId}
-            )`,
-          ),
-        );
-
-      return Number(result?.count ?? 0);
     });
   }
 
@@ -505,55 +434,6 @@ export class LeadRepository extends TenantAwareRepository {
           ),
         )
         .orderBy(desc(leadNotes.createdAt));
-    });
-  }
-
-  // -----------------------------------------------------------------------
-  // getUnreadLeadIds — IDs of leads not yet read by the user
-  // -----------------------------------------------------------------------
-
-  async getUnreadLeadIds(userId: string): Promise<string[]> {
-    return this.withTransaction(async (tx) => {
-      const rows = await tx
-        .select({ id: leads.id })
-        .from(leads)
-        .where(
-          and(
-            eq(leads.tenantId, this.ctx.getTenantId()),
-            eq(leads.assignedAgentId, userId),
-            sql`${leads.id} NOT IN (
-              SELECT ${leadReadMarks.leadId}
-              FROM ${leadReadMarks}
-              WHERE ${leadReadMarks.userId} = ${userId}
-            )`,
-          ),
-        );
-
-      return rows.map((r) => r.id);
-    });
-  }
-
-  // -----------------------------------------------------------------------
-  // isLeadReadByUser
-  // -----------------------------------------------------------------------
-
-  async isLeadReadByUser(
-    leadId: string,
-    userId: string,
-  ): Promise<boolean> {
-    return this.withTransaction(async (tx) => {
-      const [mark] = await tx
-        .select()
-        .from(leadReadMarks)
-        .where(
-          and(
-            eq(leadReadMarks.leadId, leadId),
-            eq(leadReadMarks.userId, userId),
-          ),
-        )
-        .limit(1);
-
-      return mark !== undefined;
     });
   }
 

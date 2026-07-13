@@ -5,6 +5,7 @@ import {
   PROPERTY_TYPE_LABELS,
   OPERATION_TYPE_LABELS,
   PROMOTION_STATUS_LABELS,
+  KIND_LABELS,
 } from "@/shared/constants/domain-labels";
 
 // ---------------------------------------------------------------------------
@@ -41,13 +42,8 @@ export interface CatalogListProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const KIND_LABELS: Record<string, string> = {
-  portfolio: "Portafolio",
-  external: "Captación externa",
-};
-
 function kindLabel(kind: string): string {
-  return KIND_LABELS[kind] ?? kind;
+  return KIND_LABELS[kind as keyof typeof KIND_LABELS] ?? kind;
 }
 
 function operationLabel(op: string | null): string {

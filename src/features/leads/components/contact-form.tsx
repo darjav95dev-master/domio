@@ -50,7 +50,7 @@ export function ContactForm() {
         const result = await createLeadAction(formData);
 
         if (!result.success) {
-          setError(result.error);
+          setError(result.error ?? "Error al enviar el formulario");
           return;
         }
 

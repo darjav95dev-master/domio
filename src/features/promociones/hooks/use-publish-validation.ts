@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { PromocionUpdateSchema } from "@/shared/schemas/promocion.schema";
-import type { PromocionFormData, SectionErrors, PublishBlockedInfo } from "../components/promocion-form";
+import type { PromocionFormData, SectionErrors, PublishBlockedInfo } from "./use-promocion-form";
 
 // ---------------------------------------------------------------------------
 // Types

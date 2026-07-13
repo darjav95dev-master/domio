@@ -1,22 +1,17 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { cn } from "@/shared/utils/cn";
-import { Button } from "@/shared/components/button";
 import { LeadStatusBadge } from "./lead-status-badge";
-import {
-  updateLeadStatusAction,
-  addNoteAction,
-  reassignLeadAction,
-} from "@/features/leads/actions/leads.actions";
-import { LEAD_STATUS_TRANSITIONS } from "@/shared/types/lead-schema";
+import { LeadNotesSection } from "./lead-notes-section";
+import { LeadHistorySection } from "./lead-history-section";
+import { LeadReassignDialog } from "./lead-reassign-dialog";
+import { useLeadDetail } from "@/features/leads/hooks/use-lead-detail";
 import type {
   LeadRow,
   LeadNoteRow,
   LeadHistoryRow,
 } from "@/infrastructure/db/repositories/lead.repository";
-import type { LeadStatus, UserRole } from "@/shared/constants/db-enums";
+import type { UserRole } from "@/shared/constants/db-enums";
 
 import { LEAD_STATUS_LABELS as STATUS_LABELS } from "@/shared/constants/domain-labels";
 
@@ -24,19 +19,12 @@ import { LEAD_STATUS_LABELS as STATUS_LABELS } from "@/shared/constants/domain-l
 // Constants
 // ---------------------------------------------------------------------------
 
-const BUTTON_MONO_CLASS = "px-4 py-2 font-mono text-[11px] uppercase tracking-[0.08em]";
 const CONTROL_CLASS = [
   "rounded-control border border-border-default bg-bg-surface px-3 py-2",
   "font-sans text-sm text-fg-default",
   "transition-colors duration-standard ease-standard",
   "hover:border-border-strong focus:border-accent-default",
 ].join(" ");
-const INPUT_BASE = [
-  "rounded-control border border-border-default px-3 py-2",
-  "font-sans text-sm text-fg-default",
-  "transition-colors duration-standard ease-standard",
-  "hover:border-border-strong focus:border-accent-default",
-];
 
 const SOURCE_LABELS: Record<string, string> = {
   commercial: "Comercial",
@@ -69,103 +57,23 @@ export function LeadDetail({
   history: initialHistory,
   currentUserRole,
 }: LeadDetailProps) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-
-  // Local state
-  const [notes, setNotes] = useState<LeadNoteRow[]>(initialNotes);
-  const [history, setHistory] = useState<LeadHistoryRow[]>(initialHistory);
-  const [currentStatus, setCurrentStatus] = useState<LeadStatus>(
-    lead.status as LeadStatus,
-  );
-  const [noteText, setNoteText] = useState("");
-  const [noteError, setNoteError] = useState<string | null>(null);
-
-  // Reassign state
-  const [showReassign, setShowReassign] = useState(false);
-  const [reassignAgentId, setReassignAgentId] = useState("");
-
-  // ── Status change ──────────────────────────────────────────────────────
-
-  const validTransitions = LEAD_STATUS_TRANSITIONS[currentStatus] ?? [];
-
-  const handleStatusChange = useCallback(
-    (newStatus: string) => {
-      const status = newStatus as LeadStatus;
-      if (!validTransitions.includes(status)) return;
-
-      setNoteError(null);
-      startTransition(async () => {
-        try {
-          const updated = await updateLeadStatusAction(lead.id, status);
-          setCurrentStatus(updated.status as LeadStatus);
-
-          // Re-fetch history to show the new entry
-          const { getLeadDetailAction } = await import(
-            "@/features/leads/actions/leads.actions"
-          );
-          const detail = await getLeadDetailAction(lead.id);
-          setHistory(detail.history);
-        } catch (err) {
-          setNoteError(
-            err instanceof Error ? err.message : "Error al cambiar estado",
-          );
-        }
-      });
-    },
-    [lead.id, validTransitions],
-  );
-
-  // ── Add note ───────────────────────────────────────────────────────────
-
-  const handleAddNote = useCallback(
-    async (formData: FormData) => {
-      const text = formData.get("note") as string;
-      if (!text?.trim()) {
-        setNoteError("La nota no puede estar vacía");
-        return;
-      }
-
-      setNoteError(null);
-      startTransition(async () => {
-        try {
-          const newNote = await addNoteAction(lead.id, text.trim());
-          setNotes((prev) => [newNote, ...prev]);
-          setNoteText("");
-        } catch (err) {
-          setNoteError(
-            err instanceof Error ? err.message : "Error al añadir nota",
-          );
-        }
-      });
-    },
-    [lead.id],
-  );
-
-  // ── Reassign ───────────────────────────────────────────────────────────
-
-  const handleReassign = useCallback(
-    async (formData: FormData) => {
-      const agentId = formData.get("agentId") as string;
-      if (!agentId?.trim()) {
-        return;
-      }
-
-      startTransition(async () => {
-        try {
-          await reassignLeadAction(lead.id, agentId.trim());
-          setShowReassign(false);
-          setReassignAgentId("");
-          router.refresh();
-        } catch (err) {
-          setNoteError(
-            err instanceof Error ? err.message : "Error al reasignar lead",
-          );
-        }
-      });
-    },
-    [lead.id, router],
-  );
+  const {
+    notes,
+    history,
+    currentStatus,
+    noteText,
+    noteError,
+    isPending,
+    validTransitions,
+    handleStatusChange,
+    handleAddNote,
+    handleReassign,
+    setNoteText,
+    showReassign,
+    setShowReassign,
+    reassignAgentId,
+    setReassignAgentId,
+  } = useLeadDetail(lead, initialNotes, initialHistory);
 
   // ── Source display ─────────────────────────────────────────────────────
 
@@ -282,211 +190,26 @@ export function LeadDetail({
         </div>
       </section>
 
-      {/* ── Notes ───────────────────────────────────────────────── */}
-      <section
-        aria-label="Notas internas"
-        className="rounded-card border border-border-default bg-bg-surface p-6"
-      >
-        <h2 className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
-          Notas internas
-        </h2>
+      <LeadNotesSection
+        notes={notes}
+        noteText={noteText}
+        noteError={noteError}
+        isPending={isPending}
+        handleAddNote={handleAddNote}
+        setNoteText={setNoteText}
+      />
 
-        {/* Note list */}
-        <div className="mt-4 space-y-3">
-          {notes.length === 0 && (
-            <p className="font-sans text-sm text-fg-subtle">
-              No hay notas todavía.
-            </p>
-          )}
+      <LeadHistorySection history={history} />
 
-          {notes.map((note) => (
-            <div
-              key={note.id}
-              className="rounded-lg border border-border-subtle bg-bg-canvas p-4"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-sans text-sm text-fg-default">{note.body}</p>
-              </div>
-              <p className="mt-1 font-mono text-[10px] text-fg-subtle">
-                {formatDate(note.createdAt)}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Add note form */}
-        <form
-          action={handleAddNote}
-          className="mt-4 flex items-start gap-3"
-        >
-          <div className="flex-1">
-            <label htmlFor="note-input" className="sr-only">
-              Nueva nota
-            </label>
-            <textarea
-              id="note-input"
-              name="note"
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Escribe una nota…"
-              rows={2}
-              className={cn(
-                INPUT_BASE.join(" "),
-                "w-full bg-bg-canvas placeholder:text-fg-subtle resize-none",
-              )}
-            />
-          </div>
-
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={isPending || !noteText.trim()}
-            aria-label="Añadir nota"
-            className={cn(BUTTON_MONO_CLASS)}
-          >
-            {isPending ? "Guardando…" : "Añadir nota"}
-          </Button>
-        </form>
-
-        {noteError && (
-          <p
-            role="alert"
-            aria-live="polite"
-            className="mt-2 font-sans text-sm text-status-danger-default"
-          >
-            {noteError}
-          </p>
-        )}
-      </section>
-
-      {/* ── History Timeline ────────────────────────────────────── */}
-      <section
-        aria-label="Histórico de cambios"
-        className="rounded-card border border-border-default bg-bg-surface p-6"
-      >
-        <h2 className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
-          Histórico de cambios
-        </h2>
-
-        {history.length === 0 && (
-          <p className="mt-4 font-sans text-sm text-fg-subtle">
-            No hay cambios registrados.
-          </p>
-        )}
-
-        {history.length > 0 && (
-          <ol className="mt-4 space-y-0">
-            {history.map((entry, idx) => (
-              <li key={entry.id} className="relative flex gap-4 pb-6 last:pb-0">
-                {/* Timeline line */}
-                {idx < history.length - 1 && (
-                  <div
-                    className="absolute left-[7px] top-5 h-full w-px bg-border-default"
-                    aria-hidden="true"
-                  />
-                )}
-
-                {/* Timeline dot */}
-                <div className="relative flex shrink-0 items-start pt-1">
-                  <div
-                    className={cn(
-                      "h-3.5 w-3.5 rounded-full border-2",
-                      idx === 0
-                        ? "border-accent-default bg-accent-subtle"
-                        : "border-border-strong bg-bg-surface",
-                    )}
-                    aria-hidden="true"
-                  />
-                </div>
-
-                {/* Timeline content */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-sans text-sm font-medium text-fg-default">
-                      {STATUS_LABELS[entry.toStatus as LeadStatus] ??
-                        entry.toStatus}
-                    </span>
-                    <span className="font-sans text-xs text-fg-subtle">
-                      {entry.fromStatus
-                        ? `desde ${STATUS_LABELS[entry.fromStatus as LeadStatus] ?? entry.fromStatus}`
-                        : "Estado inicial"}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 font-mono text-[10px] text-fg-subtle">
-                    {formatDate(entry.createdAt)}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-
-      {/* ── Reassign (ADMIN only) ───────────────────────────────── */}
-      {currentUserRole === "ADMIN" && (
-        <section
-          aria-label="Reasignar lead"
-          className="rounded-card border border-border-default bg-bg-surface p-6"
-        >
-          {!showReassign ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowReassign(true)}
-              aria-label="Reasignar lead a otro agente"
-              className={cn("font-mono text-[11px] uppercase tracking-[0.08em]")}
-            >
-              Reasignar
-            </Button>
-          ) : (
-            <form action={handleReassign} className="flex items-end gap-3">
-              <div className="flex-1">
-                <label
-                  htmlFor="reassign-agent"
-                  className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle"
-                >
-                  Nuevo agente (ID)
-                </label>
-                <input
-                  id="reassign-agent"
-                  name="agentId"
-                  type="text"
-                  value={reassignAgentId}
-                  onChange={(e) => setReassignAgentId(e.target.value)}
-                  placeholder="ID del agente…"
-                className={cn(
-                  INPUT_BASE.join(" "),
-                  "mt-1 w-full bg-bg-canvas placeholder:text-fg-subtle",
-                )}
-                />
-              </div>
-
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={isPending || !reassignAgentId.trim()}
-                aria-label="Confirmar reasignación"
-                className={cn(BUTTON_MONO_CLASS)}
-              >
-                {isPending ? "Reasignando…" : "Confirmar"}
-              </Button>
-
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setShowReassign(false);
-                  setReassignAgentId("");
-                }}
-                aria-label="Cancelar reasignación"
-                className={cn(BUTTON_MONO_CLASS)}
-              >
-                Cancelar
-              </Button>
-            </form>
-          )}
-        </section>
-      )}
+      <LeadReassignDialog
+        currentUserRole={currentUserRole}
+        showReassign={showReassign}
+        reassignAgentId={reassignAgentId}
+        isPending={isPending}
+        handleReassign={handleReassign}
+        setShowReassign={setShowReassign}
+        setReassignAgentId={setReassignAgentId}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { LeadRepository } from "@/infrastructure/db/repositories/lead.repository";
+import { LeadReadMarkRepository } from "@/infrastructure/db/repositories/lead-read-mark.repository";
 import {
   createMockAuthCtx,
   setupMockTransaction,
@@ -295,7 +296,7 @@ describe("LeadRepository", () => {
       expect(result.status).toBe("CONTACTED");
     });
 
-    it("rejects invalid transition (NEW -> WON)", async () => {
+    it("allows any status change (validation moved to action layer - T006)", async () => {
       const { ctx, mockWithTx } = createMockAuthCtx({
         tenantId: TENANT_ID,
         userId: USER_ID,
@@ -304,61 +305,18 @@ describe("LeadRepository", () => {
       const repo = new LeadRepository(ctx);
 
       const oldLead = { ...baseLeadRow, status: "NEW" as LeadStatus };
+      const updatedLead = { ...baseLeadRow, status: "WON" as LeadStatus };
 
-      // Only one query: fetch current lead to check transition
-      setupMockTransaction(mockWithTx, [[oldLead]]);
+      // Seq: fetch, update, insert history, re-fetch
+      setupMockTransaction(mockWithTx, [
+        [oldLead],
+        [updatedLead],
+        [{ id: "h-1" }],
+        [updatedLead],
+      ]);
 
-      await expect(
-        repo.updateStatus(LEAD_ID, "WON", USER_ID),
-      ).rejects.toThrow("Invalid status transition");
-    });
-
-    it("rejects transition from terminal state WON", async () => {
-      const { ctx, mockWithTx } = createMockAuthCtx({
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        role: "ADMIN",
-      });
-      const repo = new LeadRepository(ctx);
-
-      const oldLead = { ...baseLeadRow, status: "WON" as LeadStatus };
-      setupMockTransaction(mockWithTx, [[oldLead]]);
-
-      await expect(
-        repo.updateStatus(LEAD_ID, "CONTACTED", USER_ID),
-      ).rejects.toThrow("Invalid status transition");
-    });
-
-    it("rejects transition from terminal state LOST", async () => {
-      const { ctx, mockWithTx } = createMockAuthCtx({
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        role: "ADMIN",
-      });
-      const repo = new LeadRepository(ctx);
-
-      const oldLead = { ...baseLeadRow, status: "LOST" as LeadStatus };
-      setupMockTransaction(mockWithTx, [[oldLead]]);
-
-      await expect(
-        repo.updateStatus(LEAD_ID, "CONTACTED", USER_ID),
-      ).rejects.toThrow("Invalid status transition");
-    });
-
-    it("rejects same status transition (no-op)", async () => {
-      const { ctx, mockWithTx } = createMockAuthCtx({
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        role: "ADMIN",
-      });
-      const repo = new LeadRepository(ctx);
-
-      const oldLead = { ...baseLeadRow, status: "NEW" as LeadStatus };
-      setupMockTransaction(mockWithTx, [[oldLead]]);
-
-      await expect(
-        repo.updateStatus(LEAD_ID, "NEW", USER_ID),
-      ).rejects.toThrow("Invalid status transition");
+      const result = await repo.updateStatus(LEAD_ID, "WON", USER_ID);
+      expect(result.status).toBe("WON");
     });
   });
 
@@ -382,6 +340,11 @@ describe("LeadRepository", () => {
     });
   });
 
+// ---------------------------------------------------------------------------
+// LeadReadMarkRepository — read mark operations (extraídas de LeadRepository)
+// ---------------------------------------------------------------------------
+
+describe("LeadReadMarkRepository", () => {
   describe("markAsRead", () => {
     it("inserts a read mark for the lead and user", async () => {
       const { ctx, mockWithTx } = createMockAuthCtx({
@@ -389,12 +352,12 @@ describe("LeadRepository", () => {
         userId: USER_ID,
         role: "ADMIN",
       });
-      const repo = new LeadRepository(ctx);
+      const readMarkRepo = new LeadReadMarkRepository(ctx);
 
       const readMark = { ...baseLeadReadMarkRow };
       setupMockTransaction(mockWithTx, [[readMark]]);
 
-      const result = await repo.markAsRead(LEAD_ID, USER_ID);
+      const result = await readMarkRepo.markAsRead(LEAD_ID, USER_ID);
 
       expect(result).not.toBeNull();
       expect(result.leadId).toBe(LEAD_ID);
@@ -407,7 +370,7 @@ describe("LeadRepository", () => {
         userId: USER_ID,
         role: "ADMIN",
       });
-      const repo = new LeadRepository(ctx);
+      const readMarkRepo = new LeadReadMarkRepository(ctx);
 
       const updatedMark = {
         ...baseLeadReadMarkRow,
@@ -415,7 +378,7 @@ describe("LeadRepository", () => {
       };
       setupMockTransaction(mockWithTx, [[updatedMark]]);
 
-      const result = await repo.markAsRead(LEAD_ID, USER_ID);
+      const result = await readMarkRepo.markAsRead(LEAD_ID, USER_ID);
 
       expect(result).not.toBeNull();
       expect(result.readAt).toEqual(new Date("2026-07-08T13:00:00Z"));
@@ -429,11 +392,11 @@ describe("LeadRepository", () => {
         userId: USER_ID,
         role: "AGENT",
       });
-      const repo = new LeadRepository(ctx);
+      const readMarkRepo = new LeadReadMarkRepository(ctx);
 
       setupMockTransaction(mockWithTx, [[{ count: "5" }]]);
 
-      const result = await repo.getUnreadCount(USER_ID);
+      const result = await readMarkRepo.getUnreadCount(USER_ID);
 
       expect(result).toBe(5);
     });
@@ -444,11 +407,11 @@ describe("LeadRepository", () => {
         userId: USER_ID,
         role: "AGENT",
       });
-      const repo = new LeadRepository(ctx);
+      const readMarkRepo = new LeadReadMarkRepository(ctx);
 
       setupMockTransaction(mockWithTx, [[{ count: "0" }]]);
 
-      const result = await repo.getUnreadCount(USER_ID);
+      const result = await readMarkRepo.getUnreadCount(USER_ID);
 
       expect(result).toBe(0);
     });
@@ -461,7 +424,7 @@ describe("LeadRepository", () => {
         userId: AGENT_ID,
         role: "AGENT",
       });
-      const repo = new LeadRepository(ctx);
+      const readMarkRepo = new LeadReadMarkRepository(ctx);
 
       const unreadRows = [
         { id: "lead-1" },
@@ -470,7 +433,7 @@ describe("LeadRepository", () => {
       ];
       setupMockTransaction(mockWithTx, [unreadRows]);
 
-      const result = await repo.getUnreadLeadIds(AGENT_ID);
+      const result = await readMarkRepo.getUnreadLeadIds(AGENT_ID);
 
       expect(result).toHaveLength(3);
       expect(result).toContain("lead-1");
@@ -484,15 +447,16 @@ describe("LeadRepository", () => {
         userId: AGENT_ID,
         role: "AGENT",
       });
-      const repo = new LeadRepository(ctx);
+      const readMarkRepo = new LeadReadMarkRepository(ctx);
 
       setupMockTransaction(mockWithTx, [[]]);
 
-      const result = await repo.getUnreadLeadIds(AGENT_ID);
+      const result = await readMarkRepo.getUnreadLeadIds(AGENT_ID);
 
       expect(result).toHaveLength(0);
     });
   });
+});
 
   describe("reassign", () => {
     it("updates assigned_agent_id and deletes read marks atomically", async () => {

@@ -1,11 +1,12 @@
 import { type NextRequest } from "next/server";
 import { requireAuth } from "@/infrastructure/auth/require-auth";
-import { PromocionRepository, type CursorResult } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionRepository } from "@/infrastructure/db/repositories/promocion.repository";
+import { PromocionCursorQuery } from "@/infrastructure/db/repositories/promocion-cursor.query";
 import { PromocionCreateSchema } from "@/shared/schemas/promocion.schema";
 import {
   DEFAULT_PAGE_SIZE,
 } from "@/shared/constants/domain-config";
-import type { PromocionFilters } from "@/infrastructure/db/repositories/promocion.repository";
+import type { PromocionFilters } from "@/infrastructure/db/repositories/promocion-cursor.query";
 
 // ---------------------------------------------------------------------------
 // GET /api/internal/promociones
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   if (!auth.authorized) return auth.response;
 
   try {
-    const repository = new PromocionRepository(auth.ctx);
+    const cursorQuery = new PromocionCursorQuery(auth.ctx);
 
     // Parse query params using standard URL (works with plain Request in tests)
     const url = new URL(request.url);
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       ? Math.min(Math.max(1, Number(limitParam)), 100)
       : DEFAULT_PAGE_SIZE;
 
-    const result: CursorResult = await repository.findAllWithCursor(filters, {
+    const result = await cursorQuery.findAllWithCursor(filters, {
       cursor: cursor ?? "",
       limit,
     });

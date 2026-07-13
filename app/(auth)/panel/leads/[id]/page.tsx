@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "@/infrastructure/auth/session";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import { LeadRepository } from "@/infrastructure/db/repositories/lead.repository";
+import { LeadReadMarkRepository } from "@/infrastructure/db/repositories/lead-read-mark.repository";
 import { LeadDetail } from "@/features/leads/components/lead-detail";
 import { ArsopButtons } from "@/features/leads/components/arsop-buttons";
 
@@ -34,6 +35,7 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
     session.role,
   );
   const repo = new LeadRepository(ctx);
+  const readMarkRepo = new LeadReadMarkRepository(ctx);
 
   // Fetch lead detail + notes + history
   const lead = await repo.findById(id);
@@ -52,7 +54,7 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
 
   // Auto-mark as read when opening the detail (T013 requirement)
   try {
-    await repo.markAsRead(id, session.userId);
+    await readMarkRepo.markAsRead(id, session.userId);
   } catch {
     // Non-critical: if marking as read fails, still show the lead
   }

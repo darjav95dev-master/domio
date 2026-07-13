@@ -4,6 +4,7 @@ import type {
   OperationType,
   LeadStatus,
   PromocionStatus,
+  PromocionKind,
   UserRole,
   Amenity,
 } from "./db-enums";
@@ -67,6 +68,11 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = Object.freeze({
   ADMIN: "Administrador",
   OPERATOR: "Operador",
   AGENT: "Agente",
+});
+
+export const KIND_LABELS: Record<PromocionKind, string> = Object.freeze({
+  portfolio: "Portafolio",
+  external: "Captación externa",
 });
 
 export const AMENITY_LABELS: Record<Amenity, string> = Object.freeze({

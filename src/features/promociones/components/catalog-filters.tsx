@@ -6,6 +6,7 @@ import { cn } from "@/shared/utils/cn";
 import {
   PROMOTION_STATUS_LABELS,
   CONSTRUCTION_STATUS_LABELS,
+  KIND_LABELS,
 } from "@/shared/constants/domain-labels";
 import { PROMOCION_STATUSES, CONSTRUCTION_STATUSES } from "@/shared/constants/db-enums";
 import { LABEL_STYLE, SELECT_STYLE } from "@/shared/styles/backoffice-form";
@@ -14,11 +15,10 @@ import { LABEL_STYLE, SELECT_STYLE } from "@/shared/styles/backoffice-form";
 // Constants
 // ---------------------------------------------------------------------------
 
-const KIND_OPTIONS = [
+const KIND_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "", label: "Todos" },
-  { value: "portfolio", label: "Portafolio" },
-  { value: "external", label: "Captación externa" },
-] as const;
+  ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })),
+];
 
 const FILTER_FIELDS = [
   "status",

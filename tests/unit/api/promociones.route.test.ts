@@ -22,6 +22,10 @@ const mockRepository = vi.hoisted(() => ({
   PromocionRepository: vi.fn(),
 }));
 
+const mockCursorQuery = vi.hoisted(() => ({
+  PromocionCursorQuery: vi.fn(),
+}));
+
 vi.mock("@/infrastructure/auth/session", () => ({
   getServerSession: mockSession.getServerSession,
 }));
@@ -30,6 +34,13 @@ vi.mock(
   "@/infrastructure/db/repositories/promocion.repository",
   () => ({
     PromocionRepository: mockRepository.PromocionRepository,
+  }),
+);
+
+vi.mock(
+  "@/infrastructure/db/repositories/promocion-cursor.query",
+  () => ({
+    PromocionCursorQuery: mockCursorQuery.PromocionCursorQuery,
   }),
 );
 
@@ -95,7 +106,7 @@ describe("GET /api/internal/promociones", () => {
       nextCursor: null,
       total: 1,
     });
-    mockRepository.PromocionRepository.mockImplementation(() => ({
+    mockCursorQuery.PromocionCursorQuery.mockImplementation(() => ({
       findAllWithCursor: mockImpl,
     }));
 
@@ -130,7 +141,7 @@ describe("GET /api/internal/promociones", () => {
       nextCursor: null,
       total: 0,
     });
-    mockRepository.PromocionRepository.mockImplementation(() => ({
+    mockCursorQuery.PromocionCursorQuery.mockImplementation(() => ({
       findAllWithCursor: mockImpl,
     }));
 
@@ -158,7 +169,7 @@ describe("GET /api/internal/promociones", () => {
     const mockImpl = mockFindAllWithCursor.mockRejectedValue(
       new Error("DB error"),
     );
-    mockRepository.PromocionRepository.mockImplementation(() => ({
+    mockCursorQuery.PromocionCursorQuery.mockImplementation(() => ({
       findAllWithCursor: mockImpl,
     }));
 

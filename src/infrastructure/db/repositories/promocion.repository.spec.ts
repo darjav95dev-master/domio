@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { PromocionRepository } from "./promocion.repository";
+import { PromocionCursorQuery } from "./promocion-cursor.query";
 import { PromocionHistoryRepository } from "./promocion-history.repository";
 import {
   createMockAuthCtx,
@@ -76,16 +77,16 @@ const baseUnidadRow = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// PromocionRepository
+// PromocionCursorQuery — findAllWithCursor tests (moved from PromocionRepository)
 // ---------------------------------------------------------------------------
-describe("PromocionRepository", () => {
+describe("PromocionCursorQuery", () => {
   describe("findAllWithCursor", () => {
     it("returns all promociones for the tenant on first page (no cursor)", async () => {
       const { ctx, mockWithTx } = createMockAuthCtx({
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const cursorQuery = new PromocionCursorQuery(ctx);
       const items = [
         { ...basePromocionRow, id: "p1" },
         { ...basePromocionRow, id: "p2" },
@@ -93,7 +94,7 @@ describe("PromocionRepository", () => {
       // findAllWithCursor (no cursor): count query + items query
       setupMockTransaction(mockWithTx, [[{ count: "2" }], items]);
 
-      const result = await repo.findAllWithCursor({}, { limit: 10 });
+      const result = await cursorQuery.findAllWithCursor({}, { limit: 10 });
 
       expect(result.items).toHaveLength(2);
       expect(result.total).toBe(2);
@@ -106,7 +107,7 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const cursorQuery = new PromocionCursorQuery(ctx);
       const items = [
         {
           ...basePromocionRow,
@@ -116,7 +117,7 @@ describe("PromocionRepository", () => {
       ];
       setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAllWithCursor({}, { limit: 10 });
+      const result = await cursorQuery.findAllWithCursor({}, { limit: 10 });
 
       expect(result.items).toHaveLength(1);
       expect(
@@ -129,11 +130,11 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const cursorQuery = new PromocionCursorQuery(ctx);
       const items = [{ ...basePromocionRow, status: "PUBLISHED" }];
       setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAllWithCursor({ status: "PUBLISHED" }, { limit: 10 });
+      const result = await cursorQuery.findAllWithCursor({ status: "PUBLISHED" }, { limit: 10 });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0]?.status).toBe("PUBLISHED");
@@ -144,7 +145,7 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const cursorQuery = new PromocionCursorQuery(ctx);
       const items = [
         {
           ...basePromocionRow,
@@ -154,7 +155,7 @@ describe("PromocionRepository", () => {
       ];
       setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAllWithCursor(
+      const result = await cursorQuery.findAllWithCursor(
         { kind: "portfolio", constructionStatus: "IN_CONSTRUCTION" },
         { limit: 10 },
       );
@@ -167,11 +168,11 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const cursorQuery = new PromocionCursorQuery(ctx);
       const items = [{ ...basePromocionRow }];
       setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAllWithCursor(
+      const result = await cursorQuery.findAllWithCursor(
         { island: "Tenerife", municipality: "Adeje" },
         { limit: 10 },
       );
@@ -184,13 +185,13 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const cursorQuery = new PromocionCursorQuery(ctx);
       const items = [
         { ...basePromocionRow, assignedAgentId: "agent-1" },
       ];
       setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-      const result = await repo.findAllWithCursor(
+      const result = await cursorQuery.findAllWithCursor(
         { assignedAgentId: "agent-1" },
         { limit: 10 },
       );
@@ -203,10 +204,10 @@ describe("PromocionRepository", () => {
         tenantId: TENANT_ID,
         role: "ADMIN",
       });
-      const repo = new PromocionRepository(ctx);
+      const cursorQuery = new PromocionCursorQuery(ctx);
       setupMockTransaction(mockWithTx, [[{ count: "0" }]]);
 
-      const result = await repo.findAllWithCursor({}, { limit: 5 });
+      const result = await cursorQuery.findAllWithCursor({}, { limit: 5 });
 
       expect(result.items).toHaveLength(0);
       expect(result.total).toBe(0);
@@ -220,13 +221,13 @@ describe("PromocionRepository", () => {
           userId: "agent-1",
           role: "AGENT",
         });
-        const repo = new PromocionRepository(ctx);
+        const cursorQuery = new PromocionCursorQuery(ctx);
         const items = [
           { ...basePromocionRow, assignedAgentId: "agent-1" },
         ];
         setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
-        const result = await repo.findAllWithCursor({}, { limit: 10 });
+        const result = await cursorQuery.findAllWithCursor({}, { limit: 10 });
 
         expect(result.items).toHaveLength(1);
       });
@@ -237,14 +238,14 @@ describe("PromocionRepository", () => {
           userId: "agent-1",
           role: "AGENT",
         });
-        const repo = new PromocionRepository(ctx);
+        const cursorQuery = new PromocionCursorQuery(ctx);
         const items = [
           { ...basePromocionRow, assignedAgentId: "agent-1" },
         ];
         setupMockTransaction(mockWithTx, [[{ count: "1" }], items]);
 
         // Even though we pass a different agent ID, the AGENT's own ID takes precedence
-        const result = await repo.findAllWithCursor(
+        const result = await cursorQuery.findAllWithCursor(
           { assignedAgentId: "other-agent" },
           { limit: 10 },
         );
@@ -253,6 +254,12 @@ describe("PromocionRepository", () => {
       });
     });
   });
+});
+
+// ---------------------------------------------------------------------------
+// PromocionRepository
+// ---------------------------------------------------------------------------
+describe("PromocionRepository", () => {
 
   describe("findById", () => {
     it("returns the promocion with nested tipologias and unidades", async () => {

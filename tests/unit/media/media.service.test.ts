@@ -296,7 +296,7 @@ describe("MediaService", () => {
   });
 
   describe("reorderGallery", () => {
-    it("updates sort_order values atomically for each asset", async () => {
+    it("updates sort_order values atomically with a single batch UPDATE", async () => {
       const assetIds = ["id-1", "id-2", "id-3"];
       const selectWhere = vi.fn().mockResolvedValue(
         assetIds.map((id) => fakeAsset({ id })),
@@ -310,13 +310,17 @@ describe("MediaService", () => {
       await service.reorderGallery(ownerId, assetIds);
 
       expect(db.transaction).toHaveBeenCalled();
-      expect(tx.update).toHaveBeenCalledTimes(3);
+      // Ahora es 1 batch UPDATE con CASE expression en lugar de N UPDATEs
+      expect(tx.update).toHaveBeenCalledTimes(1);
       expect(tx.update).toHaveBeenCalledWith(mediaAssets);
 
       const updateReturn = (tx.update as Mock).mock.results[0]?.value;
-      expect(updateReturn?.set).toHaveBeenNthCalledWith(1, { sortOrder: 0 });
-      expect(updateReturn?.set).toHaveBeenNthCalledWith(2, { sortOrder: 1 });
-      expect(updateReturn?.set).toHaveBeenNthCalledWith(3, { sortOrder: 2 });
+      // Verificamos que set recibe un objeto con sortOrder como sql expression
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sortOrder: expect.any(Object),
+        }),
+      );
     });
 
     it("empty array is a no-op — returns without calling the database", async () => {

@@ -5,7 +5,7 @@ import { ZodError } from "zod";
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be defined before any imports
 // ---------------------------------------------------------------------------
-const { mockSession, mockRepoInstance } = vi.hoisted(() => {
+const { mockSession, mockRepoInstance, mockReadMarkRepoInstance } = vi.hoisted(() => {
   const session = {
     userId: "00000000-0000-4000-8000-000000000010",
     tenantId: "00000000-0000-4000-8000-000000000001",
@@ -18,16 +18,19 @@ const { mockSession, mockRepoInstance } = vi.hoisted(() => {
     findById: vi.fn(),
     updateStatus: vi.fn(),
     addNote: vi.fn(),
-    markAsRead: vi.fn(),
-    getUnreadCount: vi.fn(),
-    getUnreadLeadIds: vi.fn(),
     reassign: vi.fn(),
     exportCsv: vi.fn(),
     getNotes: vi.fn(),
     getLeadHistory: vi.fn(),
   };
 
-  return { mockSession: session, mockRepoInstance: instance };
+  const readMarkInstance = {
+    markAsRead: vi.fn(),
+    getUnreadCount: vi.fn(),
+    getUnreadLeadIds: vi.fn(),
+  };
+
+  return { mockSession: session, mockRepoInstance: instance, mockReadMarkRepoInstance: readMarkInstance };
 });
 
 vi.mock("@/infrastructure/auth/session", () => ({
@@ -36,6 +39,10 @@ vi.mock("@/infrastructure/auth/session", () => ({
 
 vi.mock("@/infrastructure/db/repositories/lead.repository", () => ({
   LeadRepository: vi.fn(() => mockRepoInstance),
+}));
+
+vi.mock("@/infrastructure/db/repositories/lead-read-mark.repository", () => ({
+  LeadReadMarkRepository: vi.fn(() => mockReadMarkRepoInstance),
 }));
 
 // ---------------------------------------------------------------------------
@@ -136,12 +143,12 @@ describe("LeadActions", () => {
   // -----------------------------------------------------------------------
   describe("getUnreadCountAction", () => {
     it("returns the unread count for current user", async () => {
-      mockRepoInstance.getUnreadCount.mockResolvedValue(3);
+      mockReadMarkRepoInstance.getUnreadCount.mockResolvedValue(3);
 
       const result = await getUnreadCountAction();
 
       expect(result).toBe(3);
-      expect(mockRepoInstance.getUnreadCount).toHaveBeenCalledWith(USER_ID);
+      expect(mockReadMarkRepoInstance.getUnreadCount).toHaveBeenCalledWith(USER_ID);
     });
 
     it("throws Permission denied when session is null", async () => {
@@ -220,13 +227,13 @@ describe("LeadActions", () => {
         userId: USER_ID,
         readAt: new Date("2026-07-08T12:00:00Z"),
       };
-      mockRepoInstance.markAsRead.mockResolvedValue(readMark);
+      mockReadMarkRepoInstance.markAsRead.mockResolvedValue(readMark);
 
       const result = await markAsReadAction(LEAD_ID);
 
       expect(result.leadId).toBe(LEAD_ID);
       expect(result.userId).toBe(USER_ID);
-      expect(mockRepoInstance.markAsRead).toHaveBeenCalledWith(
+      expect(mockReadMarkRepoInstance.markAsRead).toHaveBeenCalledWith(
         LEAD_ID,
         USER_ID,
       );

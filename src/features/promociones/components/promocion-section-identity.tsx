@@ -6,6 +6,7 @@ import { PROPERTY_TYPES, OPERATION_TYPES } from "@/shared/constants/db-enums";
 import {
   PROPERTY_TYPE_LABELS,
   OPERATION_TYPE_LABELS,
+  KIND_LABELS,
 } from "@/shared/constants/domain-labels";
 import {
   LABEL_STYLE,
@@ -43,8 +44,7 @@ export interface IdentitySectionProps {
 // ---------------------------------------------------------------------------
 
 const KIND_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "portfolio", label: "Portafolio" },
-  { value: "external", label: "Captación externa" },
+  ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })),
 ];
 
 const INPUT_BASE =
