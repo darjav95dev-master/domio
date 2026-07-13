@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------------------
+# Stack de aplicación de Domio (postgres + web + worker).
+# Se lanza DOS veces en el mismo VPS con proyectos distintos:
+#   docker compose -p domio-dev  --env-file deploy/env.dev  -f deploy/docker-compose.app.yml up -d
+#   docker compose -p domio-prod --env-file deploy/env.prod -f deploy/docker-compose.app.yml up -d
+# El nombre de proyecto (-p) aísla contenedores, red y volumen de cada entorno.
+# El proxy Caddy (docker-compose.proxy.yml) enruta por dominio a cada web.
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data          # volumen NOMBRADO (no anónimo)
+      - ./init-postgis.sql:/docker-entrypoint-initdb.d/10-init-postgis.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+    # Puerto NO publicado: la DB solo es accesible desde la red interna del stack.
+
+  web:
+    image: ${IMAGE_WEB}:${IMAGE_TAG}
+    restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE}
+    environment:
+      # Fuerza la conexión a la DB del propio stack (ignora lo que traiga el .env).
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: 'node -e "fetch(''http://127.0.0.1:3000/api/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"'
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      internal: {}
+      web:
+        aliases:
+          - ${WEB_ALIAS}      # Caddy enruta a este alias (domio-dev-web / domio-prod-web)
+
+  worker:
+    image: ${IMAGE_TOOLS}:${IMAGE_TAG}
+    restart: unless-stopped
+    command: ["pnpm", "worker:emails"]
+    env_file:
+      - ${APP_ENV_FILE}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+volumes:
+  pgdata:
+
+networks:
+  internal: {}
+  web:
+    external: true
+    name: domio-web            # red compartida con el proxy (crear una vez)

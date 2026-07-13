@@ -1,0 +1,114 @@
+name: CD
+
+# develop → despliega Development · main → despliega Producción.
+# feature/* NO despliega (solo CI en ci.yml).
+on:
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_WEB: ghcr.io/${{ github.repository_owner }}/domio-web
+  IMAGE_TOOLS: ghcr.io/${{ github.repository_owner }}/domio-tools
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: |
+          echo "tag=${{ github.ref_name == 'main' && 'latest' || 'develop' }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Imagen web (standalone). Los NEXT_PUBLIC_* se incrustan en build → por entorno.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          tags: |
+            ${{ env.IMAGE_WEB }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_WEB }}:${{ github.sha }}
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_APP_ENV=${{ vars.NEXT_PUBLIC_APP_ENV }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+
+      # Imagen tools (worker + migraciones).
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: tools
+          tags: |
+            ${{ env.IMAGE_TOOLS }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_TOOLS }}:${{ github.sha }}
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    steps:
+      - name: Deploy por SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/domio
+            git pull --ff-only
+            PROJECT=${{ github.ref_name == 'main' && 'domio-prod' || 'domio-dev' }}
+            ENVFILE=deploy/env.${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+            COMPOSE="docker compose -p $PROJECT --env-file $ENVFILE -f deploy/docker-compose.app.yml"
+
+            # 1. Backup pre-deploy (obligatorio antes de migrar)
+            mkdir -p backups
+            $COMPOSE exec -T postgres pg_dump -U domio -d domio -Fc \
+              > backups/${PROJECT}_$(date +%Y%m%d_%H%M).dump || echo "aviso: sin DB previa (primer deploy)"
+
+            # 2. Traer imagen nueva (tag por entorno)
+            $COMPOSE pull
+
+            # 3. Migraciones (expand/contract; forward-only)
+            $COMPOSE run --rm tools pnpm db:migrate
+
+            # 4. Recrear web + worker
+            $COMPOSE up -d
+
+            # 5. Healthcheck con rollback al sha anterior si falla
+            for i in $(seq 1 10); do
+              if curl -fsS http://localhost:80/api/health >/dev/null 2>&1 || \
+                 docker exec ${PROJECT}-web-1 node -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+                echo "healthy"; exit 0
+              fi
+              echo "esperando healthcheck ($i)…"; sleep 6
+            done
+            echo "❌ healthcheck falló → rollback"
+            sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$(cat backups/.last_good_tag 2>/dev/null || echo latest)/" "$ENVFILE"
+            $COMPOSE up -d
+            exit 1

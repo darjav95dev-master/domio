@@ -43,19 +43,16 @@ Los scripts pasan el fichero con la bandera nativa de Node `--env-file`
 cp .env.example .env.local            # si no lo tienes; edita valores
 pnpm dev
 
-# Development server
-cp .env.development.example .env.development   # rellena R2 dev, DB, secretos
+# Development / Production
+# Los ficheros .env.development y .env.production ya existen (gitignored) con los
+# valores reales; solo hay que rellenar las credenciales de terceros (RELLENAR).
 pnpm build:development && pnpm start:development
-
-# Production
-cp .env.production.example .env.production     # rellena R2 prod, DB, secretos
 pnpm build:production && pnpm start:production
 ```
 
 ## Ficheros
 
-Commiteados (plantillas, sin secretos): `.env.example`,
-`.env.development.example`, `.env.production.example`.
+Commiteado (plantilla, sin secretos): `.env.example`.
 Ignorados por git (valores reales): `.env.local`, `.env.development`,
 `.env.production`.
 

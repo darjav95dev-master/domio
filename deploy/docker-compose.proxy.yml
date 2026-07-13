@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+# Reverse proxy compartido (Caddy) para los dos stacks del VPS.
+# Un único Caddy escucha 80/443, resuelve TLS (Let's Encrypt) y enruta por
+# dominio a la web de cada entorno a través de la red compartida `domio-web`.
+#   docker compose -p domio-proxy --env-file deploy/env.proxy -f deploy/docker-compose.proxy.yml up -d
+# ---------------------------------------------------------------------------
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PROD_DOMAIN: ${PROD_DOMAIN}
+      DEV_DOMAIN: ${DEV_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [web]
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  web:
+    external: true
+    name: domio-web

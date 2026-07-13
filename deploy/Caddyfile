@@ -1,0 +1,13 @@
+# TLS automático (Let's Encrypt) + reverse proxy por dominio.
+# Los aliases domio-prod-web / domio-dev-web los define cada stack de app
+# como alias de red en docker-compose.app.yml (WEB_ALIAS).
+
+{$PROD_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy domio-prod-web:3000
+}
+
+{$DEV_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy domio-dev-web:3000
+}
