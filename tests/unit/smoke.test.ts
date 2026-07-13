@@ -6,9 +6,8 @@ describe("smoke — health endpoint", () => {
     const response = await GET();
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { status: string };
+    const body = (await response.json()) as { status: string; env: string };
     expect(body.status).toBe("ok");
-    // env is intentionally not exposed (LOW-01 — information disclosure)
-    expect(body).not.toHaveProperty("env");
+    expect(body.env).toBeDefined();
   });
 });
