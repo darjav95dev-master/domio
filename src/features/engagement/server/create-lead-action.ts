@@ -13,7 +13,7 @@ import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { contactFormSchema } from "../schemas/contact-form.schema";
 import { checkIpRateLimit } from "@/infrastructure/rate-limiting/ip-rate-limit";
 import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
-import { BACKOFFICE_LEADS_URL } from "@/shared/constants/tenant-hosts";
+import { backofficeLeadUrl } from "@/shared/constants/tenant-hosts";
 import { verifyTurnstileToken } from "@/shared/utils/turnstile";
 import { RGPD_CONSENT_TEXT_LEAD } from "@/shared/constants/consent-texts";
 import { EmailRepository } from "@/infrastructure/email/email.repository";
@@ -210,7 +210,7 @@ export async function createLeadService(
           agentName: agent.name,
           leadName: data.name,
           promotionName: promocion.name,
-          backofficeUrl: `${BACKOFFICE_LEADS_URL}/${lead.id}`,
+          backofficeUrl: backofficeLeadUrl(lead.id),
         },
       },
       tx,
