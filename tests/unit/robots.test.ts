@@ -5,40 +5,42 @@ const SITE_URL = "https://wedomio.com";
 describe("robots configuration", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.resetModules();
   });
 
-  it("should block /panel and /api/internal", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", SITE_URL);
-    const { default: robots } = await import("../../app/robots");
-    const result = robots();
+  describe("en producción", () => {
+    it("permite / y bloquea /panel y /api/internal", async () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_ENV", "production");
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", SITE_URL);
+      vi.resetModules();
+      const { default: robots } = await import("../../app/robots");
+      const rule = robots().rules;
 
-    expect(result.rules).toBeDefined();
-    const rule = result.rules;
-    expect(rule.userAgent).toBe("*");
-    expect(rule.disallow).toContain("/panel");
-    expect(rule.disallow).toContain("/api/internal");
+      expect(rule.userAgent).toBe("*");
+      expect(rule.allow).toBe("/");
+      expect(rule.disallow).toContain("/panel");
+      expect(rule.disallow).toContain("/api/internal");
+    });
+
+    it("usa NEXT_PUBLIC_SITE_URL como host", async () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_ENV", "production");
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", SITE_URL);
+      vi.resetModules();
+      const { default: robots } = await import("../../app/robots");
+      expect(robots().host).toBe(SITE_URL);
+    });
   });
 
-  it("should allow / (implicit)", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", SITE_URL);
-    const { default: robots } = await import("../../app/robots");
-    const result = robots();
+  describe("fuera de producción (dev/local)", () => {
+    it("bloquea TODO el sitio para no indexar el clon de desarrollo", async () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_ENV", "development");
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://dev.wedomio.com");
+      vi.resetModules();
+      const { default: robots } = await import("../../app/robots");
+      const rule = robots().rules;
 
-    expect(result.rules.disallow).toContain("/panel");
-    expect(result.rules.disallow).toContain("/api/internal");
-  });
-
-  it("should use NEXT_PUBLIC_SITE_URL as host", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", SITE_URL);
-    const { default: robots } = await import("../../app/robots");
-    const result = robots();
-    expect(result.host).toBe(SITE_URL);
-  });
-
-  it("should fallback to localhost when env var is missing", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
-    const { default: robots } = await import("../../app/robots");
-    const result = robots();
-    expect(result.host).toBe("http://localhost:3000");
+      expect(rule.disallow).toBe("/");
+      expect(rule.allow).toBeUndefined();
+    });
   });
 });

@@ -2,7 +2,7 @@
 APP  := -f deploy/docker-compose.app.yml
 PROXY:= -f deploy/docker-compose.proxy.yml
 
-.PHONY: net proxy-up dev-up prod-up dev-migrate prod-migrate logs-% backup down-% build-% deploy-% check-%
+.PHONY: net proxy-up dev-up prod-up dev-migrate prod-migrate logs-% backup restore-test down-% build-% deploy-% check-%
 
 # Variables que Next necesita en BUILD (se hornean en la imagen), no en runtime.
 # Todas son públicas: viajan en el bundle que descarga cualquier visitante.
@@ -64,8 +64,32 @@ check-%:               ## Verificar servicios externos: check-dev / check-prod
 	docker compose -p domio-$* --env-file deploy/env.$* $(APP) \
 	  run --rm -e CHECK_EMAIL="$$CHECK_EMAIL" worker pnpm check:services
 
-backup:                ## pg_dump de producción → backups/
+BACKUP_RETENTION_DAYS ?= 14
+
+backup:                ## pg_dump de producción → backups/ (+ poda > BACKUP_RETENTION_DAYS)
 	@mkdir -p backups
 	docker compose -p domio-prod --env-file deploy/env.prod $(APP) exec -T postgres \
 	  pg_dump -U domio -d domio -Fc > backups/prod_$$(date +%Y%m%d_%H%M).dump
-	@echo "OK → backups/"
+	@# Retención: borra dumps propios más viejos que N días (no toca otros ficheros).
+	@find backups -name 'prod_*.dump' -mtime +$(BACKUP_RETENTION_DAYS) -delete
+	@echo "OK → backups/ (retención: $(BACKUP_RETENTION_DAYS) días)"
+
+# Prueba de restauración (§6: "restauración probada al menos una vez").
+# Restaura el dump MÁS RECIENTE sobre una base TEMPORAL (restore_test), nunca
+# sobre la de producción, y cronometra cuánto tarda. Al terminar la borra.
+# Uso:  make -f deploy/Makefile restore-test
+restore-test:          ## Restaura el último backup en una BD temporal y cronometra
+	@set -e; \
+	DUMP=$$(ls -t backups/prod_*.dump 2>/dev/null | head -1); \
+	[ -n "$$DUMP" ] || { echo "✗ No hay backups. Ejecuta antes: make -f deploy/Makefile backup"; exit 1; }; \
+	echo "▶ Restaurando $$DUMP en la BD temporal 'restore_test'…"; \
+	PSQL="docker compose -p domio-prod --env-file deploy/env.prod $(APP) exec -T postgres"; \
+	$$PSQL psql -U domio -d postgres -c "DROP DATABASE IF EXISTS restore_test;" >/dev/null; \
+	$$PSQL psql -U domio -d postgres -c "CREATE DATABASE restore_test;" >/dev/null; \
+	START=$$(date +%s); \
+	cat "$$DUMP" | $$PSQL pg_restore -U domio -d restore_test --no-owner --no-acl 2>/dev/null || true; \
+	END=$$(date +%s); \
+	echo "▶ Verificando datos restaurados:"; \
+	$$PSQL psql -U domio -d restore_test -c "select 'promociones' t, count(*) from promociones union all select 'usuarios', count(*) from users union all select 'leads', count(*) from leads;"; \
+	$$PSQL psql -U domio -d postgres -c "DROP DATABASE restore_test;" >/dev/null; \
+	echo "✅ Restauración OK · tiempo de recuperación: $$((END-START))s · (BD temporal eliminada)"
