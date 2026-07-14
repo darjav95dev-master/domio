@@ -8,7 +8,10 @@ const ENV_EXAMPLE_PATH = resolve(ROOT, ".env.example");
 const REQUIRED_VARIABLES = [
   "DATABASE_URL",
   "AUTH_SECRET",
-  "AUTH_URL",
+  // NextAuth v4 lee NEXTAUTH_URL, no AUTH_URL (ese es el nombre de la v5). Con
+  // AUTH_URL documentado y NEXTAUTH_URL ausente, los entornos se montaron sin la
+  // variable que la librería sí usa, y los redirects apuntaban a localhost.
+  "NEXTAUTH_URL",
   "R2_ACCOUNT_ID",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
