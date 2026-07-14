@@ -3,6 +3,7 @@ import tsEslint from "@typescript-eslint/eslint-plugin";
 import nextPlugin from "@next/eslint-plugin-next";
 import sonarjs from "eslint-plugin-sonarjs";
 import jsxA11y from "eslint-plugin-jsx-a11y";
+import reactHooks from "eslint-plugin-react-hooks";
 
 const nextRules = {
   ...nextPlugin.configs.recommended.rules,
@@ -30,6 +31,15 @@ export default defineConfig([
       "@next/next": nextPlugin,
     },
     rules: nextRules,
+  },
+  // @next/eslint-plugin-next NO incluye las reglas de hooks: sin esto,
+  // exhaustive-deps no corre y las stale closures llegan a producción.
+  {
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
+    },
   },
   sonarjs.configs.recommended,
   {

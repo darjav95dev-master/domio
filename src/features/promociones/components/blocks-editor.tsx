@@ -416,7 +416,10 @@ export function BlocksEditor({
   const isSaving = savingId !== null || isReordering;
 
   // ── Block type selector: types not yet added ──────────────────────────
-  const usedTypes = new Set(blocks.map((b) => b.blockType));
+  const usedTypes = useMemo(
+    () => new Set(blocks.map((b) => b.blockType)),
+    [blocks],
+  );
   const addableTypes = availableTypes.filter((t) => !usedTypes.has(t));
 
   // ── Handlers ──────────────────────────────────────────────────────────

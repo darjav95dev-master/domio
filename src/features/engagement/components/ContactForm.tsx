@@ -102,7 +102,7 @@ export function ContactForm({ promocionId, tipologias }: ContactFormProps) {
         });
       }
     },
-    [promocionId],
+    [promocionId, turnstileToken],
   );
 
   const isLoading = status === "loading";
