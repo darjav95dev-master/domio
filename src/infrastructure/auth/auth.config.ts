@@ -44,16 +44,31 @@ export const authConfig: NextAuthOptions = {
         }
 
         // Lazy imports: only resolved in route handler context, not in middleware
-        const { eq } = await import("drizzle-orm");
-        const { db } = await import("@/infrastructure/db/client");
+        const { and, eq } = await import("drizzle-orm");
         const { users } = await import("@/infrastructure/db/schema");
+        const { PublicContext } = await import(
+          "@/infrastructure/tenant/PublicContext"
+        );
         const bcrypt = await import("bcryptjs");
 
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
+        // Quien intenta entrar aún no tiene sesión, así que no hay tenant que
+        // sacar del JWT: se usa el del despliegue (PUBLIC_TENANT_ID). Consultar
+        // `users` a pelo solo funcionaba porque la app conectaba con un rol que
+        // saltea el RLS; con el rol restringido la política de `users` exige
+        // app.current_tenant_id y la consulta devolvería cero filas.
+        const context = new PublicContext();
+        const [user] = await context.withTransaction((tx) =>
+          tx
+            .select()
+            .from(users)
+            .where(
+              and(
+                eq(users.email, email),
+                eq(users.tenantId, context.getTenantId()),
+              ),
+            )
+            .limit(1),
+        );
 
         if (!user || !user.passwordHash || !user.isActive) {
           return null;
