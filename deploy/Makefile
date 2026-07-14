@@ -64,11 +64,15 @@ check-%:               ## Verificar servicios externos: check-dev / check-prod
 	docker compose -p domio-$* --env-file deploy/env.$* $(APP) \
 	  run --rm -e CHECK_EMAIL="$$CHECK_EMAIL" worker pnpm check:services
 
-backup:                ## pg_dump de producción → backups/
+BACKUP_RETENTION_DAYS ?= 14
+
+backup:                ## pg_dump de producción → backups/ (+ poda > BACKUP_RETENTION_DAYS)
 	@mkdir -p backups
 	docker compose -p domio-prod --env-file deploy/env.prod $(APP) exec -T postgres \
 	  pg_dump -U domio -d domio -Fc > backups/prod_$$(date +%Y%m%d_%H%M).dump
-	@echo "OK → backups/"
+	@# Retención: borra dumps propios más viejos que N días (no toca otros ficheros).
+	@find backups -name 'prod_*.dump' -mtime +$(BACKUP_RETENTION_DAYS) -delete
+	@echo "OK → backups/ (retención: $(BACKUP_RETENTION_DAYS) días)"
 
 # Prueba de restauración (§6: "restauración probada al menos una vez").
 # Restaura el dump MÁS RECIENTE sobre una base TEMPORAL (restore_test), nunca
