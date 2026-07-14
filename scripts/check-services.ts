@@ -13,7 +13,11 @@
  *
  * Uso (dentro del contenedor worker, que tiene el entorno cargado):
  *   docker compose -p domio-prod --env-file deploy/env.prod -f deploy/docker-compose.app.yml \
- *     run --rm -e CHECK_EMAIL='tucorreo@ejemplo.com' worker tsx scripts/check-services.ts
+ *     run --rm -e CHECK_EMAIL='tucorreo@ejemplo.com' worker pnpm check:services
+ *
+ * Vía pnpm, no `tsx` a secas: el binario no está en el PATH del contenedor y el
+ * entrypoint de la imagen de Node acaba pasándoselo a `node` como si fuera un
+ * fichero ("Cannot find module '/app/tsx'").
  *
  * Sale con código 1 si algún servicio OBLIGATORIO falla.
  */
@@ -115,14 +119,25 @@ async function checkUpstash() {
       return;
     }
     const k = `_healthcheck:${Date.now()}`;
-    await redis.set(k, "1", { ex: 30 });
+    const esperado = `domio-${Date.now()}`;
+
+    await redis.set(k, esperado, { ex: 30 });
     const v = await redis.get(k);
     await redis.del(k);
+
+    // El SDK de Upstash deserializa el valor al leerlo, así que no se compara con
+    // === contra una cadena: se normaliza. Antes se guardaba "1" y se comparaba
+    // con === "1"; si volvía el número 1, el check decía KO con Redis funcionando.
+    const roundtrip = String(v) === esperado;
+
     const limiterName = createRateLimiter().constructor.name;
     const active = limiterName !== "NoopRateLimiter";
+
     record("Upstash (rate limit)", {
-      ok: v === "1" && active,
-      detail: `set/get=${v === "1" ? "OK" : "KO"} · limiter=${limiterName}${active ? "" : " ⚠️ NO-OP"}`,
+      ok: roundtrip && active,
+      detail: roundtrip
+        ? `set/get=OK · limiter=${limiterName}${active ? "" : " ⚠️ NO-OP (permite todo)"}`
+        : `set/get=KO · escribí "${esperado}" y leí ${JSON.stringify(v)} (tipo ${typeof v}) · limiter=${limiterName}`,
     });
   } catch (e) {
     record("Upstash (rate limit)", { ok: false, detail: msg(e) });
@@ -130,18 +145,43 @@ async function checkUpstash() {
 }
 
 // ─────────────────────────── Sentry ───────────────────────────────
+// Se envía el evento al endpoint de ingesta con fetch, no con el SDK:
+// @sentry/nextjs no expone captureMessage fuera del runtime de Next
+// ("Sentry.captureMessage is not a function"). Además así se prueba lo que
+// importa de verdad — que el DSN es válido y que hay salida de red al proyecto.
 async function checkSentry() {
+  const dsn = process.env.SENTRY_DSN;
+  if (!dsn) {
+    record("Sentry", { ok: false, detail: "SENTRY_DSN ausente" });
+    return;
+  }
+
   try {
-    if (!process.env.SENTRY_DSN) {
-      record("Sentry", { ok: false, detail: "SENTRY_DSN ausente" });
-      return;
-    }
-    const Sentry = await import("@sentry/nextjs");
-    const { createSentryConfig } = await import("@/infrastructure/observability/sentry-common");
-    Sentry.init(createSentryConfig({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 1.0 }));
-    const id = Sentry.captureMessage(`Domio healthcheck · ${process.env.APP_ENV} · ${new Date().toISOString()}`, "info");
-    await Sentry.flush(3000);
-    record("Sentry", { ok: Boolean(id), detail: `evento enviado (id=${id}) → revísalo en el dashboard (${process.env.APP_ENV})` });
+    // https://<clave>@<host>/<projectId>
+    const { username: key, host, pathname } = new URL(dsn);
+    const projectId = pathname.replace(/^\//, "");
+
+    const res = await fetch(`https://${host}/api/${projectId}/store/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Sentry-Auth": `Sentry sentry_version=7, sentry_key=${key}, sentry_client=domio-healthcheck/1.0`,
+      },
+      body: JSON.stringify({
+        message: `Domio healthcheck · ${process.env.APP_ENV} · ${new Date().toISOString()}`,
+        level: "info",
+        platform: "node",
+        environment: process.env.APP_ENV,
+      }),
+    });
+
+    const body = (await res.json()) as { id?: string };
+    record("Sentry", {
+      ok: res.ok && Boolean(body.id),
+      detail: res.ok
+        ? `evento aceptado (id=${body.id}) → revísalo en el dashboard (${process.env.APP_ENV})`
+        : `Sentry rechazó el evento (HTTP ${res.status})`,
+    });
   } catch (e) {
     record("Sentry", { ok: false, detail: msg(e) });
   }

@@ -24,6 +24,7 @@
     "test:contract": "vitest run tests/contract --passWithNoTests",
     "test:contract:update": "CONTRACT_UPDATE_SNAPSHOTS=true vitest run tests/contract --passWithNoTests",
     "worker:emails": "tsx scripts/worker-emails.ts",
+    "check:services": "tsx scripts/check-services.ts",
     "db:generate": "drizzle-kit generate --config=src/infrastructure/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=src/infrastructure/db/drizzle.config.ts",
     "db:seed": "tsx scripts/seed.ts",
