@@ -55,6 +55,8 @@ jobs:
             NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
             NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
             R2_PUBLIC_URL=${{ vars.R2_PUBLIC_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_RELEASE=${{ github.sha }}
 
       # Imagen tools (worker + migraciones).
       - uses: docker/build-push-action@v6

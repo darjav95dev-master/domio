@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     // Fail-fast: en producción, sin RATE_LIMIT_STORE_URL el rate limiter cae a
@@ -17,3 +19,11 @@ export async function register() {
     await import("./sentry.server.config");
   }
 }
+
+/**
+ * Reenvía a Sentry los errores de servidor (route handlers, server components,
+ * server actions). Sin este hook, Next captura el error, devuelve un 500 y NO se
+ * lo cuenta a nadie: el SDK arrancaba, registraba la release y las sesiones, pero
+ * el dashboard de errores quedaba vacío para siempre. Es obligatorio desde Next 15.
+ */
+export const onRequestError = Sentry.captureRequestError;

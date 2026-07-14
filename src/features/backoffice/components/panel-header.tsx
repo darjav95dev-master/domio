@@ -1,11 +1,11 @@
 import { getServerSession } from "@/infrastructure/auth/session";
+import { LogoutButton } from "@/features/backoffice/components/logout-button";
 
 /**
  * PanelHeader — top bar of the backoffice panel.
  *
- * Server component that reads the current session, displays the user's name
- * (or email fallback), and provides a logout button via redirect to the
- * NextAuth signout endpoint.
+ * Server component que lee la sesión y muestra el nombre del usuario. El cierre
+ * de sesión lo hace LogoutButton (cliente), que redirige a /panel/login.
  *
  * Styling: border-bottom subtle divider, compact padding, flex space-between.
  */
@@ -24,15 +24,7 @@ export default async function PanelHeader() {
     <header className="flex items-center justify-between border-b border-border-default px-6 py-3">
       <span className="text-base font-medium text-fg-default">{displayName}</span>
 
-      <form action="/api/auth/signout" method="POST">
-        <button
-          type="submit"
-          aria-label="Cerrar sesión"
-          className="cursor-pointer rounded-md px-3 py-1.5 text-sm text-fg-muted transition-colors duration-quick ease-standard hover:bg-accent-subtle hover:text-accent-default focus-visible:outline-offset-[-2px]"
-        >
-          Cerrar sesión
-        </button>
-      </form>
+      <LogoutButton />
     </header>
   );
 }

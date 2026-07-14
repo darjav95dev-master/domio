@@ -30,7 +30,7 @@ interface TurnstileOptions {
   "expired-callback": () => void;
   "error-callback": () => void;
   theme?: "light" | "dark" | "auto";
-  size?: "normal" | "compact";
+  size?: "normal" | "compact" | "flexible";
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +109,11 @@ export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
         onToken(null);
       },
       theme: "light",
+      // Se adapta al ancho del contenedor (mín. 300px): queda alineado con los
+      // inputs del formulario en vez de un recuadro pequeño pegado a la
+      // izquierda. Es la opción nativa de Cloudflare; escalarlo por CSS lo
+      // dejaría borroso.
+      size: "flexible",
     });
 
     widgetIdRef.current = widgetId;
@@ -129,7 +134,7 @@ export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
   return (
     <div
       ref={containerRef}
-      className={className}
+      className={className ?? "w-full"}
       aria-label="Verificación de seguridad"
       role="presentation"
     />
