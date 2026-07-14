@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
+const LOGOUT_LABEL = "Cerrar sesión";
+
 const mockGetServerSession = vi.fn();
 
 vi.mock("@/infrastructure/auth/session", () => ({
@@ -63,9 +65,9 @@ describe("PanelHeader", () => {
     const PanelHeader = (await import("../panel-header")).default;
     render(await PanelHeader());
 
-    const logoutButton = screen.getByLabelText("Cerrar sesión");
+    const logoutButton = screen.getByLabelText(LOGOUT_LABEL);
     expect(logoutButton).toBeInTheDocument();
-    expect(logoutButton).toHaveTextContent("Cerrar sesión");
+    expect(logoutButton).toHaveTextContent(LOGOUT_LABEL);
   });
 
   it("returns null (empty) when session is null", async () => {
@@ -92,7 +94,7 @@ describe("PanelHeader", () => {
     expect(header).toBeInTheDocument();
   });
 
-  it("logout button is inside a form with a server action", async () => {
+  it("cierra sesión con signOut(), no con un form POST a /api/auth/signout", async () => {
     mockGetServerSession.mockResolvedValue({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -103,8 +105,15 @@ describe("PanelHeader", () => {
     const PanelHeader = (await import("../panel-header")).default;
     const { container } = render(await PanelHeader());
 
-    const form = container.querySelector("form");
-    expect(form).toBeInTheDocument();
-    expect(form?.querySelector('button[type="submit"]')).toBeInTheDocument();
+    // El form plano no llevaba token CSRF: NextAuth v4 lo rechazaba y redirigía
+    // a su página de confirmación (/api/auth/signout?csrf=true) en vez de cerrar
+    // la sesión y volver al login.
+    expect(container.querySelector("form")).not.toBeInTheDocument();
+    expect(
+      container.querySelector('form[action="/api/auth/signout"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: LOGOUT_LABEL }),
+    ).toBeInTheDocument();
   });
 });
