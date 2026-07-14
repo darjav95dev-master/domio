@@ -37,10 +37,14 @@ down-%:                ## Parar un stack: down-dev / down-prod
 	docker compose -p domio-$* --env-file deploy/env.$* $(APP) down
 
 build-%:               ## Construir imagen web: build-dev / build-prod
-	@set -a; . ./deploy/env.$*; . "$$APP_ENV_FILE"; set +a; \
+	@set -a; . ./deploy/env.$*; \
+	envf="$$APP_ENV_FILE"; \
+	case "$$envf" in /*) ;; *) envf="deploy/$$envf" ;; esac; \
+	[ -f "$$envf" ] || { echo "✗ No existe $$envf (APP_ENV_FILE=$$APP_ENV_FILE)"; exit 1; }; \
+	. "$$envf"; set +a; \
 	for v in $(BUILD_VARS); do \
 	  eval "val=\$$$$v"; \
-	  [ -n "$$val" ] || { echo "✗ Falta $$v en $$APP_ENV_FILE (se necesita en BUILD)"; exit 1; }; \
+	  [ -n "$$val" ] || { echo "✗ Falta $$v en $$envf (se necesita en BUILD)"; exit 1; }; \
 	  args="$$args --build-arg $$v=$$val"; \
 	done; \
 	echo "▶ build $$IMAGE_WEB:$$IMAGE_TAG"; \
