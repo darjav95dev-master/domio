@@ -22,17 +22,12 @@ describe("EmailRepository", () => {
     repository = new EmailRepository(mockDb as never);
   });
 
-  describe("findPendingEligible", () => {
-    it("calls db.execute with FOR UPDATE SKIP LOCKED", async () => {
-      const mockResult = { rows: [] };
-      mockExecute.mockResolvedValue(mockResult);
-
-      const result = await repository.findPendingEligible(10);
-
-      expect(mockExecute).toHaveBeenCalled();
-      expect(result).toEqual([]);
-    });
-  });
+  // findPendingEligible se prueba contra Postgres real en
+  // tests/integration/email/email-repository-db.test.ts. Aquí había un test con
+  // mock que solo afirmaba "llama a db.execute" y que el resultado era [] (lo que
+  // el propio mock devolvía): pasaba en verde mientras la consulta devolvía
+  // to_email en vez de toEmail y ningún email llegaba a enviarse. Un mock no
+  // puede validar el mapeo columna→propiedad; hace falta la base de datos.
 
   describe("markSent", () => {
     it("updates status to SENT", async () => {
