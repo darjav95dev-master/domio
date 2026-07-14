@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, lte, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { db as defaultDb } from "@/infrastructure/db/client";
 import { emailQueue } from "@/infrastructure/db/schema/email-queue";
@@ -31,18 +31,26 @@ export class EmailRepository {
     tx?: NodePgDatabase<typeof schema>,
   ): Promise<EmailQueue[]> {
     const db = tx ?? this.db;
-    const result = await db.execute<EmailQueue>(
-      sql`
-        SELECT * FROM email_queue
-        WHERE status = ${"PENDING"}
-          AND (next_attempt_at IS NULL OR next_attempt_at <= now())
-        ORDER BY next_attempt_at ASC NULLS FIRST
-        LIMIT ${limit}
-        FOR UPDATE SKIP LOCKED
-      `,
-    );
-
-    return result.rows as unknown as EmailQueue[];
+    // Con SQL crudo las filas vuelven en snake_case (to_email), no en el camelCase
+    // del schema: row.toEmail quedaba undefined y Resend rechazaba con "Missing `to`
+    // field". El query builder mapea las columnas de verdad.
+    return db
+      .select()
+      .from(emailQueue)
+      .where(
+        and(
+          eq(emailQueue.status, "PENDING"),
+          or(
+            isNull(emailQueue.nextAttemptAt),
+            lte(emailQueue.nextAttemptAt, sql`now()`),
+          ),
+        ),
+      )
+      // NULLS FIRST: los recién encolados (next_attempt_at NULL) van antes que
+      // los que esperan reintento. Postgres pone NULLS LAST en ASC por defecto.
+      .orderBy(sql`${emailQueue.nextAttemptAt} asc nulls first`)
+      .limit(limit)
+      .for("update", { skipLocked: true });
   }
 
   /**
