@@ -5,6 +5,7 @@ import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAw
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 import { EMAIL_TEMPLATE_NAMES } from "@/shared/constants/email-templates";
 import { INVITATION_TOKEN_TTL_MS } from "@/shared/constants/domain-config";
+import { setupPasswordUrl } from "@/shared/constants/tenant-hosts";
 import type { UserRole } from "@/shared/constants/db-enums";
 import type { UserRow, UpdateUserInput } from "@/shared/types/user-schema";
 
@@ -152,7 +153,7 @@ export class UserRepository extends TenantAwareRepository {
         payload: {
           inviteeName: data.name,
           role: data.role,
-          setupPasswordUrl: `${process.env.AUTH_URL ?? ""}/auth/setup-password?token=${token}`,
+          setupPasswordUrl: setupPasswordUrl(token),
         },
       });
 

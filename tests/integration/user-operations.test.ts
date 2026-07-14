@@ -290,8 +290,12 @@ describe("UserRepository", () => {
       const payload = valuesArg!.payload as Record<string, unknown>;
       const url = payload.setupPasswordUrl as string;
 
-      // Verify it's a real token, not "pending"
-      expect(url).toMatch(/\/auth\/setup-password\?token=[0-9a-f]{64}$/);
+      // Token real (no "pending") y URL absoluta a la ruta que EXISTE: el panel
+      // vive en /panel/*, y /auth/setup-password (lo que se generaba antes) era
+      // un 404 — el invitado no podía establecer su contraseña jamás.
+      expect(url).toMatch(
+        /^https?:\/\/.+\/panel\/setup-password\?token=[0-9a-f]{64}$/,
+      );
       expect(url).not.toContain("pending");
     });
 
