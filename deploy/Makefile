@@ -2,7 +2,7 @@
 APP  := -f deploy/docker-compose.app.yml
 PROXY:= -f deploy/docker-compose.proxy.yml
 
-.PHONY: net proxy-up dev-up prod-up dev-migrate prod-migrate logs-% backup down-% build-% deploy-%
+.PHONY: net proxy-up dev-up prod-up dev-migrate prod-migrate logs-% backup down-% build-% deploy-% check-%
 
 # Variables que Next necesita en BUILD (se hornean en la imagen), no en runtime.
 # Todas son públicas: viajan en el bundle que descarga cualquier visitante.
@@ -57,6 +57,12 @@ build-%:               ## Construir imágenes web + tools: build-dev / build-pro
 # se queda con el código viejo. Se levantan los dos.
 deploy-%: build-%      ## Build + levantar web y worker sin pull: deploy-dev / deploy-prod
 	docker compose -p domio-$* --env-file deploy/env.$* $(APP) up -d web worker
+
+# Ejercita los 6 servicios externos con los clientes reales de la app.
+# CHECK_EMAIL='tu@correo' make -f deploy/Makefile check-prod  → envía un email de prueba.
+check-%:               ## Verificar servicios externos: check-dev / check-prod
+	docker compose -p domio-$* --env-file deploy/env.$* $(APP) \
+	  run --rm -e CHECK_EMAIL="$$CHECK_EMAIL" worker pnpm check:services
 
 backup:                ## pg_dump de producción → backups/
 	@mkdir -p backups

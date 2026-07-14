@@ -13,7 +13,11 @@
  *
  * Uso (dentro del contenedor worker, que tiene el entorno cargado):
  *   docker compose -p domio-prod --env-file deploy/env.prod -f deploy/docker-compose.app.yml \
- *     run --rm -e CHECK_EMAIL='tucorreo@ejemplo.com' worker tsx scripts/check-services.ts
+ *     run --rm -e CHECK_EMAIL='tucorreo@ejemplo.com' worker pnpm check:services
+ *
+ * Vía pnpm, no `tsx` a secas: el binario no está en el PATH del contenedor y el
+ * entrypoint de la imagen de Node acaba pasándoselo a `node` como si fuera un
+ * fichero ("Cannot find module '/app/tsx'").
  *
  * Sale con código 1 si algún servicio OBLIGATORIO falla.
  */
