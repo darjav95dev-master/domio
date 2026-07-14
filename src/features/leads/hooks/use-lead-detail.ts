@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   updateLeadStatusAction,
@@ -54,7 +54,10 @@ export function useLeadDetail(
   const [showReassign, setShowReassign] = useState(false);
   const [reassignAgentId, setReassignAgentId] = useState("");
 
-  const validTransitions = LEAD_STATUS_TRANSITIONS[currentStatus] ?? [];
+  const validTransitions = useMemo(
+    () => LEAD_STATUS_TRANSITIONS[currentStatus] ?? [],
+    [currentStatus],
+  );
 
   const handleStatusChange = useCallback(
     (newStatus: string) => {

@@ -23,8 +23,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    ports:
+      # SOLO loopback del VPS: acceso admin (DBeaver) vía túnel SSH, nunca público.
+      # Puerto de host distinto por entorno (PG_HOST_PORT en deploy/env.*).
+      - "127.0.0.1:${PG_HOST_PORT:-5432}:5432"
     networks: [internal]
-    # Puerto NO publicado: la DB solo es accesible desde la red interna del stack.
 
   web:
     image: ${IMAGE_WEB}:${IMAGE_TAG}
