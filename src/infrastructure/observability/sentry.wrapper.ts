@@ -18,7 +18,7 @@ let _sentryInitialized = false;
 
 /**
  * Marca Sentry como inicializado.
- * Debe llamarse desde sentry.client.config.ts y sentry.server.config.ts
+ * Debe llamarse desde instrumentation-client.ts y sentry.server.config.ts
  * después de Sentry.init().
  */
 export function markSentryInitialized(): void {

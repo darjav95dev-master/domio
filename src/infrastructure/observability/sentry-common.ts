@@ -18,7 +18,7 @@ export interface SentryConfig {
 
 /**
  * Creates a shared Sentry config object, deduplicating the logic
- * that was previously verbatim-copied between sentry.client.config.ts
+ * that was previously verbatim-copied between instrumentation-client.ts
  * and sentry.server.config.ts.
  *
  * @param options - Configuration options (DSN and sample rate).
