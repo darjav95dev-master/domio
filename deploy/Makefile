@@ -19,10 +19,10 @@ prod-up: net            ## Levantar/actualizar stack producción
 	docker compose -p domio-prod --env-file deploy/env.prod $(APP) up -d
 
 dev-migrate:            ## Migraciones en development
-	docker compose -p domio-dev --env-file deploy/env.dev $(APP) run --rm tools pnpm db:migrate
+	docker compose -p domio-dev --env-file deploy/env.dev $(APP) run --rm worker pnpm db:migrate
 
 prod-migrate:          ## Migraciones en producción
-	docker compose -p domio-prod --env-file deploy/env.prod $(APP) run --rm tools pnpm db:migrate
+	docker compose -p domio-prod --env-file deploy/env.prod $(APP) run --rm worker pnpm db:migrate
 
 logs-%:                ## make -f deploy/Makefile logs-prod  (o logs-dev)
 	docker compose -p domio-$* --env-file deploy/env.$* $(APP) logs -f --tail=100

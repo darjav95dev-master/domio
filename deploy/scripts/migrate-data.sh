@@ -28,7 +28,7 @@ echo "▶ [$PROJECT] Esperando a que Postgres esté sano…"
 until $COMPOSE ps postgres | grep -q healthy; do sleep 2; done
 
 echo "▶ [$PROJECT] Aplicando migraciones (esquema limpio, las 8)…"
-$COMPOSE run --rm tools pnpm db:migrate
+$COMPOSE run --rm worker pnpm db:migrate
 
 echo "▶ [$PROJECT] Cargando datos de aplicación…"
 $COMPOSE exec -T postgres pg_restore \
