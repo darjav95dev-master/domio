@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getServerSession } from "@/infrastructure/auth/session";
+import { isPublicPanelRoute } from "@/shared/constants/panel-routes";
 import { Sidebar } from "@/features/backoffice/components/sidebar";
 import PanelHeader from "@/features/backoffice/components/panel-header";
 
@@ -54,11 +55,12 @@ export default async function PanelLayout({
     const headersList = await headers();
     const pathname = headersList.get("x-pathname") ?? "";
 
-    if (!pathname.includes("/panel/login")) {
+    if (!isPublicPanelRoute(pathname)) {
       redirect("/panel/login");
     }
 
-    // On the login page, render without sidebar/header.
+    // En las rutas públicas (login, setup-password) se renderiza sin sidebar
+    // ni header: quien las usa todavía no tiene sesión.
     return <>{children}</>;
   }
 

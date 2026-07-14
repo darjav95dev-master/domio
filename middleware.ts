@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { checkLoginRateLimit } from "@/infrastructure/auth/rate-limit-login";
+import { isPublicPanelRoute } from "@/shared/constants/panel-routes";
 
 /**
  * Middleware for the backoffice panel.
@@ -32,8 +33,8 @@ export async function middleware(request: NextRequest) {
     if (rateLimitResponse) return rateLimitResponse;
   }
 
-  // ── Auth guard for /panel/* (except /panel/login itself) ──
-  if (pathname.startsWith("/panel") && !pathname.startsWith("/panel/login")) {
+  // ── Auth guard for /panel/* (excepto las rutas públicas de acceso) ──
+  if (pathname.startsWith("/panel") && !isPublicPanelRoute(pathname)) {
     const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
     if (!token) {
       const loginUrl = new URL("/panel/login", request.url);

@@ -11,3 +11,7 @@ export const API_KEY_HEADER = "x-api-key";
  */
 export const backofficeLeadUrl = (leadId: string): string =>
   `${getSiteUrl()}/panel/leads/${leadId}`;
+
+/** Destino del email de invitación: app/(auth)/panel/setup-password/page.tsx */
+export const setupPasswordUrl = (token: string): string =>
+  `${getSiteUrl()}/panel/setup-password?token=${token}`;
