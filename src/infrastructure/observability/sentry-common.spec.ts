@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createSentryConfig } from "./sentry-common";
 import type { ErrorEvent, Breadcrumb } from "@sentry/nextjs";
 
@@ -41,8 +41,33 @@ describe("createSentryConfig", () => {
     expect((result.data as Record<string, unknown>).url).toBe("/ok");
   });
 
-  it("includes environment from NODE_ENV", () => {
-    const config = createSentryConfig({ dsn: TEST_DSN, tracesSampleRate: 1.0 });
-    expect(config.environment).toBeDefined();
+  // El test anterior solo comprobaba toBeDefined(): pasaba en verde mientras el
+  // environment salía de NODE_ENV, que vale "production" tanto en el servidor de
+  // desarrollo como en el de producción (ambos corren un build de producción).
+  // Los eventos de dev llegaban a Sentry etiquetados como production.
+  it.each([
+    ["development", "development"],
+    ["production", "production"],
+    ["local", "local"],
+  ])("etiqueta environment=%s cuando APP_ENV=%s", async (appEnv, esperado) => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_APP_ENV", appEnv);
+    vi.stubEnv("NODE_ENV", "production"); // como en la imagen, en TODOS los entornos
+
+    const { createSentryConfig: build } = await import("./sentry-common");
+    const config = build({ dsn: TEST_DSN, tracesSampleRate: 1.0 });
+
+    expect(config.environment).toBe(esperado);
+    vi.unstubAllEnvs();
+  });
+
+  it("incluye la release del build", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_RELEASE", "abc1234");
+
+    const { createSentryConfig: build } = await import("./sentry-common");
+    expect(build({ dsn: TEST_DSN, tracesSampleRate: 1.0 }).release).toBe("abc1234");
+
+    vi.unstubAllEnvs();
   });
 });

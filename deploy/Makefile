@@ -8,7 +8,7 @@ PROXY:= -f deploy/docker-compose.proxy.yml
 # Todas son públicas: viajan en el bundle que descarga cualquier visitante.
 # Ninguna es un secreto — los secretos jamás se hornean en la imagen.
 BUILD_VARS := NEXT_PUBLIC_APP_ENV NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_TURNSTILE_SITE_KEY \
-              PUBLIC_TENANT_ID R2_PUBLIC_URL
+              PUBLIC_TENANT_ID R2_PUBLIC_URL NEXT_PUBLIC_SENTRY_DSN
 
 net:                     ## Crear la red compartida (una sola vez)
 	docker network inspect domio-web >/dev/null 2>&1 || docker network create domio-web
@@ -47,7 +47,8 @@ build-%:               ## Construir imágenes web + tools: build-dev / build-pro
 	  [ -n "$$val" ] || { echo "✗ Falta $$v en $$envf (se necesita en BUILD)"; exit 1; }; \
 	  args="$$args --build-arg $$v=$$val"; \
 	done; \
-	echo "▶ build $$IMAGE_WEB:$$IMAGE_TAG"; \
+	args="$$args --build-arg NEXT_PUBLIC_SENTRY_RELEASE=$$(git rev-parse --short HEAD)"; \
+	echo "▶ build $$IMAGE_WEB:$$IMAGE_TAG (release $$(git rev-parse --short HEAD))"; \
 	docker build --target runner $$args -t "$$IMAGE_WEB:$$IMAGE_TAG" .; \
 	echo "▶ build $$IMAGE_TOOLS:$$IMAGE_TAG"; \
 	docker build --target tools $$args -t "$$IMAGE_TOOLS:$$IMAGE_TAG" .
