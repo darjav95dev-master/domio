@@ -36,7 +36,7 @@ logs-%:                ## make -f deploy/Makefile logs-prod  (o logs-dev)
 down-%:                ## Parar un stack: down-dev / down-prod
 	docker compose -p domio-$* --env-file deploy/env.$* $(APP) down
 
-build-%:               ## Construir imagen web: build-dev / build-prod
+build-%:               ## Construir imágenes web + tools: build-dev / build-prod
 	@set -a; . ./deploy/env.$*; \
 	envf="$$APP_ENV_FILE"; \
 	case "$$envf" in /*) ;; *) envf="deploy/$$envf" ;; esac; \
@@ -48,10 +48,14 @@ build-%:               ## Construir imagen web: build-dev / build-prod
 	  args="$$args --build-arg $$v=$$val"; \
 	done; \
 	echo "▶ build $$IMAGE_WEB:$$IMAGE_TAG"; \
-	docker build --target runner $$args -t "$$IMAGE_WEB:$$IMAGE_TAG" .
+	docker build --target runner $$args -t "$$IMAGE_WEB:$$IMAGE_TAG" .; \
+	echo "▶ build $$IMAGE_TOOLS:$$IMAGE_TAG"; \
+	docker build --target tools $$args -t "$$IMAGE_TOOLS:$$IMAGE_TAG" .
 
-deploy-%: build-%      ## Build + levantar web sin pull: deploy-dev / deploy-prod
-	docker compose -p domio-$* --env-file deploy/env.$* $(APP) up -d web
+# El worker corre la imagen tools, no la web: si solo se recrea 'web', el worker
+# se queda con el código viejo. Se levantan los dos.
+deploy-%: build-%      ## Build + levantar web y worker sin pull: deploy-dev / deploy-prod
+	docker compose -p domio-$* --env-file deploy/env.$* $(APP) up -d web worker
 
 backup:                ## pg_dump de producción → backups/
 	@mkdir -p backups
