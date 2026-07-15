@@ -2,7 +2,7 @@
 APP  := -f deploy/docker-compose.app.yml
 PROXY:= -f deploy/docker-compose.proxy.yml
 
-.PHONY: net proxy-up dev-up prod-up dev-migrate prod-migrate logs-% backup restore-test down-% build-% deploy-% check-%
+.PHONY: net proxy-up dev-up prod-up dev-migrate prod-migrate logs-% backup restore-test down-% build-% deploy-% check-% app-role-%
 
 # Variables que Next necesita en BUILD (se hornean en la imagen), no en runtime.
 # Todas son públicas: viajan en el bundle que descarga cualquier visitante.
@@ -63,6 +63,16 @@ deploy-%: build-%      ## Build + levantar web y worker sin pull: deploy-dev / d
 check-%:               ## Verificar servicios externos: check-dev / check-prod
 	docker compose -p domio-$* --env-file deploy/env.$* $(APP) \
 	  run --rm -e CHECK_EMAIL="$$CHECK_EMAIL" worker pnpm check:services
+
+# Crea/actualiza el rol sin privilegios con el que conecta `web` (ver app-role.sql).
+# Idempotente: reejecutar tras una migración que añada tablas.
+# La contraseña sale de APP_DB_PASSWORD en deploy/env.{dev,prod} — nunca del repo.
+app-role-%:            ## Crear/actualizar el rol RLS de la app: app-role-dev / app-role-prod
+	@set -a; . ./deploy/env.$*; set +a; \
+	[ -n "$$APP_DB_PASSWORD" ] || { echo "✗ Falta APP_DB_PASSWORD en deploy/env.$*"; exit 1; }; \
+	docker compose -p domio-$* --env-file deploy/env.$* $(APP) exec -T postgres \
+	  psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" \
+	    -v app_password="$$APP_DB_PASSWORD" -f - < deploy/app-role.sql
 
 BACKUP_RETENTION_DAYS ?= 14
 

@@ -40,6 +40,9 @@ cd /opt/domio        # repo clonado en el VPS
 # ── Contraseñas de Postgres: generadas aquí, distintas por entorno ──
 PROD_PG=$(openssl rand -base64 24 | tr -dc A-Za-z0-9 | head -c 24)
 DEV_PG=$(openssl rand -base64 24 | tr -dc A-Za-z0-9 | head -c 24)
+# Contraseñas del rol domio_app (el que usa `web`: sin privilegios, sujeto a RLS)
+PROD_APP_PG=$(openssl rand -base64 24 | tr -dc A-Za-z0-9 | head -c 24)
+DEV_APP_PG=$(openssl rand -base64 24 | tr -dc A-Za-z0-9 | head -c 24)
 
 # ── deploy/env.proxy — dominios ──
 cat > deploy/env.proxy <<'EOF'
@@ -55,6 +58,7 @@ IMAGE_TAG=latest
 POSTGRES_USER=domio
 POSTGRES_PASSWORD=$PROD_PG
 POSTGRES_DB=domio
+APP_DB_PASSWORD=$PROD_APP_PG
 APP_ENV_FILE=../.env.production
 WEB_ALIAS=domio-prod-web
 EOF
@@ -65,6 +69,7 @@ IMAGE_TAG=develop
 POSTGRES_USER=domio
 POSTGRES_PASSWORD=$DEV_PG
 POSTGRES_DB=domio
+APP_DB_PASSWORD=$DEV_APP_PG
 APP_ENV_FILE=../.env.development
 WEB_ALIAS=domio-dev-web
 EOF
@@ -143,6 +148,29 @@ deploy/scripts/migrate-data.sh domio-dev  backups/domio_appdata_YYYYMMDD.dump
 > El script aplica las 8 migraciones (esquema limpio) y luego carga solo los datos
 > de aplicación. **Requisito previo:** PostGIS lo crea el contenedor al iniciar
 > (`init-postgis.sql`); las migraciones NO lo crean.
+
+## Rol de la app (RLS)
+
+`web` **no** conecta con el superusuario de Postgres, sino con `domio_app`: un rol
+sin privilegios y **sin `BYPASSRLS`**, así que las políticas de aislamiento por
+tenant se le aplican de verdad. (`worker` sí conserva el owner: es quien ejecuta
+las migraciones, que son DDL.)
+
+El rol lo crea `deploy/app-role.sql`, con la contraseña de `APP_DB_PASSWORD`:
+
+```bash
+make -f deploy/Makefile app-role-prod   # o app-role-dev
+```
+
+Es **idempotente**: reejecútalo después de una migración que añada tablas para
+concederle permisos sobre ellas. Comprobar que está bien:
+
+```bash
+docker compose -p domio-prod --env-file deploy/env.prod -f deploy/docker-compose.app.yml \
+  exec postgres psql -U domio -d domio \
+  -c "select rolname, rolsuper, rolbypassrls from pg_roles where rolname='domio_app';"
+# domio_app | f | f   ← si sale 't' en alguna, el RLS no se está aplicando
+```
 
 ## Operación diaria
 

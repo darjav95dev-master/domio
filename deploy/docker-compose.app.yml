@@ -36,7 +36,10 @@ services:
       - ${APP_ENV_FILE}
     environment:
       # Fuerza la conexión a la DB del propio stack (ignora lo que traiga el .env).
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Conecta con domio_app: rol sin privilegios y SIN bypassrls, así que las
+      # políticas de RLS por tenant se le aplican de verdad (el owner las saltaba).
+      # El rol lo crea deploy/app-role.sql → make -f deploy/Makefile app-role-<env>.
+      DATABASE_URL: postgresql://domio_app:${APP_DB_PASSWORD:?falta APP_DB_PASSWORD en deploy/env.<env>}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,6 +62,9 @@ services:
     env_file:
       - ${APP_ENV_FILE}
     environment:
+      # El worker conserva el owner: es quien ejecuta `db:migrate` (DDL), que el
+      # rol de la app no puede hacer. No expone superficie a internet, y las
+      # tablas que toca (email_queue) no tienen política de tenant.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:

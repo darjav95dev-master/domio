@@ -1,8 +1,8 @@
 import { eq, and, or, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { apiKeys } from "@/infrastructure/db/schema";
-import { db } from "@/infrastructure/db/client";
 import { ApiKeyContext } from "@/infrastructure/tenant/ApiKeyContext";
+import { PublicContext } from "@/infrastructure/tenant/PublicContext";
 import { ContextResolutionError, extractApiKey } from "@/infrastructure/tenant/context-middleware";
 import { logger } from "@/shared/utils/logger";
 
@@ -30,6 +30,10 @@ export type TouchLastUsedAtFn = (apiKeyId: string) => Promise<void>;
 
 // ─── Default implementations (production) ────────────────────────────────────
 
+// La clave llega sin sesión, así que el tenant no se puede sacar de un JWT: se
+// busca dentro del tenant del despliegue (PUBLIC_TENANT_ID) vía PublicContext,
+// que pone app.current_tenant_id y deja que el RLS de api_keys haga de filtro.
+// El tenant real de la clave se devuelve igual (ApiKeyContext lo usa después).
 const defaultFindActiveKeys: FindActiveKeysFn = async (keyPrefix?: string) => {
   const conditions = [eq(apiKeys.isActive, true)];
 
@@ -38,23 +42,27 @@ const defaultFindActiveKeys: FindActiveKeysFn = async (keyPrefix?: string) => {
     conditions.push(or(eq(apiKeys.keyPrefix, keyPrefix), isNull(apiKeys.keyPrefix)) as never);
   }
 
-  return db
-    .select({
-      id: apiKeys.id,
-      tenantId: apiKeys.tenantId,
-      keyHash: apiKeys.keyHash,
-      rateLimitPerMin: apiKeys.rateLimitPerMin,
-    })
-    .from(apiKeys)
-    .where(and(...conditions));
+  return new PublicContext().withTransaction((tx) =>
+    tx
+      .select({
+        id: apiKeys.id,
+        tenantId: apiKeys.tenantId,
+        keyHash: apiKeys.keyHash,
+        rateLimitPerMin: apiKeys.rateLimitPerMin,
+      })
+      .from(apiKeys)
+      .where(and(...conditions)),
+  );
 };
 
 const defaultTouchLastUsedAt: TouchLastUsedAtFn = async (apiKeyId: string) => {
   try {
-    await db
-      .update(apiKeys)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(apiKeys.id, apiKeyId));
+    await new PublicContext().withTransaction((tx) =>
+      tx
+        .update(apiKeys)
+        .set({ lastUsedAt: new Date() })
+        .where(eq(apiKeys.id, apiKeyId)),
+    );
   } catch (error) {
     // Non-critical: log but do not fail the request
     logger.warn(
