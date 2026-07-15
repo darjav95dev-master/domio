@@ -100,11 +100,17 @@ jobs:
           NEXT_PUBLIC_SENTRY_DSN: ""
         run: pnpm build
 
+      # Excluye rutas con acceso a datos legítimo fuera de la disciplina de
+      # tenant: repositorios, helpers de tenant, scripts de administración
+      # (corren como owner), el subsistema de email y los tests (montan datos).
       - name: CI grep check #1 — no SET without LOCAL outside infrastructure
         run: |
           matches=$(git ls-files '*.ts' \
             | grep -vE '^src/infrastructure/tenant/' \
             | grep -vE '^src/infrastructure/db/repositories/' \
+            | grep -vE '^src/infrastructure/email/' \
+            | grep -vE '^scripts/' \
+            | grep -vE '^tests/' \
             | while read -r file; do
               awk '{sub(/\/\/.*/,""); if ($0 ~ /[`"'"'"']SET / && $0 !~ /SET LOCAL/) print FILENAME":"NR":"$0}' "$file"
             done)
@@ -119,6 +125,9 @@ jobs:
           matches=$(git ls-files '*.ts' \
             | grep -vE '^src/infrastructure/db/repositories/' \
             | grep -vE '^src/infrastructure/tenant/' \
+            | grep -vE '^src/infrastructure/email/' \
+            | grep -vE '^scripts/' \
+            | grep -vE '^tests/' \
             | while read -r file; do
               awk '{sub(/\/\/.*/,""); \
                 if ($0 ~ /db\.(select|insert|update|delete|transaction|execute)/ || \
