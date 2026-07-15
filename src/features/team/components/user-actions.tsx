@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { PencilSimple, Warning, X } from "@phosphor-icons/react";
+import { PencilSimple, Warning, X, Trash, Power } from "@phosphor-icons/react";
 import {
   updateUserAction,
   deactivateUserAction,
+  reactivateUserAction,
+  deleteUserAction,
 } from "@/features/team/actions/team.actions";
 import { Button } from "@/shared/components/button";
 import { Input } from "@/shared/components/input";
@@ -25,6 +27,19 @@ interface UserActionsProps {
 }
 
 // ---------------------------------------------------------------------------
+// Shared button class fragments (extracted to satisfy sonarjs/no-duplicate-string)
+// ---------------------------------------------------------------------------
+
+const ACTION_BUTTON_BASE =
+  "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-sans text-sm transition-colors duration-quick focus-visible:outline-offset-[-2px]";
+const ACTION_BUTTON_MUTED =
+  "text-fg-muted hover:bg-accent-subtle hover:text-accent-default";
+const ACTION_BUTTON_DANGER =
+  "text-status-danger-default hover:bg-status-danger-subtle";
+const ACTION_BUTTON_SUCCESS =
+  "text-status-success-default hover:bg-status-success-subtle disabled:opacity-60";
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -32,7 +47,10 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
   // ── State ──────────────────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Edit form state
   const [name, setName] = useState(user.name ?? "");
@@ -82,6 +100,37 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
         setWarning(result.warning);
       }
       setConfirmDeactivate(false);
+      onUpdated();
+    } else {
+      setError(result.error);
+    }
+  }
+
+  // ── Reactivate handlers ────────────────────────────────────────────────
+
+  async function handleReactivate() {
+    setReactivating(true);
+    setError(null);
+    const result = await reactivateUserAction(user.id);
+    setReactivating(false);
+
+    if (result.success) {
+      onUpdated();
+    } else {
+      setError(result.error);
+    }
+  }
+
+  // ── Delete handlers ────────────────────────────────────────────────────
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError(null);
+    const result = await deleteUserAction(user.id);
+    setDeleting(false);
+
+    if (result.success) {
+      setConfirmDelete(false);
       onUpdated();
     } else {
       setError(result.error);
@@ -237,6 +286,69 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
     );
   }
 
+  // ── Render: delete confirmation ────────────────────────────────────────
+
+  if (confirmDelete) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirmar eliminación"
+        className="rounded-surface border border-status-danger-default/40 bg-bg-surface p-4"
+      >
+        <div className="flex items-start gap-3">
+          <Warning
+            size={ICON_SIZES.inline}
+            className="mt-0.5 shrink-0 text-status-danger-default"
+            aria-hidden="true"
+          />
+          <div className="flex-1">
+            <p className="font-sans text-sm font-medium text-fg-default">
+              ¿Eliminar a {user.name ?? user.email}?
+            </p>
+            <p className="mt-1 font-sans text-sm text-fg-subtle">
+              Esta acción es <strong className="text-fg-default">definitiva</strong>.
+              El usuario se borrará del tenant y ya no podrá iniciar sesión.
+              Las asignaciones de leads y promociones se liberarán (set null);
+              el historial asociado al usuario se eliminará en cascada.
+            </p>
+
+            {error && (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="mt-2 rounded-md border border-status-danger-default/40 bg-status-danger-subtle px-3 py-2 font-sans text-sm text-status-danger-default"
+              >
+                {error}
+              </p>
+            )}
+            <div className="mt-3 flex gap-2">
+              <Button
+                variant="primary"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-sm"
+              >
+                {deleting ? "Eliminando..." : "Sí, eliminar"}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setConfirmDelete(false);
+                  setError(null);
+                }}
+                disabled={deleting}
+                className="text-sm"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Render: default (action buttons) ───────────────────────────────────
 
   return (
@@ -254,32 +366,44 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
         type="button"
         onClick={() => setEditing(true)}
         aria-label={`Editar ${user.name ?? user.email}`}
-        className={cn(
-          "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5",
-          "font-sans text-sm text-fg-muted transition-colors duration-quick",
-          "hover:bg-accent-subtle hover:text-accent-default",
-          "focus-visible:outline-offset-[-2px]",
-        )}
+        className={cn(ACTION_BUTTON_BASE, ACTION_BUTTON_MUTED)}
       >
         <PencilSimple size={14} aria-hidden="true" />
         Editar
       </button>
 
-      {user.isActive && (
+      {user.isActive ? (
         <button
           type="button"
           onClick={() => setConfirmDeactivate(true)}
           aria-label={`Desactivar ${user.name ?? user.email}`}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5",
-            "font-sans text-sm text-status-danger-default transition-colors duration-quick",
-            "hover:bg-status-danger-subtle",
-            "focus-visible:outline-offset-[-2px]",
-          )}
+          className={cn(ACTION_BUTTON_BASE, ACTION_BUTTON_DANGER)}
         >
           <X size={14} aria-hidden="true" />
           Desactivar
         </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={handleReactivate}
+            disabled={reactivating}
+            aria-label={`Reactivar ${user.name ?? user.email}`}
+            className={cn(ACTION_BUTTON_BASE, ACTION_BUTTON_SUCCESS)}
+          >
+            <Power size={14} aria-hidden="true" />
+            {reactivating ? "Activando..." : "Activar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            aria-label={`Eliminar ${user.name ?? user.email}`}
+            className={cn(ACTION_BUTTON_BASE, ACTION_BUTTON_DANGER)}
+          >
+            <Trash size={14} aria-hidden="true" />
+            Eliminar
+          </button>
+        </>
       )}
     </div>
     </div>

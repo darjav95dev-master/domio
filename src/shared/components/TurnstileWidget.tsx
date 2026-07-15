@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CheckCircle } from "@phosphor-icons/react";
+import { ICON_SIZES } from "@/shared/constants/iconography";
+import { cn } from "@/shared/utils/cn";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +52,11 @@ export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
   const widgetIdRef = useRef<string | null>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [scriptError, setScriptError] = useState(false);
+  // Whether the challenge has been solved. When solved we overlay our own
+  // centered, larger "Verificación completada" indicator instead of relying
+  // on Cloudflare's default "Operación exitosa" text, which cannot be resized
+  // inside the iframe and looks visually unbalanced.
+  const [solved, setSolved] = useState(false);
 
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -101,12 +109,18 @@ export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
       sitekey: siteKey,
       callback: (token: string) => {
         onToken(token);
+        setSolved(true);
       },
       "expired-callback": () => {
         onToken(null);
+        setSolved(false);
+        // Reset the widget so the user can retry after the token expires.
+        if (widgetIdRef.current) window.turnstile?.reset(widgetIdRef.current);
       },
       "error-callback": () => {
         onToken(null);
+        setSolved(false);
+        if (widgetIdRef.current) window.turnstile?.reset(widgetIdRef.current);
       },
       theme: "light",
       // Se adapta al ancho del contenedor (mín. 300px): queda alineado con los
@@ -123,6 +137,7 @@ export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
         window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
       }
+      setSolved(false);
     };
   }, [scriptLoaded, siteKey, onToken]);
 
@@ -132,11 +147,30 @@ export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={className ?? "w-full"}
-      aria-label="Verificación de seguridad"
-      role="presentation"
-    />
+    <div className={cn("relative w-full", className)}>
+      <div
+        ref={containerRef}
+        aria-label="Verificación de seguridad"
+        role="presentation"
+        className={cn("w-full", solved && "pointer-events-none opacity-0")}
+      />
+      {solved && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute inset-0 flex items-center justify-center gap-3 rounded-control border border-status-success-default bg-status-success-subtle px-4"
+        >
+          <CheckCircle
+            size={ICON_SIZES.nav + 12}
+            weight="fill"
+            className="shrink-0 text-status-success-default"
+            aria-hidden="true"
+          />
+          <span className="font-sans text-xl font-semibold leading-tight text-status-success-default md:text-2xl">
+            Verificación completada
+          </span>
+        </div>
+      )}
+    </div>
   );
 }

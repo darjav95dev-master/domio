@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { CheckCircle } from "@phosphor-icons/react";
 import { Button } from "@/shared/components/button";
 import { Input } from "@/shared/components/input";
 import {
@@ -47,14 +48,23 @@ export function ContactFormGeneric() {
       <div
         role="status"
         aria-live="polite"
-        className="rounded-surface border border-status-success-default bg-status-success-subtle p-10 text-center"
+        className="flex h-full min-h-[360px] flex-col items-center justify-center rounded-surface border border-status-success-default/50 bg-status-success-subtle px-8 py-12 text-center"
       >
-        <p className="font-sans text-lg font-medium text-status-success-default">
-          Mensaje enviado correctamente
+        <CheckCircle
+          size={56}
+          weight="fill"
+          className="text-status-success-default"
+          aria-hidden="true"
+        />
+        <p className="mt-6 font-display text-3xl font-medium tracking-[-0.015em] text-fg-default sm:text-4xl">
+          ¡Operación exitosa!
         </p>
-        <p className="mt-4 font-sans text-sm leading-relaxed text-fg-muted">
-          Gracias por contactar con nosotros. Te responderemos a la mayor
-          brevedad posible.
+        <p className="mt-3 font-sans text-lg font-medium text-status-success-default">
+          Hemos recibido tu mensaje
+        </p>
+        <p className="mt-4 max-w-sm font-sans text-base leading-relaxed text-fg-muted">
+          Gracias por contactar con nosotros. Nuestro equipo te responderá a
+          la mayor brevedad posible.
         </p>
       </div>
     );

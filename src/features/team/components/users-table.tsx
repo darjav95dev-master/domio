@@ -32,7 +32,7 @@ const STATUS_OPTIONS = [
 // Component
 // ---------------------------------------------------------------------------
 
-export function UsersTable() {
+export function UsersTable({ currentUserId }: { currentUserId?: string }) {
   // ── State ──────────────────────────────────────────────────────────────
   const [data, setData] = useState<PaginatedUsers | null>(null);
   const [loading, setLoading] = useState(true);
@@ -331,7 +331,7 @@ export function UsersTable() {
                   <td className="px-4 py-3">{renderRoleBadge(user.role)}</td>
                   <td className="px-4 py-3">{renderStatusBadge(user.isActive)}</td>
                   <td className="px-4 py-3 text-right">
-                    <UserActions user={user} onUpdated={fetchUsers} />
+                    <UserActions user={user} onUpdated={fetchUsers} currentUserId={currentUserId} />
                   </td>
                 </tr>
               ))}
