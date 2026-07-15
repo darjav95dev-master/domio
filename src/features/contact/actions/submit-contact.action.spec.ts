@@ -26,6 +26,13 @@ vi.mock("../server/get-contact-data", () => ({
   getContactPageData: mockGetContactPageData,
 }));
 
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+const CONTACT_EMAIL = "info@wedomio.com";
+const SENDER_NAME = "Ana López";
+const SENDER_EMAIL = "ana@example.com";
+const SENDER_MESSAGE = "Me interesa una vivienda.";
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function createFormData(overrides?: Partial<Record<string, string>>): FormData {
@@ -45,7 +52,7 @@ describe("submitContactForm", () => {
     // Default: rate limit allowed, contact config with email
     mockCheckContactRateLimit.mockResolvedValue({ allowed: true });
     mockGetContactPageData.mockResolvedValue({
-      contactConfig: { email: "info@wedomio.com" },
+      contactConfig: { email: CONTACT_EMAIL },
     });
     mockEnqueue.mockResolvedValue(undefined);
   });
@@ -89,25 +96,45 @@ describe("submitContactForm", () => {
 
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
-    expect(mockEnqueue).toHaveBeenCalledTimes(1);
+    // Dos correos: notificación al negocio + confirmación al remitente.
+    expect(mockEnqueue).toHaveBeenCalledTimes(2);
   });
 
-  it("enqueues email with correct payload", async () => {
+  it("enqueues the business notification with correct payload", async () => {
     const formData = createFormData({
-      name: "Ana López",
-      email: "ana@example.com",
-      message: "Me interesa una vivienda.",
+      name: SENDER_NAME,
+      email: SENDER_EMAIL,
+      message: SENDER_MESSAGE,
     });
 
     await submitContactForm(null, formData);
 
     expect(mockEnqueue).toHaveBeenCalledWith({
-      toEmail: "info@wedomio.com",
+      toEmail: CONTACT_EMAIL,
       template: "contact-form-notification",
       payload: {
-        name: "Ana López",
-        email: "ana@example.com",
-        message: "Me interesa una vivienda.",
+        name: SENDER_NAME,
+        email: SENDER_EMAIL,
+        message: SENDER_MESSAGE,
+      },
+    });
+  });
+
+  it("enqueues a confirmation to the sender", async () => {
+    const formData = createFormData({
+      name: SENDER_NAME,
+      email: SENDER_EMAIL,
+      message: SENDER_MESSAGE,
+    });
+
+    await submitContactForm(null, formData);
+
+    expect(mockEnqueue).toHaveBeenCalledWith({
+      toEmail: SENDER_EMAIL,
+      template: "contact-form-confirmation",
+      payload: {
+        name: SENDER_NAME,
+        contactEmail: CONTACT_EMAIL,
       },
     });
   });

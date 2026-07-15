@@ -251,9 +251,9 @@ describe("template registry", () => {
   });
 
   describe("getAllTemplateNames", () => {
-    it("returns all 5 template names", () => {
+    it("returns all 6 template names", () => {
       const names = getAllTemplateNames();
-      expect(names).toHaveLength(5);
+      expect(names).toHaveLength(6);
       expect(names).toContain(EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT);
       expect(names).toContain(EMAIL_TEMPLATE_NAMES.LEAD_CONFIRMATION);
       expect(names).toContain(EMAIL_TEMPLATE_NAMES.TEAM_INVITATION);
