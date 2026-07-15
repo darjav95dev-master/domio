@@ -8,6 +8,7 @@ export const EMAIL_TEMPLATE_NAMES = {
   // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- false positive: "password-recovery" is a template name for the password recovery email, not a credential or secret
   PASSWORD_RECOVERY: "password-recovery",
   CONTACT_FORM_NOTIFICATION: "contact-form-notification",
+  CONTACT_FORM_CONFIRMATION: "contact-form-confirmation",
 } as const;
 
 export type EmailTemplateName =
@@ -45,6 +46,14 @@ export const contactFormNotificationSchema = z.object({
   message: z.string().min(1).max(2000),
 });
 
+// Confirmación que recibe quien rellena el formulario general (no hay promoción,
+// a diferencia de leadConfirmation). contactEmail es la dirección a la que puede
+// escribir (la configurada en contact_config).
+export const contactFormConfirmationSchema = z.object({
+  name: z.string().min(1).max(100),
+  contactEmail: z.string().email().max(255),
+});
+
 // ─── Schema registry ─────────────────────────────────────────────────
 export const emailTemplatePayloadSchemas = {
   [EMAIL_TEMPLATE_NAMES.LEAD_ASSIGNED_AGENT]: leadAssignedAgentSchema,
@@ -52,4 +61,5 @@ export const emailTemplatePayloadSchemas = {
   [EMAIL_TEMPLATE_NAMES.TEAM_INVITATION]: teamInvitationSchema,
   [EMAIL_TEMPLATE_NAMES.PASSWORD_RECOVERY]: passwordRecoverySchema,
   [EMAIL_TEMPLATE_NAMES.CONTACT_FORM_NOTIFICATION]: contactFormNotificationSchema,
+  [EMAIL_TEMPLATE_NAMES.CONTACT_FORM_CONFIRMATION]: contactFormConfirmationSchema,
 } as const;

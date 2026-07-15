@@ -62,10 +62,19 @@ export async function submitContactForm(
 
   if (contactEmail) {
     const emailService = new EmailService(new EmailRepository());
+
+    // Notificación interna al negocio.
     await emailService.enqueue({
       toEmail: contactEmail,
       template: EMAIL_TEMPLATE_NAMES.CONTACT_FORM_NOTIFICATION,
       payload: parsed.data satisfies Record<string, unknown>,
+    });
+
+    // Confirmación a quien rellenó el formulario (como en el flujo de leads).
+    await emailService.enqueue({
+      toEmail: parsed.data.email,
+      template: EMAIL_TEMPLATE_NAMES.CONTACT_FORM_CONFIRMATION,
+      payload: { name: parsed.data.name, contactEmail },
     });
   }
 

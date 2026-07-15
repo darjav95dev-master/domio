@@ -39,8 +39,8 @@ const SETUP_URL = "https://panel.wedomio.com/setup/abc123";
 const NOT_A_URL = "not-a-url";
 
 describe("EMAIL_TEMPLATE_NAMES", () => {
-  it("has exactly 5 template names", () => {
-    expect(Object.keys(EMAIL_TEMPLATE_NAMES)).toHaveLength(5);
+  it("has exactly 6 template names", () => {
+    expect(Object.keys(EMAIL_TEMPLATE_NAMES)).toHaveLength(6);
   });
 
   it("contains lead-assigned-agent", () => {
@@ -154,8 +154,8 @@ describe("passwordRecoverySchema", () => {
 });
 
 describe("emailTemplatePayloadSchemas", () => {
-  it("maps all 5 template names to schemas", () => {
-    expect(Object.keys(emailTemplatePayloadSchemas)).toHaveLength(5);
+  it("maps all 6 template names to schemas", () => {
+    expect(Object.keys(emailTemplatePayloadSchemas)).toHaveLength(6);
   });
 
   it("has each template entry defined", () => {
