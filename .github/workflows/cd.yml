@@ -16,7 +16,13 @@ env:
   IMAGE_TOOLS: ghcr.io/${{ github.repository_owner }}/domio-tools
 
 jobs:
+  # Puerta de calidad: lint, typecheck, tests (con Postgres+RLS) y build.
+  # Si falla, no se construye ni se despliega nada.
+  quality:
+    uses: ./.github/workflows/ci.yml
+
   build-and-push:
+    needs: quality
     runs-on: ubuntu-latest
     permissions:
       contents: read

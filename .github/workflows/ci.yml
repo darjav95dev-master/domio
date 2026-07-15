@@ -7,10 +7,35 @@ on:
   pull_request:
     branches:
       - main
+  # Invocable desde el CD: así develop/main validan (puerta) antes de desplegar.
+  workflow_call:
 
 jobs:
   quality:
     runs-on: ubuntu-latest
+
+    # Postgres+PostGIS para los tests de aislamiento/RLS. El usuario inicial es
+    # superusuario; NO lo usamos para los tests (saltaría el RLS). Creamos aparte
+    # el rol `test` sin privilegios, dueño de la BD `test`, igual que en local.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # migrate, tests y build conectan con el rol restringido (RLS se aplica).
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,10 +60,44 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Rol `test` (sin bypassrls) dueño de la BD `test`, y PostGIS creado por el
+      # superusuario (CREATE EXTENSION lo exige). Estructura, cero datos: los
+      # tests insertan y limpian los suyos.
+      - name: Prepare test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d postgres -c "CREATE ROLE test LOGIN PASSWORD 'test';"
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE test OWNER test;"
+          psql -h localhost -U postgres -d test -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+          # Al migrar, el ADD CONSTRAINT de las FK evalúa las policies RLS. Como
+          # las corre el rol `test` (sin bypassrls, a diferencia del superusuario
+          # que migra en prod), necesita que app.current_tenant_id exista. Se le
+          # da un valor temporal y se quita antes de los tests, para no falsear
+          # el test de "sin contexto no se puede consultar".
+          psql -h localhost -U postgres -d postgres -c "ALTER DATABASE test SET app.current_tenant_id = '00000000-0000-0000-0000-000000000001';"
+
+      - name: Migrate schema
+        run: pnpm db:migrate
+
+      - name: Reset tenant GUC (los tests fijan el suyo por transacción)
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d postgres -c "ALTER DATABASE test RESET app.current_tenant_id;"
+
       - name: Tests
         run: pnpm test:run
 
       - name: Build
+        env:
+          # El build de Next hornea las públicas y valida PUBLIC_TENANT_ID.
+          # Valores de CI (no secretos): solo para que compile.
+          PUBLIC_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+          NEXT_PUBLIC_APP_ENV: development
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: "1x00000000000000000000AA"
+          R2_PUBLIC_URL: http://localhost
+          NEXT_PUBLIC_SENTRY_DSN: ""
         run: pnpm build
 
       - name: CI grep check #1 — no SET without LOCAL outside infrastructure
