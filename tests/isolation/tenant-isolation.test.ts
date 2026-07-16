@@ -12,6 +12,61 @@ import {
 } from "./setup";
 import { createLeadService } from "@/features/engagement/server/create-lead-action";
 
+function collectTsFiles(dir: string, fs: typeof import("node:fs"), path: typeof import("node:path")): string[] {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectTsFiles(fullPath, fs, path));
+    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+function scanFileForSetViolations(
+  file: string,
+  fs: typeof import("node:fs"),
+): string[] {
+  const raw = fs.readFileSync(file, "utf-8");
+  const stripped = raw.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*/gu, "");
+  const violations: string[] = [];
+
+  for (const [index, line] of stripped.split("\n").entries()) {
+    if (/\bSET\s+/u.test(line) && !/SET\s+LOCAL/iu.test(line)) {
+      violations.push(`${file}:${index + 1}: ${line.trim()}`);
+    }
+  }
+
+  return violations;
+}
+
+function findSetWithoutLocalViolations(
+  fs: typeof import("node:fs"),
+  path: typeof import("node:path"),
+): string[] {
+  const scanDirs = [
+    path.resolve("src/infrastructure/tenant"),
+    path.resolve("src/infrastructure/db/repositories"),
+  ];
+
+  const violations: string[] = [];
+
+  for (const dir of scanDirs) {
+    if (!fs.existsSync(dir)) continue;
+    const files = collectTsFiles(dir, fs, path);
+    for (const file of files) {
+      violations.push(...scanFileForSetViolations(file, fs));
+    }
+  }
+
+  return violations;
+}
+
 class TestRepository extends TenantAwareRepository {
   async findPromociones() {
     return this.withTransaction(async (tx) => {
@@ -144,49 +199,7 @@ describe.skipIf(!hasDatabaseUrl())("Tenant isolation", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
 
-    const scanDirs = [
-      path.resolve("src/infrastructure/tenant"),
-      path.resolve("src/infrastructure/db/repositories"),
-    ];
-
-    function collectTsFiles(dir: string): string[] {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      const files: string[] = [];
-
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          files.push(...collectTsFiles(fullPath));
-        } else if (entry.isFile() && entry.name.endsWith(".ts")) {
-          files.push(fullPath);
-        }
-      }
-
-      return files;
-    }
-
-    const violations: string[] = [];
-
-    for (const dir of scanDirs) {
-      if (!fs.existsSync(dir)) {
-        continue;
-      }
-
-      const files = collectTsFiles(dir);
-      for (const file of files) {
-        const content = fs.readFileSync(file, "utf-8");
-        const lines = content.split("\n");
-
-        for (const [index, line] of lines.entries()) {
-          const code = line.replace(/\/\/.*/u, "");
-          if (/\bSET\s+/u.test(code) && !/SET\s+LOCAL/iu.test(code)) {
-            violations.push(`${file}:${index + 1}: ${line.trim()}`);
-          }
-        }
-      }
-    }
-
-    expect(violations).toEqual([]);
+    expect(findSetWithoutLocalViolations(fs, path)).toEqual([]);
   });
 
   it("T026: createLeadService rejects promocionId from another tenant", async () => {
