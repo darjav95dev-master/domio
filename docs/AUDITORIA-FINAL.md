@@ -3,6 +3,25 @@
 > Último checkpoint antes de la entrega. Revisión como Tech Lead / Software Architect / Senior Full-Stack / revisor de TFG.
 > Fecha: 2026-07-18 · Rama auditada: `develop` · HEAD `1361cde`
 
+## Verificación de equivalencia funcional vs `develop` (última comprobación)
+
+Objetivo: garantizar que la rama `fix/auditoria-final-hardening` se comporta **idéntica de cara al usuario** que `develop`. Ejecutado contra la BD real (Postgres local sembrado: 4 users, 9 promociones, 2 tenants) con la app levantada.
+
+| Cambio | Riesgo de comportamiento | Prueba realizada | Resultado |
+|---|---|---|---|
+| H1 (persistir `validation.data` + saneador) | Podía alterar contenido guardado | Round-trip de **los 32 content_blocks reales** por el schema | **0 diferencias semánticas** (solo reordena claves JSON, invisible) |
+| H2 (escape JSON-LD) | Bytes del `<script>` | Ningún dato real contiene `<` → salida **byte-idéntica** a `JSON.stringify`; JSON-LD live válido (`Organization`, `RealEstateListing`, `BreadcrumbList`) | Idéntico |
+| M1 (`limit` no finito) | Solo el caso roto | `?limit=abc` en vivo con clave válida | 500 → **200** (default). Uso válido sin cambios |
+| M2 (rate-limit IP) | Nueva barrera | Sin `RATE_LIMIT_STORE_URL` → NoopRateLimiter; API v1 happy-path **200**, sin clave **401**, headers `X-RateLimit-*` presentes | **No-op** en este entorno; comportamiento igual |
+| M3 (server component) | Render | `/panel/contenidos` renderizado logueado: heading + 7 tarjetas con hrefs correctos | Markup idéntico |
+| B3 (health) | Respuesta liveness | `GET /api/health` → `{"status":"ok","env":"local"}` (igual); `?deep=1` nuevo | Liveness idéntico |
+
+Flujos de usuario probados en vivo end-to-end (todos OK): login backoffice, dashboard, editor de promoción, **crear/revocar API key**, consumo API v1 con clave, home y ficha pública, redirección de auth. Consola del navegador: **0 errores de la app** (solo ruido interno de Electron). Seed restaurado a su estado original tras las pruebas.
+
+**Conclusión:** ningún cambio altera el comportamiento de cara al usuario respecto a `develop`. Las diferencias son estrictamente: (a) casos antes rotos que ahora responden mejor (M1, seguridad H1/H2), y (b) mejoras invisibles (M3 bundle, B3 readiness).
+
+---
+
 ## Alcance y método
 
 - **54.295 líneas** TS/TSX (374 archivos en `src`, 58 en `app`), **162 archivos de test**.
