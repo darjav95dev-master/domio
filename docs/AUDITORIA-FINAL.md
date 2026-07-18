@@ -159,9 +159,9 @@ Lo que impide un ✅ limpio son **dos vectores de XSS almacenado** (sanitizador 
 | Validación de query params en API pública | ✅ (M1 corregido) |
 | Rate-limit por IP en API pública | ✅ (M2 aplicado, sin lockout) |
 | Optimización server/client components | ✅ (M3 parcial: candidato seguro convertido) |
-| Higiene de repo (`.DS_Store`, binarios) | ✅ (B1 hecho) / ⚠️ (B2 `.codebase-memory` pendiente) |
-| Health check profundo | ⚠️ (B3 pendiente) |
-| Verificación de UI en vivo (render/e2e) | ⚠️ (build OK; e2e/Playwright no ejecutados) |
+| Higiene de repo (`.DS_Store`, binarios) | ✅ (B1 y B2 hechos) |
+| Health check profundo | ✅ (B3 hecho: `?deep=1` DB+Redis) |
+| Verificación de UI en vivo (render/e2e) | ⚠️ (build OK; e2e 27/32 — 5 fallos preexistentes por drift, ver E1) |
 | Auditoría de accesibilidad en vivo (contraste/teclado) | ❌ (no ejecutada) |
 
 ---
@@ -177,9 +177,21 @@ Aplicado y verificado (typecheck 0, lint 0, **1746 tests**, `pnpm build` OK):
 - ✅ **M3 (parcial)** — solo se convirtió a server component el único candidato con interactividad cero y padre server (`ContenidosPageList`). El resto de `'use client'` se dejó intacto por ser interactividad legítima (primitivas con `forwardRef`, hooks de scroll, backoffice).
 - ✅ **B1** — `.DS_Store` fuera del control de versiones.
 
-Pendiente (decisión / fuera de alcance de esta rama):
+También aplicado:
 
-- ⚠️ **B2** — dejar de versionar `.codebase-memory/` (binarios de tooling).
-- ⚠️ **B3** — health check profundo (`SELECT 1` + ping Redis).
-- ⚠️ **e2e/Playwright** — no ejecutados en esta sesión (sí `pnpm build`).
-- 🔵 Ninguno de los cambios altera flujos de usuario existentes; M2 es la única barrera nueva y está calibrada para no dispararse con tráfico legítimo.
+- ✅ **B2** — `.codebase-memory/` fuera del control de versiones + `.gitignore`.
+- ✅ **B3** — health check profundo: `GET /api/health?deep=1` verifica DB (`SELECT 1`) y Redis (`ping`), 503 si una dependencia requerida cae. El liveness simple (sin `?deep`) se mantiene intacto para el CD.
+
+### E1 — 🟡 5 tests e2e preexistentes en rojo (drift test↔contenido)
+
+Al ejecutar `pnpm test:e2e` (Postgres local sembrado: 4 users, 9 promociones): **27/32 pasan, 5 fallan**. Verificado que **ninguno** toca código de esta rama (`git diff develop..HEAD`) — son fallos previos:
+
+1. `visitor.spec.ts:62` — espera hero `/Tu hogar en Canarias empieza aquí/`; el contenido sembrado hoy es "Tu hogar en Canarias, sin complicaciones…". Aserción desactualizada.
+2. `visitor.spec.ts:99` — espera `<h1>Promociones</h1>` en `/portafolio`; el heading cambió.
+3. `admin.spec.ts:137` — crear/revocar API key.
+4. `admin.spec.ts:192` — editar config de contacto y reflejarla en `/contacto`.
+5. `catalog-editor.spec.ts:82` — el form de edición carga todas las secciones.
+
+Los 3–5 probablemente dependen de servicios no configurados en local (Turnstile/R2) o de fixtures. **Recomendación:** actualizar las aserciones de contenido (1–2) al copy actual y revisar 3–5 con los servicios de test levantados, antes de presumir de "e2e verde" en la defensa.
+
+- 🔵 Ninguno de los cambios aplicados altera flujos de usuario existentes; M2 es la única barrera nueva y está calibrada para no dispararse con tráfico legítimo.
