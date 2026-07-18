@@ -1,7 +1,6 @@
-import { sql } from "drizzle-orm";
-import { db } from "@/infrastructure/db/client";
 import { getRedisClient } from "@/infrastructure/rate-limiting/redis-client";
 import { logger } from "@/shared/utils/logger";
+import { pingDatabase } from "@/infrastructure/db/repositories/health.repository";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +11,7 @@ type DependencyStatus = "ok" | "down" | "not_configured";
  */
 async function checkDatabase(): Promise<DependencyStatus> {
   try {
-    await db.execute(sql`SELECT 1`);
+    await pingDatabase();
     return "ok";
   } catch (error) {
     logger.error(
