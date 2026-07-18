@@ -180,7 +180,7 @@ Lo que impide un ✅ limpio son **dos vectores de XSS almacenado** (sanitizador 
 | Optimización server/client components | ✅ (M3 parcial: candidato seguro convertido) |
 | Higiene de repo (`.DS_Store`, binarios) | ✅ (B1 y B2 hechos) |
 | Health check profundo | ✅ (B3 hecho: `?deep=1` DB+Redis) |
-| Verificación de UI en vivo (render/e2e) | ⚠️ (build OK; e2e 27/32 — 5 fallos preexistentes por drift, ver E1) |
+| Verificación de UI en vivo (render/e2e) | ✅ (build OK; **e2e 32/32**, ver E1) |
 | Auditoría de accesibilidad en vivo (contraste/teclado) | ❌ (no ejecutada) |
 
 ---
@@ -201,7 +201,17 @@ También aplicado:
 - ✅ **B2** — `.codebase-memory/` fuera del control de versiones + `.gitignore`.
 - ✅ **B3** — health check profundo: `GET /api/health?deep=1` verifica DB (`SELECT 1`) y Redis (`ping`), 503 si una dependencia requerida cae. El liveness simple (sin `?deep`) se mantiene intacto para el CD.
 
-### E1 — 🟡 Tests e2e preexistentes en rojo por drift test↔UI (NO por regresión)
+### E1 — ✅ RESUELTO: suite e2e 32/32 (era drift test↔UI, no regresión)
+
+**Estado final: los 32 tests e2e pasan** (2 pasadas completas consecutivas). Todo lo corregido fue **código/config de test**; producción intacta y verificada en vivo. Resumen de causas y fixes:
+
+- **Home / Portafolio** (visitor): aserciones de copy desactualizadas + FilterBar refactorizado a dropdowns custom → selectores y `selectFilter` actualizados; secciones ancladas por id estable.
+- **admin (API key)**: el éxito "API key creada" es el `<h2>` del diálogo, no un `role="alert"`; se cierra el diálogo antes de revocar.
+- **catalog-editor (form)**: el editor no usa `<form>` sino `<fieldset>/<legend>` (rol `group`) → `promocionForm` ancla a la sección "Identidad".
+- **Ficha con mapa** (varios): maplibre pide tiles sin cesar y `networkidle` hacía timeout → `InmuebleDetailPage` navega con `waitUntil:"load"` **solo en la ficha** (BasePage y backoffice mantienen `networkidle`).
+- **Formulario de contacto**: bloqueado por Turnstile en headless → claves de **test públicas de Cloudflare** en el `webServer` de Playwright (test-only).
+
+Detalle histórico del diagnóstico (para trazabilidad):
 
 Al ejecutar `pnpm test:e2e` (Postgres local sembrado): fallos preexistentes por desalineación de los **tests** con la UI real (el código de producción funciona; verificado en vivo). Ninguno toca código de esta rama.
 
