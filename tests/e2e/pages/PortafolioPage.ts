@@ -139,6 +139,6 @@ export class PortafolioPage extends BasePage {
     const card = this.propertyCards.first();
     await card.locator("h2 a").click();
     await this.page.waitForURL(/\/inmuebles\//, { timeout: 10_000 });
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("load");
   }
 }
