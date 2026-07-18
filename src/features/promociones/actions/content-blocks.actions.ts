@@ -49,10 +49,13 @@ export async function upsertContentBlockAction(
     );
     const repository = new PromocionContentBlockRepository(authCtx);
 
+    // Persistir el payload YA sanitizado por el transform del schema
+    // (validation.data), no el crudo: de lo contrario el saneado de HTML se
+    // descarta y se guardaría el HTML sin limpiar.
     const block = await repository.upsertContentBlock(
       promocionId,
       blockType,
-      payload,
+      validation.data.payload,
       session.userId,
     );
 

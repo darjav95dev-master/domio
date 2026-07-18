@@ -12,6 +12,7 @@ import { buildPageMetadata } from "@/features/seo/server/build-page-metadata";
 import { buildOrganizationJsonLd } from "@/features/seo/server/organization-json-ld";
 import { getOrganizationData } from "@/features/seo/server/get-organization-data";
 import { DEFAULT_META } from "@/shared/utils/seo/constants";
+import { serializeJsonLd } from "@/shared/utils/seo/json-ld";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(organizationJsonLd),
+          __html: serializeJsonLd(organizationJsonLd),
         }}
       />
       <RevealWrapper>
