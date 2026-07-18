@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/infrastructure/auth/session";
-import { ContenidosPageClient } from "@/features/contenidos/components/ContenidosPageClient";
+import { ContenidosPageList } from "@/features/contenidos/components/ContenidosPageList";
 import { ErrorBoundary } from "@/shared/components/error-boundary";
 
 /**
@@ -8,7 +8,7 @@ import { ErrorBoundary } from "@/shared/components/error-boundary";
  *
  * **Auth guard:** defence-in-depth — el layout ya protege /panel/*.
  * **Role guard:** solo ADMIN y OPERATOR pueden acceder.
- * **UI:** renderiza ContenidosPageClient que lista las páginas disponibles.
+ * **UI:** renderiza ContenidosPageList que lista las páginas disponibles.
  *
  * @see spec.md — User Story 1
  * @see tasks.md — T024
@@ -28,7 +28,7 @@ export default async function ContenidosPage() {
 
   return (
     <ErrorBoundary>
-      <ContenidosPageClient />
+      <ContenidosPageList />
     </ErrorBoundary>
   );
 }

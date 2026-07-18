@@ -154,25 +154,32 @@ Lo que impide un ✅ limpio son **dos vectores de XSS almacenado** (sanitizador 
 | Manejo de errores de API | ✅ |
 | Sin secretos ni `.env` versionados | ✅ |
 | Observabilidad (Sentry + logger) | ✅ |
-| Sanitización de HTML (rich text) | ⚠️ (H1) |
-| Escapado de JSON-LD | ⚠️ (H2) |
-| Validación de query params en API pública | ⚠️ (M1) |
-| Rate-limit por IP en API pública | ⚠️ (M2) |
-| Optimización server/client components | ⚠️ (M3) |
-| Higiene de repo (`.DS_Store`, binarios) | ⚠️ (B1/B2) |
-| Health check profundo | ⚠️ (B3) |
-| Verificación de UI en vivo (render/e2e) | ❌ (no ejecutada en esta auditoría) |
+| Sanitización de HTML (rich text) | ✅ (H1 corregido) |
+| Escapado de JSON-LD | ✅ (H2 corregido) |
+| Validación de query params en API pública | ✅ (M1 corregido) |
+| Rate-limit por IP en API pública | ✅ (M2 aplicado, sin lockout) |
+| Optimización server/client components | ✅ (M3 parcial: candidato seguro convertido) |
+| Higiene de repo (`.DS_Store`, binarios) | ✅ (B1 hecho) / ⚠️ (B2 `.codebase-memory` pendiente) |
+| Health check profundo | ⚠️ (B3 pendiente) |
+| Verificación de UI en vivo (render/e2e) | ⚠️ (build OK; e2e/Playwright no ejecutados) |
 | Auditoría de accesibilidad en vivo (contraste/teclado) | ❌ (no ejecutada) |
 
 ---
 
-## Plan de acción sugerido (orden)
+## Estado de aplicación (rama `fix/auditoria-final-hardening`)
 
-1. **H2** — escapar `<` en los tres JSON-LD. ~10 min.
-2. **H1** — reemplazar el sanitizador regex por `isomorphic-dompurify`. ~30–45 min.
-3. **M1** — validar `limit`/query con Zod en `/api/v1/*`. ~20 min.
-4. **M2** — rate-limit por IP en API pública. ~20 min.
-5. **B1** — `git rm --cached` de los `.DS_Store`. ~2 min.
-6. Antes de dar por cerrado: levantar la app y pasar los e2e/Playwright para cerrar los dos ❌ de verificación en vivo.
+Aplicado y verificado (typecheck 0, lint 0, **1746 tests**, `pnpm build` OK):
 
-Con los puntos 1–4 cerrados, el veredicto pasa a **✅ Listo para entregar**.
+- ✅ **H1** — causa raíz corregida (el action persistía el payload crudo; ahora `validation.data`) + sanitizador endurecido (URL sin comillas, entidades HTML, controles en el esquema). Sin nueva dependencia en el bundle cliente. Techo documentado con `ponytail:`.
+- ✅ **H2** — helper `serializeJsonLd` escapa `<` en los tres JSON-LD.
+- ✅ **M1** — `limit` no finito cae al default (no más 500).
+- ✅ **M2** — guarda por IP en `/api/v1/*` **antes** de auth. Límite generoso (120/min, 2× el de clave), **sin lockout**, degradación graceful si Redis no está → **no penaliza a consumidores legítimos**. El frontend propio no consume `/api/v1/*`, así que no afecta a la UX interna.
+- ✅ **M3 (parcial)** — solo se convirtió a server component el único candidato con interactividad cero y padre server (`ContenidosPageList`). El resto de `'use client'` se dejó intacto por ser interactividad legítima (primitivas con `forwardRef`, hooks de scroll, backoffice).
+- ✅ **B1** — `.DS_Store` fuera del control de versiones.
+
+Pendiente (decisión / fuera de alcance de esta rama):
+
+- ⚠️ **B2** — dejar de versionar `.codebase-memory/` (binarios de tooling).
+- ⚠️ **B3** — health check profundo (`SELECT 1` + ping Redis).
+- ⚠️ **e2e/Playwright** — no ejecutados en esta sesión (sí `pnpm build`).
+- 🔵 Ninguno de los cambios altera flujos de usuario existentes; M2 es la única barrera nueva y está calibrada para no dispararse con tráfico legítimo.

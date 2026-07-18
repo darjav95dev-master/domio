@@ -5,6 +5,7 @@ import {
   addRateLimitHeaders,
 } from "@/infrastructure/rate-limiting/api-key-middleware";
 import { applyRateLimit } from "@/features/api-public/with-rate-limit";
+import { applyPublicApiIpRateLimit } from "@/features/api-public/with-ip-rate-limit";
 import { ContextResolutionError } from "@/infrastructure/tenant/context-middleware";
 import { logger } from "@/shared/utils/logger";
 
@@ -21,6 +22,13 @@ import { logger } from "@/shared/utils/logger";
 
 async function handler(request: Request): Promise<Response> {
   try {
+    // 0. Guarda anti-abuso por IP, antes de autenticar (frena floods de claves
+    //    inválidas contra el bcrypt de verificación). Límite generoso, sin lockout.
+    const ipCheck = await applyPublicApiIpRateLimit(request);
+    if (!ipCheck.allowed) {
+      return createRateLimitResponse(ipCheck.result);
+    }
+
     // 1. Authenticate via API key
     const ctx = await validateApiKey(request);
 
