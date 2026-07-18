@@ -16,33 +16,32 @@ export class PortafolioPage extends BasePage {
   // ── Heading ──────────────────────────────────────────────────────────
 
   get heading(): Locator {
-    return this.page.getByRole("heading", { name: "Promociones", level: 1 });
+    return this.page.getByRole("heading", { name: /próxima casa te espera/i, level: 1 });
   }
 
   // ── Filter Bar (role="search") ───────────────────────────────────────
 
   get filterBar(): Locator {
-    return this.page.getByRole("search", { name: "Filtrar propiedades" });
+    return this.page.getByRole("search", { name: "Filtrar promociones" });
   }
 
-  /** Island select */
+  // Los filtros son dropdowns custom (botón trigger con aria-label que abre un
+  // role="listbox" con role="option"), no <select> nativos. Cada getter apunta
+  // al botón trigger; selectFilter() lo abre y elige la opción.
+
+  /** Island filter trigger */
   get filterIsland(): Locator {
-    return this.filterBar.getByLabel("Isla");
+    return this.filterBar.getByRole("button", { name: "Isla" });
   }
 
-  /** Municipality select */
-  get filterMunicipality(): Locator {
-    return this.filterBar.getByLabel("Municipio");
-  }
-
-  /** Property type select */
+  /** Property type filter trigger */
   get filterPropertyType(): Locator {
-    return this.filterBar.getByLabel("Tipo");
+    return this.filterBar.getByRole("button", { name: "Tipo" });
   }
 
-  /** Operation select */
+  /** Operation filter trigger */
   get filterOperation(): Locator {
-    return this.filterBar.getByLabel("Operación");
+    return this.filterBar.getByRole("button", { name: "Operación" });
   }
 
   /** Min price select */
@@ -111,11 +110,15 @@ export class PortafolioPage extends BasePage {
    * Waits for the URL to update (Next.js client-side navigation via router.replace).
    */
   async selectFilter(
-    filter: Locator,
+    filterTrigger: Locator,
     optionLabel: string,
   ): Promise<void> {
     const currentUrl = this.page.url();
-    await filter.selectOption({ label: optionLabel });
+    // Abrir el dropdown custom y elegir la opción (role="option").
+    await filterTrigger.click();
+    await this.page
+      .getByRole("option", { name: optionLabel, exact: true })
+      .click();
     // Wait for URL to change from the current — covers both RSC and full nav
     await this.page.waitForFunction(
       (url) => window.location.href !== url,
