@@ -47,3 +47,6 @@ backups/
 deploy/env.dev
 deploy/env.prod
 deploy/env.proxy
+
+# codebase-memory: artefactos regenerables del tooling (binarios que cambian cada sesión)
+.codebase-memory/
