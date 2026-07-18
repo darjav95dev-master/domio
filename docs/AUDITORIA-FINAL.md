@@ -201,16 +201,21 @@ También aplicado:
 - ✅ **B2** — `.codebase-memory/` fuera del control de versiones + `.gitignore`.
 - ✅ **B3** — health check profundo: `GET /api/health?deep=1` verifica DB (`SELECT 1`) y Redis (`ping`), 503 si una dependencia requerida cae. El liveness simple (sin `?deep`) se mantiene intacto para el CD.
 
-### E1 — 🟡 5 tests e2e preexistentes en rojo (drift test↔contenido)
+### E1 — 🟡 Tests e2e preexistentes en rojo por drift test↔UI (NO por regresión)
 
-Al ejecutar `pnpm test:e2e` (Postgres local sembrado: 4 users, 9 promociones): **27/32 pasan, 5 fallan**. Verificado que **ninguno** toca código de esta rama (`git diff develop..HEAD`) — son fallos previos:
+Al ejecutar `pnpm test:e2e` (Postgres local sembrado): fallos preexistentes por desalineación de los **tests** con la UI real (el código de producción funciona; verificado en vivo). Ninguno toca código de esta rama.
 
-1. `visitor.spec.ts:62` — espera hero `/Tu hogar en Canarias empieza aquí/`; el contenido sembrado hoy es "Tu hogar en Canarias, sin complicaciones…". Aserción desactualizada.
-2. `visitor.spec.ts:99` — espera `<h1>Promociones</h1>` en `/portafolio`; el heading cambió.
-3. `admin.spec.ts:137` — crear/revocar API key.
-4. `admin.spec.ts:192` — editar config de contacto y reflejarla en `/contacto`.
-5. `catalog-editor.spec.ts:82` — el form de edición carga todas las secciones.
+**Corregidos** (los 2 que se pidieron — ahora verdes):
 
-Los 3–5 probablemente dependen de servicios no configurados en local (Turnstile/R2) o de fixtures. **Recomendación:** actualizar las aserciones de contenido (1–2) al copy actual y revisar 3–5 con los servicios de test levantados, antes de presumir de "e2e verde" en la defensa.
+1. ✅ `visitor.spec.ts` "home loads with real content" — hero → `/Tu hogar en Canarias/`; secciones ancladas por id estable (`#confianza`, `#promos`, `#faq-title`); enlace nav "Contactar".
+2. ✅ `visitor.spec.ts` "portafolio filters work correctly" — heading → "…próxima casa te espera…"; `filterBar` → "Filtrar promociones"; los filtros son **dropdowns custom** (`role=listbox/option`), no `<select>` nativos → `selectFilter` reescrito. `visitor.spec` completo: **5/5 verde**.
+
+**Pendientes** (fuera de lo pedido; diagnóstico confirmado, ninguno es fallo funcional):
+
+3. `admin.spec.ts:137` — el toast "API key creada" no es `role="alert"` (selector obsoleto). El flujo crear/revocar **funciona** (verificado a mano en vivo). Fix: apuntar al elemento real del modal.
+4. `catalog-editor.spec.ts:82` — espera `locator('form')`, pero el editor no envuelve los campos en `<form>`. El editor **carga** (verificado en vivo). Fix: aserción a un contenedor/heading real.
+5. `visitor.spec.ts:166/189` — timeout de `waitUntil: 'networkidle'` al navegar a la ficha: el mapa (maplibre) hace peticiones de tiles que no "reposan". **Flaky de infra**: pasan al correr `visitor.spec` aislado; solo fallan bajo carga de la suite completa. Fix: cambiar `networkidle` por `load`/`domcontentloaded` en el page object de la ficha.
+
+Estado suite completa: **28/32** (los 2 pedidos, en verde). Los 4 restantes son test-only; el código de producción está verificado en vivo.
 
 - 🔵 Ninguno de los cambios aplicados altera flujos de usuario existentes; M2 es la única barrera nueva y está calibrada para no dispararse con tráfico legítimo.
