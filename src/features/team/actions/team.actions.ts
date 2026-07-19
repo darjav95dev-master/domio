@@ -81,11 +81,20 @@ export async function createUserAction(
   }
 
   const repo = getUserRepo(auth.ctx);
-  const user = await repo.create({
-    email: parsed.data.email,
-    name: parsed.data.name,
-    role: parsed.data.role as UserRole,
-  });
+
+  let user;
+  try {
+    user = await repo.create({
+      email: parsed.data.email,
+      name: parsed.data.name,
+      role: parsed.data.role as UserRole,
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      return { success: false, error: "Ya existe un usuario con ese correo electrónico en este equipo." };
+    }
+    throw err;
+  }
 
   return { success: true, data: mapUserRow(user) };
 }

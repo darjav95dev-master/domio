@@ -30,6 +30,10 @@ function renderHtml(payload: ContactFormNotificationPayload): string {
               <a href="mailto:${escapeHtml(payload.email)}" style="color: #1a1a2e;">${escapeHtml(payload.email)}</a>
             </td>
           </tr>
+          ${payload.phone ? `<tr>
+            <td style="padding: 8px 0; color: #888; font-size: 14px; font-weight: bold;">Teléfono</td>
+            <td style="padding: 8px 0; color: #333; font-size: 15px;">${escapeHtml(payload.phone)}</td>
+          </tr>` : ""}
           <tr>
             <td style="padding: 8px 0; color: #888; font-size: 14px; font-weight: bold; vertical-align: top;">Mensaje</td>
             <td style="padding: 8px 0; color: #333; font-size: 15px; white-space: pre-wrap;">${escapeHtml(payload.message)}</td>
@@ -51,6 +55,7 @@ function renderText(payload: ContactFormNotificationPayload): string {
     "",
     `Nombre: ${payload.name}`,
     `Email: ${payload.email}`,
+    ...(payload.phone ? [`Teléfono: ${payload.phone}`] : []),
     "",
     "Mensaje:",
     payload.message,

@@ -44,6 +44,7 @@ export async function submitContactForm(
   const raw = {
     name: formData.get("name") as string,
     email: formData.get("email") as string,
+    phone: (formData.get("phone") as string) || undefined,
     message: formData.get("message") as string,
   };
 

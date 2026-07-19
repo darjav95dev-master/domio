@@ -37,6 +37,10 @@ export function ContactFormGeneric() {
     touched["email"] && fieldErrors["email"]
       ? fieldErrors["email"][0]
       : undefined;
+  const phoneError =
+    touched["phone"] && fieldErrors["phone"]
+      ? fieldErrors["phone"][0]
+      : undefined;
   const messageError =
     touched["message"] && fieldErrors["message"]
       ? fieldErrors["message"][0]
@@ -96,6 +100,18 @@ export function ContactFormGeneric() {
         disabled={isPending}
         error={emailError}
         onBlur={() => setTouched((p) => ({ ...p, email: true }))}
+      />
+
+      {/* Phone */}
+      <Input
+        id="contact-phone"
+        name="phone"
+        label="Teléfono (opcional)"
+        type="tel"
+        placeholder="Ej: +34 600 000 000"
+        disabled={isPending}
+        error={phoneError}
+        onBlur={() => setTouched((p) => ({ ...p, phone: true }))}
       />
 
       {/* Message */}

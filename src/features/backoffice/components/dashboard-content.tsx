@@ -6,6 +6,7 @@ import { cn } from "@/shared/utils/cn";
 import { PROMOTION_STATUS_LABELS } from "@/shared/constants/domain-labels";
 import { PROMOTION_STATUS_COLORS } from "@/shared/constants/status-colors";
 import { NAV_ITEMS } from "@/features/backoffice/constants/nav-items";
+import { useUnreadCount } from "@/features/leads/hooks/use-unread-count";
 import type { UserRole } from "@/shared/constants/db-enums";
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
@@ -60,9 +61,12 @@ const QUICK_LINK_HREFS = ["/panel/catalogo", "/panel/leads", "/panel/contenidos"
 export function DashboardContent({
   userName,
   userRole,
-  unreadLeadsCount,
+  unreadLeadsCount: initialUnreadLeadsCount,
   recentPromociones,
 }: DashboardContentProps) {
+  const liveCount = useUnreadCount();
+  const unreadLeadsCount = liveCount ?? initialUnreadLeadsCount;
+
   const quickLinks = NAV_ITEMS.filter(
     (item) =>
       QUICK_LINK_HREFS.includes(item.href as typeof QUICK_LINK_HREFS[number]) &&
