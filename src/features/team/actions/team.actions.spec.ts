@@ -215,6 +215,34 @@ describe("createUserAction", () => {
     expect(result.success).toBe(false);
     expect(mockCreate).not.toHaveBeenCalled();
   });
+
+  it("should return friendly error when email already exists in tenant (23505)", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    const err = Object.assign(new Error("duplicate key value violates unique constraint"), { code: "23505" });
+    mockCreate.mockRejectedValue(err);
+
+    const result = await createUserAction({
+      email: "existing@example.com",
+      name: "Duplicate User",
+      role: "AGENT",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/ya existe un usuario con ese correo/i);
+    }
+    expect(mockCreate).toHaveBeenCalled();
+  });
+
+  it("should rethrow non-duplicate errors", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    const err = new Error("unexpected DB error");
+    mockCreate.mockRejectedValue(err);
+
+    await expect(
+      createUserAction({ email: "user@example.com", name: "Test", role: "AGENT" }),
+    ).rejects.toThrow("unexpected DB error");
+  });
 });
 
 describe("updateUserAction", () => {
