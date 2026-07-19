@@ -27,6 +27,11 @@ vi.mock("../server/get-contact-data", () => ({
   getContactPageData: mockGetContactPageData,
 }));
 
+const mockVerifyTurnstileToken = vi.hoisted(() => vi.fn());
+vi.mock("@/shared/utils/turnstile", () => ({
+  verifyTurnstileToken: (...args: unknown[]) => mockVerifyTurnstileToken(...args),
+}));
+
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const CONTACT_EMAIL = "info@wedomio.com";
@@ -50,12 +55,38 @@ describe("submitContactForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default: rate limit allowed, contact config with email
+    // Default: Turnstile passes, rate limit allowed, contact config with email
+    mockVerifyTurnstileToken.mockResolvedValue({ success: true });
     mockCheckContactRateLimit.mockResolvedValue({ allowed: true });
     mockGetContactPageData.mockResolvedValue({
       contactConfig: { email: CONTACT_EMAIL },
     });
     mockEnqueue.mockResolvedValue(undefined);
+  });
+
+  // ─── Path 0: Turnstile failure ──────────────────────────────────────────
+
+  it("returns error when Turnstile verification fails", async () => {
+    mockVerifyTurnstileToken.mockResolvedValue({
+      success: false,
+      error: "Token inválido o expirado.",
+    });
+
+    const result = await submitContactForm(null, createFormData());
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Token inválido o expirado.");
+    expect(mockCheckContactRateLimit).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("returns generic security error when Turnstile returns no message", async () => {
+    mockVerifyTurnstileToken.mockResolvedValue({ success: false });
+
+    const result = await submitContactForm(null, createFormData());
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Error de verificación de seguridad.");
   });
 
   // ─── Path 1: rate limit deny ────────────────────────────────────────────
@@ -198,5 +229,16 @@ describe("submitContactForm", () => {
     expect(result.success).toBe(false);
     expect(result.fieldErrors?.phone).toBeDefined();
     expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  // ─── Path 6: email enqueue resilience ──────────────────────────────────
+
+  it("returns success even when email enqueue throws (best-effort delivery)", async () => {
+    mockEnqueue.mockRejectedValue(new Error("Queue unavailable"));
+
+    const result = await submitContactForm(null, createFormData());
+
+    expect(result.success).toBe(true);
+    expect(mockEnqueue).toHaveBeenCalled();
   });
 });

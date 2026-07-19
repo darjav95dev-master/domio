@@ -137,10 +137,14 @@ export async function updateLeadStatusAction(
   if (!lead) throw new Error("Lead not found");
 
   // Validate the transition server-side via Zod refine
-  leadStatusTransitionSchema.parse({
-    currentStatus: lead.status,
-    newStatus,
-  });
+  try {
+    leadStatusTransitionSchema.parse({
+      currentStatus: lead.status,
+      newStatus,
+    });
+  } catch {
+    throw new Error("Transición de estado no permitida");
+  }
 
   // Perform the update (repo already validates via validateStatusTransition)
   return repo.updateStatus(leadId, newStatus, session.userId);
