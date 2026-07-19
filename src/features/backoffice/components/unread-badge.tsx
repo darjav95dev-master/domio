@@ -85,9 +85,14 @@ export function UnreadBadge({
       fetchCount(abortController.signal);
     }, pollingInterval);
 
+    // Immediate refresh when a lead is opened and marked as read
+    const onLeadRead = () => { fetchCount(abortController.signal); };
+    window.addEventListener("lead:read", onLeadRead);
+
     return () => {
       abortController.abort();
       clearInterval(intervalId);
+      window.removeEventListener("lead:read", onLeadRead);
     };
   }, [fetchCount, pollingInterval]);
 

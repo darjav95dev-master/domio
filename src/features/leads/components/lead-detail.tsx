@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { cn } from "@/shared/utils/cn";
 import { LeadStatusBadge } from "./lead-status-badge";
 import { LeadNotesSection } from "./lead-notes-section";
@@ -74,6 +75,10 @@ export function LeadDetail({
     reassignAgentId,
     setReassignAgentId,
   } = useLeadDetail(lead, initialNotes, initialHistory);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("lead:read"));
+  }, []);
 
   // ── Source display ─────────────────────────────────────────────────────
 
