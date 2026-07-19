@@ -25,13 +25,15 @@ const STATUS_OPTIONS = [
 
 interface ApiKeysTableProps {
   onRevokeKey?: (key: ApiKeyResponse) => void;
+  /** IDs to hide immediately (optimistic removal after revocation). */
+  excludeIds?: Set<string>;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function ApiKeysTable({ onRevokeKey }: ApiKeysTableProps) {
+export function ApiKeysTable({ onRevokeKey, excludeIds }: ApiKeysTableProps) {
   // ── State ──────────────────────────────────────────────────────────────
   const [data, setData] = useState<PaginatedApiKeys | null>(null);
   const [loading, setLoading] = useState(true);
@@ -212,7 +214,7 @@ export function ApiKeysTable({ onRevokeKey }: ApiKeysTableProps) {
             {!loading && !error && data?.items.length === 0 && renderEmptyState()}
             {!loading &&
               !error &&
-              data?.items.map((key) => (
+              data?.items.filter((k) => !excludeIds?.has(k.id)).map((key) => (
                 <tr
                   key={key.id}
                   className="border-b border-border-default transition-colors hover:bg-accent-subtle/30"

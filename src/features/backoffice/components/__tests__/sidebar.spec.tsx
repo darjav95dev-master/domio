@@ -56,12 +56,6 @@ describe("Sidebar", () => {
       expect(screen.queryByText("API Keys")).not.toBeInTheDocument();
     });
 
-    it("does NOT render ARSOP for AGENT role", () => {
-      render(<Sidebar role="AGENT" />);
-
-      expect(screen.queryByText("ARSOP")).not.toBeInTheDocument();
-    });
-
     it("renders Contenidos for OPERATOR role", () => {
       render(<Sidebar role="OPERATOR" />);
 
@@ -74,7 +68,7 @@ describe("Sidebar", () => {
       expect(screen.queryByText("Equipo")).not.toBeInTheDocument();
     });
 
-    it("renders all 7 sections for ADMIN role", () => {
+    it("renders all 6 sections for ADMIN role", () => {
       render(<Sidebar role="ADMIN" />);
 
       expect(screen.getByText("Dashboard")).toBeInTheDocument();
@@ -83,7 +77,6 @@ describe("Sidebar", () => {
       expect(screen.getByText("Equipo")).toBeInTheDocument();
       expect(screen.getByText("Contenidos")).toBeInTheDocument();
       expect(screen.getByText("API Keys")).toBeInTheDocument();
-      expect(screen.getByText("ARSOP")).toBeInTheDocument();
     });
   });
 

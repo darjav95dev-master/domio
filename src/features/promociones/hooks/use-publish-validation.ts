@@ -73,6 +73,10 @@ export function buildPublishPayload(
     island: formState.island || null,
     municipality: formState.municipality || null,
     address: formState.address || null,
+    // Include location when both coordinates are set
+    ...(formState.lng !== null && formState.lat !== null
+      ? { location: { lng: formState.lng, lat: formState.lat } }
+      : {}),
     mapPrivacyMode: formState.mapPrivacyMode,
     seoTitle: formState.seoTitle || null,
     seoDescription: formState.seoDescription || null,

@@ -37,7 +37,9 @@ export class DashboardRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.tenantId, this.authCtx.getTenantId()),
-            eq(leads.assignedAgentId, this.authCtx.userId),
+            this.authCtx.role === "AGENT"
+              ? eq(leads.assignedAgentId, this.authCtx.userId)
+              : undefined,
             inArray(leads.status, UNREAD_LEAD_STATUSES),
             isNull(leadReadMarks.userId),
           ),
@@ -61,7 +63,9 @@ export class DashboardRepository extends TenantAwareRepository {
         .where(
           and(
             eq(promociones.tenantId, this.authCtx.getTenantId()),
-            eq(promociones.assignedAgentId, this.authCtx.userId),
+            this.authCtx.role === "AGENT"
+              ? eq(promociones.assignedAgentId, this.authCtx.userId)
+              : undefined,
           ),
         )
         .orderBy(desc(promociones.updatedAt))

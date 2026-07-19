@@ -34,6 +34,8 @@ export default async function NuevaPromocionPage() {
   const created = await repository.create({
     name: "Nueva promoción",
     kind: "portfolio",
+    // AGENT: auto-assign themselves so they can see it after creation
+    ...(session.role === "AGENT" ? { assignedAgentId: session.userId } : {}),
   });
 
   // Redirect to the edit page for the new promoción

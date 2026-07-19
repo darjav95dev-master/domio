@@ -55,8 +55,9 @@ function createEmptyItem(): UbicacionItem {
   return { service: "", distance: "" };
 }
 
-function itemKey(index: number, item: UbicacionItem): string {
-  return `ubicacion-${index}-${item.service || "empty"}`;
+function itemKey(index: number): string {
+  // ponytail: index-only key to prevent remount on content change (focus loss bug)
+  return `ubicacion-${index}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +142,7 @@ export function BlockFormUbicacion({
       <ul className="space-y-4" aria-label="Lista de servicios cercanos">
         {items.map((item, index) => (
           <li
-            key={itemKey(index, item)}
+            key={itemKey(index)}
             className="rounded-card border border-border-default bg-bg-surface p-4"
           >
             <div className="grid grid-cols-2 gap-3">

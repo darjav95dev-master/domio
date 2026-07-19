@@ -98,8 +98,8 @@ const PROMOCION_SEED = [
     island: DEFAULT_ISLAND,
     municipality: "Adeje",
     address: "Avenida de las Américas, 15",
-    location: [-16.7240, 28.1246] as [number, number],
-    locationApprox: [-16.7190, 28.1196] as [number, number],
+    location: [-16.7237, 28.0580] as [number, number],
+    locationApprox: [-16.7187, 28.0530] as [number, number],
     mapPrivacyMode: "AREA" as const,
     seoTitle: "Residencial Las Américas | Domio",
     seoDescription:
@@ -117,8 +117,8 @@ const PROMOCION_SEED = [
     island: DEFAULT_ISLAND,
     municipality: "Adeje",
     address: "Calle la Arena, 32",
-    location: [-16.7290, 28.1190] as [number, number],
-    locationApprox: [-16.7240, 28.1140] as [number, number],
+    location: [-16.7280, 28.0715] as [number, number],
+    locationApprox: [-16.7230, 28.0665] as [number, number],
     mapPrivacyMode: "EXACT" as const,
     seoTitle: "Apartamentos Costa Adeje | Domio",
     seoDescription:
@@ -174,8 +174,8 @@ const PROMOCION_SEED = [
     island: DEFAULT_ISLAND,
     municipality: "Santa Cruz",
     address: "Avenida Marítima, 7",
-    location: [-16.2500, 28.4650] as [number, number],
-    locationApprox: [-16.2450, 28.4600] as [number, number],
+    location: [-16.2520, 28.4680] as [number, number],
+    locationApprox: [-16.2470, 28.4630] as [number, number],
     mapPrivacyMode: "EXACT" as const,
     seoTitle: "Ático Santa Cruz Mar | Domio",
     seoDescription:
@@ -193,8 +193,8 @@ const PROMOCION_SEED = [
     island: DEFAULT_ISLAND,
     municipality: "Arona",
     address: "Calle del Sur, 45",
-    location: [-16.7162, 28.0986] as [number, number],
-    locationApprox: [-16.7112, 28.0936] as [number, number],
+    location: [-16.7160, 28.0510] as [number, number],
+    locationApprox: [-16.7110, 28.0460] as [number, number],
     mapPrivacyMode: "AREA" as const,
     seoTitle: "Casa Arona Sur | Domio",
     seoDescription:
@@ -212,8 +212,8 @@ const PROMOCION_SEED = [
     island: DEFAULT_ISLAND,
     municipality: "La Laguna",
     address: "Calle Herradores, 12",
-    location: [-16.3190, 28.4890] as [number, number],
-    locationApprox: [-16.3140, 28.4840] as [number, number],
+    location: [-16.3190, 28.4876] as [number, number],
+    locationApprox: [-16.3140, 28.4826] as [number, number],
     mapPrivacyMode: "EXACT" as const,
     seoTitle: "Local Comercial La Laguna | Domio",
     seoDescription:
@@ -1031,13 +1031,15 @@ async function stepContactConfig(
     .insert(schema.contactConfig)
     .values({
       tenantId: tid,
-      phone: "+34 912 345 678",
+      phone: "+34 928 123 456",
       email: "info@domio.test",
-      address: "Calle de Ejemplo 123, 28001 Madrid",
+      address: "Calle León y Castillo 322, 35007 Las Palmas de Gran Canaria",
       hours: "Lunes a Viernes, 9:00 - 18:00",
-      whatsappNumber: "+34 612 345 678",
+      whatsappNumber: "+34 628 123 456",
       whatsappPrefilledMessage:
         "Hola, me gustaría recibir más información sobre sus propiedades.",
+      officeLat: 28.1235,
+      officeLng: -15.4363,
       updatedBy: userMap["admin@domio.dev"],
     })
     .onConflictDoNothing({ target: schema.contactConfig.tenantId });

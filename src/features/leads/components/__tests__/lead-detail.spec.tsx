@@ -108,7 +108,7 @@ describe("LeadDetail", () => {
       />,
     );
 
-    expect(screen.getByText("Nuevo")).toBeInTheDocument();
+    expect(screen.getByLabelText(/estado: nuevo/i)).toBeInTheDocument();
   });
 
   it("renders notes section with list and add form", () => {

@@ -81,6 +81,7 @@ export function DashboardContent({
       </section>
 
       {/* ── Section 2: Contador de leads no leídos ─────────────────────── */}
+      {userRole !== "OPERATOR" && (
       <section aria-labelledby="leads-heading">
         <h2 id="leads-heading" className="sr-only">
           Leads no leídos
@@ -104,6 +105,7 @@ export function DashboardContent({
           </p>
         )}
       </section>
+      )}
 
       {/* ── Section 3: Enlaces rápidos ─────────────────────────────────── */}
       <section aria-labelledby="quick-links-heading">
@@ -190,9 +192,11 @@ export function DashboardContent({
           <Link href="/panel/catalogo/nueva">
             <Button variant="primary">Nueva promoción</Button>
           </Link>
-          <Link href="/panel/leads">
-            <Button variant="secondary">Ver bandeja</Button>
-          </Link>
+          {userRole !== "OPERATOR" && (
+            <Link href="/panel/leads">
+              <Button variant="secondary">Ver bandeja</Button>
+            </Link>
+          )}
         </div>
       </section>
     </div>

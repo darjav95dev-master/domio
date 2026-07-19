@@ -194,6 +194,11 @@ export default async function EditPromocionPage({
 
   // ── Build form data (includes tipologias) ──────────────────────────────
 
+  // Extract coordinates from PostGIS location tuple [lng, lat].
+  // [0,0] is the DB default for "not set" — treat as null in the form.
+  const rawLng = raw.location?.[0] ?? 0;
+  const rawLat = raw.location?.[1] ?? 0;
+
   const formData: PromocionFormData = {
     name: raw.name,
     kind: raw.kind,
@@ -204,6 +209,8 @@ export default async function EditPromocionPage({
     island: raw.island,
     municipality: raw.municipality,
     address: raw.address,
+    lng: rawLng !== 0 || rawLat !== 0 ? rawLng : null,
+    lat: rawLng !== 0 || rawLat !== 0 ? rawLat : null,
     mapPrivacyMode: raw.mapPrivacyMode ?? "AREA",
     seoTitle: raw.seoTitle,
     seoDescription: raw.seoDescription,
@@ -320,6 +327,7 @@ export default async function EditPromocionPage({
         initialDraftPayload={raw.draftPayload as Record<string, unknown> | null}
         currentStatus={raw.status}
         publishBlocked={publishBlocked}
+        canPublish={session.role !== "AGENT"}
         autosaveIntervalMs={
           process.env.E2E_AUTOSAVE_INTERVAL
             ? Number(process.env.E2E_AUTOSAVE_INTERVAL)
