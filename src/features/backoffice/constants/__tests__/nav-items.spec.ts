@@ -3,8 +3,8 @@ import { NAV_ITEMS } from "../nav-items";
 import { USER_ROLES } from "@/shared/constants/db-enums";
 
 describe("NAV_ITEMS", () => {
-  it("should have exactly 7 items", () => {
-    expect(NAV_ITEMS).toHaveLength(7);
+  it("should have exactly 6 items", () => {
+    expect(NAV_ITEMS).toHaveLength(6);
   });
 
   it("should have all items with label, href, icon, and allowedRoles", () => {
@@ -35,14 +35,13 @@ describe("NAV_ITEMS", () => {
     expect(dashboard?.href).toBe("/panel");
   });
 
-  it("should have Admin-only items (Equipo, API Keys, ARSOP)", () => {
+  it("should have Admin-only items (Equipo, API Keys)", () => {
     const adminItems = NAV_ITEMS.filter(
       (item) =>
         item.label === "Equipo" ||
-        item.label === "API Keys" ||
-        item.label === "ARSOP",
+        item.label === "API Keys",
     );
-    expect(adminItems).toHaveLength(3);
+    expect(adminItems).toHaveLength(2);
     for (const item of adminItems) {
       expect(item.allowedRoles).toEqual(["ADMIN"]);
     }

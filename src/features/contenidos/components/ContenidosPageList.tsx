@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 
 type PageEntry = {
@@ -46,7 +44,9 @@ const pages: PageEntry[] = [
   },
 ];
 
-export function ContenidosPageClient() {
+// Server component: lista estática de enlaces, sin interactividad, no necesita
+// 'use client' (antes lo declaraba y viajaba al bundle del cliente sin motivo).
+export function ContenidosPageList() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">

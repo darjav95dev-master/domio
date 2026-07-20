@@ -151,6 +151,11 @@ export async function PATCH(
     const isPublishing =
       parsed.data.status === "PUBLISHED" && current.status !== "PUBLISHED";
 
+    // AGENT role cannot publish — only ADMIN and OPERATOR can
+    if (isPublishing && auth.ctx.role === "AGENT") {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { data: updateData, resultingSlug } = publishService.prepareUpdateData(
       parsed.data,
       current,

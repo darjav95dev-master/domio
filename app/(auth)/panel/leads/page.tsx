@@ -8,6 +8,9 @@ import { DEFAULT_PAGE_SIZE } from "@/shared/constants/domain-config";
 import { logger } from "@/shared/utils/logger";
 import type { LeadRow } from "@/infrastructure/db/repositories/lead.repository";
 
+// Always re-fetch so read-marks are fresh when navigating back from a lead detail
+export const dynamic = "force-dynamic";
+
 /**
  * LeadsPage — server component que carga los leads iniciales y delega
  * la interactividad (filtros, paginación, exportación) a LeadsPageContent.

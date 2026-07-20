@@ -46,7 +46,8 @@ export class HomePage extends BasePage {
   // ── Featured Portfolio section ────────────────────────────────────────
 
   get featuredPortfolioSection(): Locator {
-    return this.page.getByRole("region", { name: /promociones destacadas/i });
+    // Sección con id estable "promos" (aria-labelledby="portfolio-title")
+    return this.page.locator("section#promos");
   }
 
   get featuredPortfolioCards(): Locator {
@@ -56,14 +57,15 @@ export class HomePage extends BasePage {
   // ── Trust section ─────────────────────────────────────────────────────
 
   get trustSection(): Locator {
-    return this.page.getByRole("region", { name: /confianza/i });
+    // Sección con id estable "confianza" (aria-labelledby="trust-title")
+    return this.page.locator("section#confianza");
   }
 
   // ── FAQ section ───────────────────────────────────────────────────────
 
-  /** FAQ accordion — uses heading "Preguntas frecuentes" */
+  /** FAQ heading (<h2 id="faq-title">) */
   get faqHeading(): Locator {
-    return this.page.getByRole("heading", { name: /preguntas frecuentes/i });
+    return this.page.locator("#faq-title");
   }
 
   // ── Navigation ────────────────────────────────────────────────────────
@@ -77,7 +79,7 @@ export class HomePage extends BasePage {
   }
 
   get navContactoLink(): Locator {
-    return this.nav.getByRole("link", { name: "Contacto" });
+    return this.nav.getByRole("link", { name: /contactar/i });
   }
 
   get navSobreLink(): Locator {

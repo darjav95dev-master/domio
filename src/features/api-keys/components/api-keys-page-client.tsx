@@ -16,6 +16,7 @@ import type { ApiKeyResponse } from "@/shared/types/api-key-schema";
 export function ApiKeysPageClient() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [revokedIds, setRevokedIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{
     variant: "success" | "error";
     title: string;
@@ -29,8 +30,10 @@ export function ApiKeysPageClient() {
   }, []);
 
   const handleRevoked = useCallback(async (key: ApiKeyResponse) => {
+    // Optimistically remove the key from the list immediately
+    setRevokedIds((prev) => new Set([...prev, key.id]));
+
     const result = await revokeApiKeyAction(key.id);
-    setRefreshKey((k) => k + 1);
     if (result.success) {
       setToast({
         variant: "success",
@@ -38,6 +41,12 @@ export function ApiKeysPageClient() {
         message: "La clave ya no es válida para autenticación.",
       });
     } else {
+      // Revert optimistic removal on failure
+      setRevokedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(key.id);
+        return next;
+      });
       setToast({
         variant: "error",
         title: result.error ?? "Error al revocar la API key",
@@ -82,7 +91,7 @@ export function ApiKeysPageClient() {
       </div>
 
       {/* API keys table */}
-      <ApiKeysTable key={refreshKey} onRevokeKey={handleRevoked} />
+      <ApiKeysTable key={refreshKey} onRevokeKey={handleRevoked} excludeIds={revokedIds} />
 
       {/* Create API key dialog */}
       <CreateApiKeyDialog

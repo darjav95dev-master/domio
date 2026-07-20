@@ -29,7 +29,10 @@ export async function getPromociones(
   input: GetPromocionesInput,
 ): Promise<ApiCursorResult> {
   const { ctx, cursor, limit } = input;
-  const clampedLimit = Math.min(Math.max(1, limit ?? DEFAULT_API_LIMIT), MAX_API_LIMIT);
+  // Number.isFinite descarta NaN/Infinity (p. ej. ?limit=abc → Number("abc") = NaN),
+  // que de lo contrario propagaría un LIMIT NaN a Postgres y devolvería un 500.
+  const requestedLimit = Number.isFinite(limit) ? (limit as number) : DEFAULT_API_LIMIT;
+  const clampedLimit = Math.min(Math.max(1, requestedLimit), MAX_API_LIMIT);
 
   const repository = new CatalogRepository(ctx);
   const options: ApiCursorOptions = { limit: clampedLimit };

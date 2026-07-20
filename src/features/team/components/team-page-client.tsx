@@ -14,7 +14,7 @@ import { Toast } from "@/shared/components/toast";
  * Wraps the UsersTable and CreateUserDialog, managing the shared state
  * for refreshing the table after mutations.
  */
-export function TeamPageClient() {
+export function TeamPageClient({ currentUserId }: { currentUserId: string }) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<{
@@ -70,7 +70,7 @@ export function TeamPageClient() {
       </div>
 
       {/* Users table */}
-      <UsersTable key={refreshKey} />
+      <UsersTable key={refreshKey} currentUserId={currentUserId} />
 
       {/* Create user dialog */}
       <CreateUserDialog

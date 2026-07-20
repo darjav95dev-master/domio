@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback, useTransition, useEffect } from "react";
 import { cn } from "@/shared/utils/cn";
 import { logger } from "@/shared/utils/logger";
 import { Button } from "@/shared/components/button";
@@ -35,9 +35,14 @@ export function LeadsPageContent({
   const [leads, setLeads] = useState<LeadRow[]>(initialLeads);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(initialPage);
-  const [unreadLeadIds] = useState<Set<string>>(
+  const [unreadLeadIds, setUnreadLeadIds] = useState<Set<string>>(
     () => new Set(initialUnreadIds ?? []),
   );
+
+  // Sync when the server re-fetches fresh read marks (e.g. navigating back from a lead detail)
+  useEffect(() => {
+    setUnreadLeadIds(new Set(initialUnreadIds ?? []));
+  }, [initialUnreadIds]);
   const [isPending, startTransition] = useTransition();
   const [exporting, setExporting] = useState(false);
 

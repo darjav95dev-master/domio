@@ -55,8 +55,9 @@ function createEmptyItem(): ZonaItem {
   return { name: "", description: "" };
 }
 
-function itemKey(index: number, item: ZonaItem): string {
-  return `zona-${index}-${item.name || "empty"}`;
+function itemKey(index: number): string {
+  // ponytail: index-only key to prevent remount on content change (focus loss bug)
+  return `zona-${index}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +142,7 @@ export function BlockFormZonas({
       <ul className="space-y-4" aria-label="Lista de zonas comunes">
         {items.map((item, index) => (
           <li
-            key={itemKey(index, item)}
+            key={itemKey(index)}
             className="rounded-card border border-border-default bg-bg-surface p-4"
           >
             <div className="space-y-3">

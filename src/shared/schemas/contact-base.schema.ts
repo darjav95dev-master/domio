@@ -17,6 +17,11 @@ export const contactBaseSchema = z.object({
     .string()
     .email("Introduce un email válido")
     .max(255, "El email no puede exceder 255 caracteres"),
+  phone: z
+    .string()
+    .max(30, "El teléfono no puede exceder 30 caracteres")
+    .optional()
+    .or(z.literal("")),
   message: z
     .string()
     .min(10, "El mensaje debe tener al menos 10 caracteres")

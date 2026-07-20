@@ -159,6 +159,27 @@ describe("getPromociones", () => {
     );
   });
 
+  it("should fall back to default limit when limit is NaN (e.g. ?limit=abc)", async () => {
+    const { getPromociones } = await import("../get-promociones");
+
+    mockFindForApiCursor.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      total: 0,
+    });
+
+    const ctx = { type: "apikey" as const, getTenantId: () => "tenant-1", apiKeyId: "key-1" };
+
+    await getPromociones({
+      ctx: ctx as never,
+      limit: Number("abc"),
+    });
+
+    expect(mockFindForApiCursor).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 20 }),
+    );
+  });
+
   it("should return empty result when repository returns no items", async () => {
     const { getPromociones } = await import("../get-promociones");
 

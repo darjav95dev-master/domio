@@ -24,6 +24,7 @@ import { RelatedProperties } from "@/features/engagement/components/RelatedPrope
 import { getContactConfig } from "@/features/engagement/server/get-contact-config";
 import { buildBreadcrumbJsonLd } from "@/features/seo/server/breadcrumb-json-ld";
 import { PROPERTY_TYPE_LABELS } from "@/shared/constants/domain-labels";
+import { serializeJsonLd } from "@/shared/utils/seo/json-ld";
 
 // Lee el inmueble (BBDD) en cada request; no se prerenderiza en build (sin DB).
 export const dynamic = "force-dynamic";
@@ -140,14 +141,14 @@ export default async function DetailPage({ params }: DetailPageProps) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(structuredData),
+            __html: serializeJsonLd(structuredData),
           }}
         />
       )}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd),
+          __html: serializeJsonLd(breadcrumbJsonLd),
         }}
       />
 

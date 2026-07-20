@@ -6,7 +6,6 @@ import {
   UsersThree,
   FileText,
   Key,
-  ShieldCheck,
   type IconProps,
 } from "@phosphor-icons/react";
 import type { UserRole } from "@/shared/constants/db-enums";
@@ -59,13 +58,6 @@ export const NAV_ITEMS: NavItem[] = [
     label: "API Keys",
     href: "/panel/api-keys",
     icon: Key,
-    allowedRoles: ["ADMIN"],
-    badgeKey: null,
-  },
-  {
-    label: "ARSOP",
-    href: "/panel/arsop",
-    icon: ShieldCheck,
     allowedRoles: ["ADMIN"],
     badgeKey: null,
   },

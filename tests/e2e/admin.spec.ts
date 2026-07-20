@@ -157,12 +157,14 @@ test.describe("Administrador — recorrido completo", () => {
     // Submit — button label: "Crear API key"
     await page.getByRole("button", { name: /crear api key/i }).click();
 
-    // Wait for success toast: "API key creada" — the dialog closes immediately
-    // after creation (handleCreated closes dialog + shows toast in the same render
-    // cycle), so the key is only visible in the toast, not inline.
+    // Tras crear, el mismo diálogo cambia su título (h2) a "API key creada"
+    // y muestra la clave una sola vez (no es un toast role="alert").
     await expect(
-      page.getByRole("alert").filter({ hasText: /API key creada/i }),
+      page.getByRole("heading", { name: /API key creada/i }),
     ).toBeVisible({ timeout: 10_000 });
+
+    // Cerrar el diálogo de resultado para no tapar la tabla/acciones detrás.
+    await page.getByRole("button", { name: /^cerrar$/i }).click();
 
     // Wait for the key to appear in the table (table refreshes via handleCreated)
     await page.waitForTimeout(1000);

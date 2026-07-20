@@ -19,5 +19,5 @@ export default async function EquipoPage() {
     redirect("/panel");
   }
 
-  return <TeamPageClient />;
+  return <TeamPageClient currentUserId={session.userId} />;
 }

@@ -16,6 +16,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 const TENANT_ID = "00000000-0000-4000-8000-000000000001";
 const API_KEY_ID = "key-001";
+const ENDPOINT_URL = "https://wedomio.com/api/v1/leads/institutional";
+const TEST_EMAIL = "test@example.com";
+const CONSENT = { legalBasis: "RGPD consent", textAccepted: "Acepto" } as const;
 
 // ---------------------------------------------------------------------------
 // Mocks — we mock the auth layer so the test focuses on the rate-limit order
@@ -88,7 +91,7 @@ describe("POST /api/v1/leads/institutional — auth before rate-limit ordering",
       withTransaction: vi.fn(),
     });
 
-    const request = new Request("https://wedomio.com/api/v1/leads/institutional", {
+    const request = new Request(ENDPOINT_URL, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -96,7 +99,7 @@ describe("POST /api/v1/leads/institutional — auth before rate-limit ordering",
       },
       body: JSON.stringify({
         name: "Test User",
-        email: "test@example.com",
+        email: TEST_EMAIL,
         phone: "+34600123456",
         message: "Quiero información",
         promocionId: "00000000-0000-4000-8000-000000000040",
@@ -129,20 +132,70 @@ describe("POST /api/v1/leads/institutional — auth before rate-limit ordering",
       new ContextResolutionError("Missing API key", 401),
     );
 
-    const request = new Request("https://wedomio.com/api/v1/leads/institutional", {
+    const request = new Request(ENDPOINT_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "Test User",
-        email: "test@example.com",
-        consent: { legalBasis: "RGPD consent", textAccepted: "Acepto" },
+        email: TEST_EMAIL,
+        consent: CONSENT,
       }),
     });
 
     const response = await POST(request);
     expect(response.status).toBe(401);
 
-    // Rate limiter should NOT be called when auth fails
-    expect(mockConsume).not.toHaveBeenCalled();
+    // La guarda por IP (previa a auth) sí puede consumir, pero el limiter POR
+    // CLAVE no debe consumirse cuando auth falla, y el fallo de auth sigue
+    // devolviendo 401 (no queda enmascarado como 429).
+    expect(mockConsume).not.toHaveBeenCalledWith(
+      API_KEY_ID,
+      expect.anything(),
+    );
+  });
+
+  it("does not consume the IP guard's budget as a 401 (auth failure is not masked as 429)", async () => {
+    const { ContextResolutionError } = await import(
+      "@/infrastructure/tenant/context-middleware"
+    );
+    mockValidateApiKey.mockRejectedValue(
+      new ContextResolutionError("Invalid or revoked API key", 403),
+    );
+
+    const request = new Request(ENDPOINT_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": "bad-key" },
+      body: JSON.stringify({
+        name: "Test User",
+        email: TEST_EMAIL,
+        consent: CONSENT,
+      }),
+    });
+
+    const response = await POST(request);
+    // El IP guard permite (mock allowed:true), así que gana el error de auth real.
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 429 from the IP guard BEFORE authenticating (M2)", async () => {
+    // El IP guard corre primero y deniega
+    mockConsume.mockResolvedValueOnce({
+      allowed: false,
+      remaining: 0,
+      limit: 120,
+      resetAt: new Date(Date.now() + 60_000),
+    });
+
+    const request = new Request(ENDPOINT_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": "any" },
+      body: "{}",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(429);
+    // No se debe intentar autenticar si la IP está limitada
+    expect(mockValidateApiKey).not.toHaveBeenCalled();
   });
 });

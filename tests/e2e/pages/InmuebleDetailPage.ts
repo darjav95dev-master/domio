@@ -9,11 +9,19 @@ import { BasePage } from "./BasePage";
 export class InmuebleDetailPage extends BasePage {
   protected readonly path = "/inmuebles";
 
+  // La ficha monta un mapa (maplibre) que pide tiles de forma continua, así que
+  // la red NUNCA reposa y "networkidle" hace timeout. Sobreescribimos la carga
+  // para usar "load" SOLO en la ficha (el resto de páginas mantiene networkidle).
+
   /**
    * Navigate to a specific property by slug.
    */
   async gotoSlug(slug: string): Promise<ReturnType<BasePage["goto"]>> {
-    return this.gotoPath(`/inmuebles/${slug}`);
+    return this.page.goto(`/inmuebles/${slug}`, { waitUntil: "load" });
+  }
+
+  async waitForLoad(): Promise<void> {
+    await this.page.waitForLoadState("load");
   }
 
   // ── Hero / Gallery ───────────────────────────────────────────────────

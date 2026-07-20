@@ -259,7 +259,7 @@ export class PromocionRepository extends TenantAwareRepository {
   }
 
   async create(
-    data: { name: string; kind: string },
+    data: { name: string; kind: string; assignedAgentId?: string },
   ): Promise<PromocionRow> {
     return this.withTransaction(async (tx) => {
       const [row] = await tx
@@ -273,6 +273,7 @@ export class PromocionRepository extends TenantAwareRepository {
           location: [0, 0] as [number, number],
           locationApprox: [0, 0] as [number, number],
           mapPrivacyMode: "EXACT" as "EXACT" | "AREA",
+          ...(data.assignedAgentId ? { assignedAgentId: data.assignedAgentId } : {}),
         })
         .returning();
 

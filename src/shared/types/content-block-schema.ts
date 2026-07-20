@@ -30,17 +30,51 @@ function isEventAttr(name: string): boolean {
 }
 
 /**
+ * Decodes numeric/hex HTML entities (&#106; / &#x6a;) so an entity-encoded
+ * `javascript:` scheme cannot slip past the protocol check — the browser
+ * decodes them before navigating.
+ */
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#x([0-9a-f]+);?/gi, (_m, hex: string) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);?/g, (_m, dec: string) =>
+      String.fromCodePoint(parseInt(dec, 10)),
+    );
+}
+
+/**
  * Checks if a URL value uses a dangerous protocol (javascript:, data:, vbscript:).
+ * Normaliza antes de comprobar: decodifica entidades HTML y elimina espacios y
+ * caracteres de control que el navegador ignora dentro del esquema (p. ej.
+ * `java\tscript:`), cerrando los bypasses habituales.
  */
 function isDangerousUrl(value: string): boolean {
-  const dangerous = /^\s*(javascript|data|vbscript):/i;
-  return dangerous.test(value);
+  const normalized = stripUrlNoise(decodeHtmlEntities(value)).toLowerCase();
+  return /^(javascript|data|vbscript):/.test(normalized);
+}
+
+/** Elimina espacios y caracteres de control (0x00–0x20) que el navegador ignora dentro del esquema. */
+function stripUrlNoise(value: string): string {
+  let out = "";
+  for (const ch of value) {
+    if (ch.codePointAt(0)! > 0x20) out += ch;
+  }
+  return out;
 }
 
 /**
  * Strips disallowed and dangerous attributes from HTML tags.
  * This is applied as a Zod transform BEFORE the allowed-tags validation,
  * so operators never see an error — the content is silently cleaned.
+ *
+ * ponytail: saneado por regex, no parser DOM. Cubre event handlers, esquemas
+ * peligrosos (con/sin comillas, entidades) y allowlist de tags/atributos. El
+ * techo conocido es que valores de atributo con whitespace interno se parten
+ * (defensa por accidente, pero segura). Si el rich-text crece, mover el saneado
+ * autoritativo al server con `sanitize-html` (solo servidor, no engorda el
+ * bundle cliente que importa este schema).
  */
 function sanitizeHtmlAttrs(html: string): string {
   return html.replace(/<([a-z][a-z0-9]*)\b([^>]*)>/gi, (full, tagName: string, attrs: string) => {
@@ -60,10 +94,19 @@ function sanitizeHtmlAttrs(html: string): string {
 
         if (isEventAttr(attrName)) return false;
 
-        // If the attribute has a value, check for dangerous URLs
-        const valueMatch = attr.match(/^[\w-]+\s*=\s*(['"])(.*?)\1$/);
-        if (valueMatch && (attrName === "href" || attrName === "src")) {
-          if (isDangerousUrl(valueMatch[2]!)) return false;
+        // If the attribute has a value, check for dangerous URLs.
+        // Cubre valor entrecomillado ('..'/"..") Y sin comillas (href=javascript:..),
+        // que antes se colaba porque solo se comprobaban los entrecomillados.
+        if (attrName === "href" || attrName === "src") {
+          const eqIndex = attr.indexOf("=");
+          if (eqIndex !== -1) {
+            let value = attr.slice(eqIndex + 1).trim();
+            const q = value[0];
+            if ((q === '"' || q === "'") && value.endsWith(q)) {
+              value = value.slice(1, -1);
+            }
+            if (isDangerousUrl(value)) return false;
+          }
         }
 
         // If the tag has an allowlist, only keep listed attributes

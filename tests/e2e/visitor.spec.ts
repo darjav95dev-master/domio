@@ -60,7 +60,7 @@ test.describe("Visitante público — recorrido completo", () => {
     await expect(home.heroSection).toBeVisible();
     await expect(home.heroClaim).toBeVisible();
     await expect(home.heroClaim).toHaveText(
-      /Tu hogar en Canarias empieza aqu/i,
+      /Tu hogar en Canarias/i,
     );
 
     // Hero CTAs

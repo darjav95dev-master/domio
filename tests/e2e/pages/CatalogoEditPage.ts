@@ -32,9 +32,12 @@ export class CatalogoEditPage extends BasePage {
 
   // ── Form Sections ────────────────────────────────────────────────────
 
-  /** The main PromocionForm component */
+  /**
+   * The main PromocionForm. No usa <form>: las secciones son <fieldset> con
+   * <legend> (rol implícito "group"). Anclamos a la sección "Identidad".
+   */
   get promocionForm(): Locator {
-    return this.page.locator("form").first();
+    return this.page.getByRole("group", { name: /identidad/i });
   }
 
   /** Construction status select (in the Commercial Status section) */

@@ -80,8 +80,9 @@ function createEmptyItem(): CalidadItem {
   return { title: "", description: "", icon: "" };
 }
 
-function itemKey(index: number, item: CalidadItem): string {
-  return `calidad-${index}-${item.title || "empty"}`;
+function itemKey(index: number): string {
+  // ponytail: index-only key to prevent remount on content change (focus loss bug)
+  return `calidad-${index}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +167,7 @@ export function BlockFormCalidades({
       <ul className="space-y-4" aria-label="Lista de calidades">
         {items.map((item, index) => (
           <li
-            key={itemKey(index, item)}
+            key={itemKey(index)}
             className="rounded-card border border-border-default bg-bg-surface p-4"
           >
             <div className="space-y-3">

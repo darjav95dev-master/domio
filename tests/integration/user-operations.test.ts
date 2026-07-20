@@ -470,4 +470,97 @@ describe("UserRepository", () => {
       await expect(repo.deactivate("nonexistent")).rejects.toThrow();
     });
   });
+
+  describe("reactivate", () => {
+    it("sets isActive to true", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        userId: ADMIN_ID,
+        role: "ADMIN",
+      });
+      const repo = new UserRepository(ctx);
+
+      const reactivatedRow = { ...baseUserRow, isActive: true };
+
+      setupMockTransaction(mockWithTx, [[reactivatedRow]]);
+
+      const result = await repo.reactivate(USER_ID);
+
+      expect(result).not.toBeNull();
+      expect(result.isActive).toBe(true);
+    });
+
+    it("throws when user does not exist", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        userId: ADMIN_ID,
+        role: "ADMIN",
+      });
+      const repo = new UserRepository(ctx);
+
+      mockWithTx.mockRejectedValue(new Error("not found"));
+
+      await expect(repo.reactivate("nonexistent")).rejects.toThrow();
+    });
+  });
+
+  describe("countActiveAdmins", () => {
+    it("returns the count of active admin rows", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        userId: ADMIN_ID,
+        role: "ADMIN",
+      });
+      const repo = new UserRepository(ctx);
+
+      setupMockTransaction(mockWithTx, [[{ count: "2" }]]);
+
+      const result = await repo.countActiveAdmins();
+
+      expect(result).toBe(2);
+    });
+
+    it("returns 0 when the count query returns no row", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        userId: ADMIN_ID,
+        role: "ADMIN",
+      });
+      const repo = new UserRepository(ctx);
+
+      setupMockTransaction(mockWithTx, [[]]);
+
+      const result = await repo.countActiveAdmins();
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe("delete", () => {
+    it("deletes an existing user", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        userId: ADMIN_ID,
+        role: "ADMIN",
+      });
+      const repo = new UserRepository(ctx);
+
+      setupMockTransaction(mockWithTx, [[{ id: USER_ID }]]);
+
+      await expect(repo.delete(USER_ID)).resolves.toBeUndefined();
+    });
+
+    it("throws when user does not exist (no row returned)", async () => {
+      const { ctx, mockWithTx } = createMockAuthCtx({
+        tenantId: TENANT_ID,
+        userId: ADMIN_ID,
+        role: "ADMIN",
+      });
+      const repo = new UserRepository(ctx);
+
+      setupMockTransaction(mockWithTx, [[]]);
+
+      await expect(repo.delete("nonexistent")).rejects.toThrow("not found");
+    });
+  });
 });

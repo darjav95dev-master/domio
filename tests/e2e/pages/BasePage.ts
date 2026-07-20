@@ -42,10 +42,12 @@ export abstract class BasePage {
   }
 
   /**
-   * Wait for the page to be fully loaded:
-   * - DOM content loaded
-   * - Network idle
-   * - No spinners/loaders visible (pragmatic timeout)
+   * Wait for the network to settle (networkidle).
+   *
+   * NOTA: las páginas con mapa (ficha /inmuebles) hacen peticiones de tiles
+   * continuas y "networkidle" no reposa; por eso `InmuebleDetailPage`
+   * sobreescribe la navegación para usar "load" solo en la ficha, sin cambiar
+   * el resto de páginas (donde networkidle es fiable).
    */
   async waitForLoad(): Promise<void> {
     await this.page.waitForLoadState("networkidle");

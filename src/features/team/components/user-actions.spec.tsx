@@ -8,10 +8,14 @@ import { UserActions } from "./user-actions";
 
 const mockUpdateUserAction = vi.hoisted(() => vi.fn());
 const mockDeactivateUserAction = vi.hoisted(() => vi.fn());
+const mockReactivateUserAction = vi.hoisted(() => vi.fn());
+const mockDeleteUserAction = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/team/actions/team.actions", () => ({
   updateUserAction: mockUpdateUserAction,
   deactivateUserAction: mockDeactivateUserAction,
+  reactivateUserAction: mockReactivateUserAction,
+  deleteUserAction: mockDeleteUserAction,
 }));
 
 const mockOnUpdated = vi.fn();
@@ -39,6 +43,10 @@ describe("UserActions", () => {
     mockDeactivateUserAction.mockResolvedValue({
       success: true as const,
       data: { ...defaultUser, isActive: false },
+    });
+    mockReactivateUserAction.mockResolvedValue({
+      success: true as const,
+      data: { ...defaultUser, isActive: true },
     });
   });
 
@@ -192,5 +200,115 @@ describe("UserActions", () => {
     await waitFor(() => {
       expect(screen.getByText("Te has desactivado a ti mismo.")).toBeInTheDocument();
     });
+  });
+
+  // ─── Reactivación ─────────────────────────────────────────────────────────
+
+  it("shows Activar and Eliminar buttons for inactive users", () => {
+    render(
+      <UserActions
+        user={{ ...defaultUser, isActive: false }}
+        onUpdated={mockOnUpdated}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /activar/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /eliminar/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /desactivar/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("calls reactivateUserAction when clicking Activar", async () => {
+    render(
+      <UserActions
+        user={{ ...defaultUser, isActive: false }}
+        onUpdated={mockOnUpdated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /activar/i }));
+
+    await waitFor(() => {
+      expect(mockReactivateUserAction).toHaveBeenCalledWith("user-1");
+    });
+  });
+
+  it("calls onUpdated after successful reactivation", async () => {
+    render(
+      <UserActions
+        user={{ ...defaultUser, isActive: false }}
+        onUpdated={mockOnUpdated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /activar/i }));
+
+    await waitFor(() => {
+      expect(mockOnUpdated).toHaveBeenCalled();
+    });
+  });
+
+  // ─── Eliminación ───────────────────────────────────────────────────────────
+
+  it("shows delete confirmation dialog for inactive users", () => {
+    render(
+      <UserActions
+        user={{ ...defaultUser, isActive: false }}
+        onUpdated={mockOnUpdated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /eliminar/i }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText(/¿Eliminar a Test User/i),
+    ).toBeInTheDocument();
+  });
+
+  it("calls deleteUserAction when confirming deletion", async () => {
+    mockDeleteUserAction.mockResolvedValue({
+      success: true as const,
+      data: { id: "user-1" },
+    });
+
+    render(
+      <UserActions
+        user={{ ...defaultUser, isActive: false }}
+        onUpdated={mockOnUpdated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /eliminar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sí, eliminar/i }));
+
+    await waitFor(() => {
+      expect(mockDeleteUserAction).toHaveBeenCalledWith("user-1");
+    });
+  });
+
+  it("shows error message when deletion is refused by backend", async () => {
+    mockDeleteUserAction.mockResolvedValue({
+      success: false as const,
+      error: "No puedes eliminar tu propia cuenta.",
+    });
+
+    render(
+      <UserActions
+        user={{ ...defaultUser, isActive: false }}
+        onUpdated={mockOnUpdated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /eliminar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sí, eliminar/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no puedes eliminar tu propia cuenta/i),
+      ).toBeInTheDocument();
+    });
+    expect(mockOnUpdated).not.toHaveBeenCalled();
   });
 });

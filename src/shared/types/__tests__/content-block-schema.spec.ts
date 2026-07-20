@@ -131,6 +131,51 @@ describe("contentBlockSchema", () => {
       }
     });
 
+    it("strips UNQUOTED javascript: URLs from href (bypass fix)", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          text: "<a href=javascript:alert(1)>click</a>",
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        expect(result.data.payload.text).not.toContain("javascript:");
+        expect(result.data.payload.text).toBe("<a>click</a>");
+      }
+    });
+
+    it("strips entity-encoded javascript: URLs from href (bypass fix)", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          // &#106; = 'j'  → &#106;avascript:
+          text: '<a href="&#106;avascript:alert(1)">click</a>',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        expect(result.data.payload.text).toBe("<a>click</a>");
+      }
+    });
+
+    it("never yields an executable javascript: scheme when the scheme has whitespace", () => {
+      const result = contentBlockSchema.safeParse({
+        blockType: B_DESC,
+        payload: {
+          text: '<a href="java\tscript:alert(1)">click</a>',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.blockType === B_DESC) {
+        // El split por whitespace rompe el esquema en dos tokens, así que
+        // "javascript:" nunca se reconstruye. Afirmamos la propiedad de
+        // seguridad (no hay esquema ejecutable), no la forma exacta del output.
+        expect(result.data.payload.text).not.toContain("javascript:");
+        expect(result.data.payload.text).not.toContain("script:alert");
+      }
+    });
+
     it("keeps valid href attributes on <a> tags", () => {
       const result = contentBlockSchema.safeParse({
         blockType: B_DESC,

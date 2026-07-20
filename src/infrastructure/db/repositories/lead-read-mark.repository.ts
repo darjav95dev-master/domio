@@ -5,6 +5,7 @@ import {
 } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
 import type { TenantContext } from "@/infrastructure/tenant/TenantContext";
+import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,6 +95,12 @@ export class LeadReadMarkRepository extends TenantAwareRepository {
 
   async getUnreadLeadIds(userId: string): Promise<string[]> {
     return this.withTransaction(async (tx) => {
+      // AGENT: only their assigned leads; ADMIN/OPERATOR: all tenant leads
+      const agentFilter =
+        this.ctx instanceof AuthenticatedContext && this.ctx.role === "AGENT"
+          ? eq(leads.assignedAgentId, userId)
+          : undefined;
+
       const rows = await tx
         .select({ id: leads.id })
         .from(leads)
@@ -107,7 +114,7 @@ export class LeadReadMarkRepository extends TenantAwareRepository {
         .where(
           and(
             eq(leads.tenantId, this.ctx.getTenantId()),
-            eq(leads.assignedAgentId, userId),
+            agentFilter,
             sql`${leadReadMarks.leadId} IS NULL`,
           ),
         );

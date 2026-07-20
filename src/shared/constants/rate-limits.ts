@@ -14,6 +14,15 @@
 export const DEFAULT_API_LIMIT_PER_MIN = 60;
 
 /**
+ * Guarda anti-abuso por IP en la API pública v1, ANTES de autenticar la clave.
+ * Solo frena floods de peticiones no autenticadas (fuerza bruta de claves /
+ * DoS sobre el bcrypt de verificación). Se fija muy por encima del límite por
+ * clave (2×) para no penalizar nunca a un consumidor legítimo, y NO aplica
+ * lockout: al pasar la ventana el contador se reinicia solo.
+ */
+export const PUBLIC_API_IP_MAX_PER_MIN = 120;
+
+/**
  * Maximum number of failed login attempts per IP within the login window.
  */
 export const LOGIN_MAX_ATTEMPTS = 5;

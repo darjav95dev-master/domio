@@ -288,4 +288,79 @@ export class UserRepository extends TenantAwareRepository {
       return updated;
     });
   }
+
+  /**
+   * Reactivates a previously deactivated user (isActive = true).
+   */
+  async reactivate(id: string): Promise<UserRow> {
+    return this.withTransaction(async (tx) => {
+      const [updated] = await tx
+        .update(users)
+        .set({ isActive: true })
+        .where(
+          and(
+            eq(users.id, id),
+            eq(users.tenantId, this.authCtx.getTenantId()),
+          ),
+        )
+        .returning();
+
+      if (!updated) {
+        throw new Error(`User with id ${id} not found`);
+      }
+
+      return updated;
+    });
+  }
+
+  /**
+   * Counts the active ADMIN users of the current tenant.
+   *
+   * Used to protect the last active admin from being deleted
+   * (otherwise the tenant would be permanently locked out).
+   */
+  async countActiveAdmins(): Promise<number> {
+    return this.withTransaction(async (tx) => {
+      const [row] = await tx
+        .select({ count: count() })
+        .from(users)
+        .where(
+          and(
+            eq(users.tenantId, this.authCtx.getTenantId()),
+            eq(users.role, "ADMIN"),
+            eq(users.isActive, true),
+          ),
+        );
+
+      return Number(row?.count ?? 0);
+    });
+  }
+
+  /**
+   * Hard-deletes a user from the tenant.
+   *
+   * All foreign keys referencing `users.id` use `ON DELETE SET NULL`
+   * (leads.assigned_agent_id, promociones.assigned_agent_id, …) or
+   * `ON DELETE CASCADE` (lead_notes, lead_history, …), so the delete
+   * cannot orfan historical rows. Tenant isolation is enforced by RLS.
+   *
+   * Throws if the user does not exist within the tenant.
+   */
+  async delete(id: string): Promise<void> {
+    return this.withTransaction(async (tx) => {
+      const [deleted] = await tx
+        .delete(users)
+        .where(
+          and(
+            eq(users.id, id),
+            eq(users.tenantId, this.authCtx.getTenantId()),
+          ),
+        )
+        .returning({ id: users.id });
+
+      if (!deleted) {
+        throw new Error(`User with id ${id} not found`);
+      }
+    });
+  }
 }

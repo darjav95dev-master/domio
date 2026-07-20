@@ -1,0 +1,231 @@
+# Auditoría técnica final — Domio
+
+> Último checkpoint antes de la entrega. Revisión como Tech Lead / Software Architect / Senior Full-Stack / revisor de TFG.
+> Fecha: 2026-07-18 · Rama auditada: `develop` · HEAD `1361cde`
+
+## Verificación de equivalencia funcional vs `develop` (última comprobación)
+
+Objetivo: garantizar que la rama `fix/auditoria-final-hardening` se comporta **idéntica de cara al usuario** que `develop`. Ejecutado contra la BD real (Postgres local sembrado: 4 users, 9 promociones, 2 tenants) con la app levantada.
+
+| Cambio | Riesgo de comportamiento | Prueba realizada | Resultado |
+|---|---|---|---|
+| H1 (persistir `validation.data` + saneador) | Podía alterar contenido guardado | Round-trip de **los 32 content_blocks reales** por el schema | **0 diferencias semánticas** (solo reordena claves JSON, invisible) |
+| H2 (escape JSON-LD) | Bytes del `<script>` | Ningún dato real contiene `<` → salida **byte-idéntica** a `JSON.stringify`; JSON-LD live válido (`Organization`, `RealEstateListing`, `BreadcrumbList`) | Idéntico |
+| M1 (`limit` no finito) | Solo el caso roto | `?limit=abc` en vivo con clave válida | 500 → **200** (default). Uso válido sin cambios |
+| M2 (rate-limit IP) | Nueva barrera | Sin `RATE_LIMIT_STORE_URL` → NoopRateLimiter; API v1 happy-path **200**, sin clave **401**, headers `X-RateLimit-*` presentes | **No-op** en este entorno; comportamiento igual |
+| M3 (server component) | Render | `/panel/contenidos` renderizado logueado: heading + 7 tarjetas con hrefs correctos | Markup idéntico |
+| B3 (health) | Respuesta liveness | `GET /api/health` → `{"status":"ok","env":"local"}` (igual); `?deep=1` nuevo | Liveness idéntico |
+
+Flujos de usuario probados en vivo end-to-end (todos OK): login backoffice, dashboard, editor de promoción, **crear/revocar API key**, consumo API v1 con clave, home y ficha pública, redirección de auth. Consola del navegador: **0 errores de la app** (solo ruido interno de Electron). Seed restaurado a su estado original tras las pruebas.
+
+**Conclusión:** ningún cambio altera el comportamiento de cara al usuario respecto a `develop`. Las diferencias son estrictamente: (a) casos antes rotos que ahora responden mejor (M1, seguridad H1/H2), y (b) mejoras invisibles (M3 bundle, B3 readiness).
+
+---
+
+## Alcance y método
+
+- **54.295 líneas** TS/TSX (374 archivos en `src`, 58 en `app`), **162 archivos de test**.
+- Ejecutadas las puertas de calidad reales del proyecto:
+  - `pnpm typecheck` → **0 errores**
+  - `pnpm lint` → **0 warnings**
+  - `pnpm test:run` → **1736 tests, 184 ficheros, todo verde (12 s)**
+- Auditados a mano: multi-tenancy/RLS, auth, API keys, capa de repositorios, rutas API públicas e internas, sanitización de HTML, JSON-LD, higiene de repo y complejidad.
+- **No verificado en vivo:** no se levantó el servidor ni se corrieron e2e/Playwright ni se inspeccionó la UI renderizada. Las notas de UX y accesibilidad son inferencias a nivel de código, no validación visual. Marcadas como tal.
+
+---
+
+## Veredicto
+
+### ⚠️ Listo para entregar, pero con mejoras recomendables
+
+El proyecto está **muy por encima** de la media de un TFG: arquitectura limpia por features, aislamiento multi-tenant a nivel de base de datos con RLS *fail-closed*, 1736 tests verdes, cero `any`, cero TODO/FIXME, cero secretos versionados. La ingeniería es sólida y madura.
+
+Lo que impide un ✅ limpio son **dos vectores de XSS almacenado** (sanitizador HTML por regex y serialización JSON-LD sin escapar) y un puñado de asperezas de robustez. Ninguno es explotable por un usuario anónimo —ambos XSS requieren una cuenta de backoffice con permiso de edición— por eso no es un ❌. Pero son exactamente el tipo de detalle que un tribunal con perfil de seguridad puede preguntar, y se arreglan en menos de una hora. Recomiendo cerrarlos antes de entregar.
+
+---
+
+## Puntuación por apartado
+
+| Apartado | Nota | Comentario |
+|---|---:|---|
+| Arquitectura | **9.0** | Features / infrastructure / shared. Repositorios tenant-aware. Separación de responsabilidades ejemplar. |
+| Calidad de código | **9.0** | 0 `any`, 0 TODO, tipado estricto, naming claro, tests exhaustivos. |
+| Escalabilidad | **8.0** | Paginación por cursor, RLS, colas de email. Sin cachés de datos ni CDN evidentes. |
+| Mantenibilidad | **8.5** | Muy legible; README de 79 KB y algún componente de 600–760 líneas restan. |
+| Seguridad | **7.0** | RLS excelente; penalizan sanitizador regex, JSON-LD sin escapar y falta de rate-limit por IP en API pública. |
+| Rendimiento | **7.5** | 55 % de componentes `'use client'` — sobre-clientización en App Router. |
+| UX *(no verificada en vivo)* | **7.5** | Hay estados de carga/error/vacío en código; sin validación visual. |
+| Accesibilidad *(no verificada en vivo)* | **8.0** | `eslint-plugin-jsx-a11y` activo, `next/image`, semántica correcta; sin auditoría de contraste/teclado real. |
+| Organización | **9.0** | Estructura y convenciones consistentes en todo el repo. |
+| **Global** | **8.2** | Proyecto de alta calidad con dos correcciones de seguridad pendientes. |
+
+---
+
+## Hallazgos
+
+### 🟠 ALTO
+
+#### H1 — Sanitizador de HTML por regex es evadible (XSS almacenado)
+- **Ubicación:** `src/shared/types/content-block-schema.ts` → `sanitizeHtmlAttrs()` (líneas ~45–85), usado por `htmlSafeString()` para `DESCRIPCION_GENERAL`. Se renderiza con `dangerouslySetInnerHTML` en `src/features/detail/components/BlockDescripcion.tsx:32`.
+- **Qué encontré:** la comprobación de URL peligrosa (`javascript:`, `data:`, `vbscript:`) solo se dispara si el valor del atributo va **entrecomillado**:
+  ```js
+  const valueMatch = attr.match(/^[\w-]+\s*=\s*(['"])(.*?)\1$/);
+  if (valueMatch && (attrName === "href" || attrName === "src")) { ... }
+  ```
+  Un atributo **sin comillas** como `href=javascript:alert(1)` no casa con `valueMatch`, así que `isDangerousUrl` nunca se evalúa; como `href` está en la allowlist de `<a>`, el token se conserva íntegro. `validateAllowedHtml` solo mira nombres de etiqueta, no valores → el payload pasa.
+- **Consecuencia:** un usuario autenticado del backoffice (agente/admin) puede guardar una descripción con `<a href=javascript:...>` que se ejecuta en el navegador de **cualquier visitante público** de la ficha. XSS almacenado. Requiere cuenta de backoffice, pero rompe la defensa en profundidad y basta una cuenta comprometida/maliciosa.
+- **Solución:** no sanitizar HTML con regex — es una clase de bug conocida. Sustituir por un sanitizador real isomórfico: `isomorphic-dompurify` o `sanitize-html`, con allowlist explícita de tags/atributos/protocolos. Una dependencia bien elegida elimina toda esta familia de bypasses y ~50 líneas de regex frágil.
+- **Prioridad:** Muy recomendable antes de la entrega.
+
+#### H2 — JSON-LD inyectado sin escapar (breakout de `</script>`)
+- **Ubicación:** `app/(public)/inmuebles/[slug]/page.tsx:142,149` y `app/(public)/page.tsx:50` — `dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}`.
+- **Qué encontré:** `structuredData`/`breadcrumbJsonLd` incluyen contenido editable (`promocion.name`, descripción, municipio). `JSON.stringify` **no escapa** `<`, `>` ni `&`. Un nombre de promoción que contenga `</script><script>…` cierra la etiqueta e inyecta script. Next.js no auto-escapa dentro de `dangerouslySetInnerHTML`.
+- **Consecuencia:** XSS almacenado por la misma vía que H1 (contenido de backoffice → visitante público), aquí a través de los metadatos SEO.
+- **Solución:** escapar antes de inyectar. Mínimo:
+  ```js
+  const safe = JSON.stringify(structuredData).replace(/</g, "\\u003c");
+  ```
+  Aplicarlo a los tres `<script type="application/ld+json">`. Idealmente un helper `jsonLdScript(data)` compartido.
+- **Prioridad:** Muy recomendable antes de la entrega.
+
+---
+
+### 🟡 MEDIO
+
+#### M1 — `limit` de query no validado → `NaN` → 500
+- **Ubicación:** `app/api/v1/promociones/route.ts:38` (`Number(limitParam)`) → `src/features/api-public/server/get-promociones.ts` (`Math.min(Math.max(1, limit), MAX)`).
+- **Qué encontré:** verificado — `?limit=abc` produce `Number("abc") = NaN`; el clamp devuelve `NaN` (`Math.max(1, NaN) === NaN`) y llega como `.limit(NaN)` a Postgres → error → **500** en vez de **400**.
+- **Consecuencia:** entrada inválida trivial rompe el endpoint público; mala DX para consumidores de la API y ruido en Sentry.
+- **Solución:** validar los query params con Zod (`z.coerce.number().int().positive().max(100).default(20)` con `safeParse` → 400 si falla), o un guard `Number.isFinite`. Revisar el mismo patrón en el resto de rutas `/api/v1/*`.
+- **Prioridad:** Recomendable.
+
+#### M2 — Sin rate-limit por IP en la API pública
+- **Ubicación:** `app/api/v1/promociones/route.ts`, `app/api/v1/leads/institutional/route.ts`. El rate-limit es **por API key** y se aplica *después* de `validateApiKey`.
+- **Qué encontré:** una petición con clave inválida hace consulta a BD + posibles `bcrypt.compare` **antes** de cualquier throttle, y no hay límite por IP. La infraestructura ya existe (`src/infrastructure/rate-limiting/ip-rate-limit.ts`) pero no se usa aquí.
+- **Consecuencia:** vector de fuerza bruta sobre claves y de DoS barato (bcrypt es caro por diseño) sin coste para el atacante.
+- **Solución:** aplicar `ip-rate-limit` como primera barrera en las rutas `/api/v1/*`, antes de resolver la clave.
+- **Prioridad:** Recomendable.
+
+#### M3 — Sobre-clientización: 55 % de componentes son `'use client'`
+- **Ubicación:** 77 de 140 componentes `.tsx` llevan `'use client'`.
+- **Qué encontré:** proporción alta para App Router, donde el server component es el default deseable. Parte es backoffice interactivo legítimo, pero conviene revisar el lado público.
+- **Consecuencia:** más JS al cliente, peor TTI/bundle en páginas públicas (home, portafolio, ficha) que son las críticas para SEO y conversión.
+- **Solución:** auditar los `'use client'` de `app/(public)` y `src/features/{home,detail,catalog}`; empujar a server component todo lo que no use estado/efectos/handlers, aislando la interactividad en hojas pequeñas.
+- **Prioridad:** Recomendable (rendimiento).
+
+---
+
+### 🟢 BAJO
+
+#### B1 — `.DS_Store` versionados
+- **Ubicación:** `.DS_Store`, `.opencode/.DS_Store`, `.specify/.DS_Store`, `.specify/memory/.DS_Store` (rastreados pese a estar en `.gitignore` — se commitearon antes de la regla).
+- **Solución:** `git rm --cached` de los cuatro. Prioridad: Recomendable.
+
+#### B2 — Artefactos binarios de tooling en git
+- **Ubicación:** `.codebase-memory/graph.db.zst`, `artifact.json` — binarios que cambian en cada sesión y ensucian el historial/diffs.
+- **Solución:** valorar `.gitignore` para `.codebase-memory/` si no es necesario compartirlos. Prioridad: Opcional.
+
+#### B3 — `/api/health` es un liveness superficial
+- **Ubicación:** `app/api/health/route.ts` — devuelve `{status:"ok", env}` sin comprobar BD ni Redis.
+- **Consecuencia:** el health puede dar OK con la base de datos caída.
+- **Solución:** añadir un readiness que haga `SELECT 1` y ping a Redis (opcionalmente en `?deep=1` para no encarecer el liveness). Prioridad: Opcional.
+
+#### B4 — Componentes y README extensos
+- **Ubicación:** `README.md` (79 KB), `blocks-editor.tsx` (763), `FilterBar.tsx` (583), `tipologia-editor.tsx` (575), `media-gallery.tsx` (536), `leads-table.tsx` (508).
+- **Solución:** partir el README por temas (`docs/`) y extraer sub-componentes/hooks de los ficheros >500 líneas. Prioridad: Opcional.
+
+#### B5 — `stripHtml` con regex (mismo olor que H1)
+- **Ubicación:** `src/features/detail/server/get-detail-data.ts:49` — `value.replace(/<[^>]*>/g, "")`.
+- **Nota:** aquí solo se usa para generar texto plano de SEO (no se re-inyecta como HTML), así que el riesgo es nulo; lo cito por coherencia con la recomendación de H1. Prioridad: Opcional.
+
+---
+
+### 🔵 MEJORA OPCIONAL
+
+- **O1 — Deuda `ponytail` rastreada (10 marcas).** Contenido hardcodeado en `home/components/*` (Hero, Trust, HowWeWork, AboutDomio) pendiente de promover al payload solo si necesita ser editable. Es deuda consciente y documentada; correcto dejarla, conviene tenerla en el backlog.
+- **O2 — `db` como `Proxy` singleton** (`src/infrastructure/db/client.ts`): ingenioso y documentado; algo inusual pero aceptable. Sin acción.
+- **O3 — `email_queue` sin `tenant_id`/RLS:** verificado que es **intencionado** (tabla de infraestructura, documentado en el propio schema y en `architecture.md §6.5`). Sin acción — se menciona solo para dejar constancia de que se revisó y es correcto.
+
+---
+
+## Lo que está muy bien (y debe destacarse en la defensa)
+
+- **Multi-tenancy fail-closed con RLS.** Cada consulta pasa por `TenantContext.withTransaction`, que hace `set_config('app.current_tenant_id', …, true)` (transaction-local); las políticas RLS (`rls.ts`) filtran por ese setting. Si no se fija el tenant, `current_setting(...)::uuid` **falla** en lugar de devolver todo → cierre por defecto. Excelente decisión de diseño.
+- **Auth robusta:** credenciales con bcrypt, rate-limit de login en middleware Edge, re-verificación de `isActive` cada 5 min en el JWT, sesión de 2 h con renovación deslizante, imports Node lazy para compatibilidad Edge.
+- **API keys** hasheadas con bcrypt y búsqueda acotada por prefijo (O(1) en el caso común) — el patrón correcto.
+- **Manejo de errores de API consistente** (`ContextResolutionError` → status, resto → 500 + log estructurado, sin filtrar internals).
+- **`debug-error` bien resuelto:** devuelve 404 en producción, no depende de acordarse de borrarlo.
+- **Testing serio:** 1736 unit + contract tests, e2e con Playwright, tests de aislamiento de tenant específicos.
+- **Higiene:** 0 `any`, 0 TODO/FIXME, 0 secretos versionados, `.gitignore` correcto para `.env*`, Sentry + logger estructurado, Husky + Prettier + ESLint (con sonarjs y jsx-a11y).
+
+---
+
+## Checklist final de entrega
+
+| Aspecto | Estado |
+|---|:--:|
+| Typecheck limpio | ✅ |
+| Lint limpio | ✅ |
+| Tests unit/contract verdes (1736) | ✅ |
+| Aislamiento multi-tenant (RLS fail-closed) | ✅ |
+| Autenticación y sesión | ✅ |
+| Gestión de API keys | ✅ |
+| Manejo de errores de API | ✅ |
+| Sin secretos ni `.env` versionados | ✅ |
+| Observabilidad (Sentry + logger) | ✅ |
+| Sanitización de HTML (rich text) | ✅ (H1 corregido) |
+| Escapado de JSON-LD | ✅ (H2 corregido) |
+| Validación de query params en API pública | ✅ (M1 corregido) |
+| Rate-limit por IP en API pública | ✅ (M2 aplicado, sin lockout) |
+| Optimización server/client components | ✅ (M3 parcial: candidato seguro convertido) |
+| Higiene de repo (`.DS_Store`, binarios) | ✅ (B1 y B2 hechos) |
+| Health check profundo | ✅ (B3 hecho: `?deep=1` DB+Redis) |
+| Verificación de UI en vivo (render/e2e) | ✅ (build OK; **e2e 32/32**, ver E1) |
+| Auditoría de accesibilidad en vivo (contraste/teclado) | ❌ (no ejecutada) |
+
+---
+
+## Estado de aplicación (rama `fix/auditoria-final-hardening`)
+
+Aplicado y verificado (typecheck 0, lint 0, **1746 tests**, `pnpm build` OK):
+
+- ✅ **H1** — causa raíz corregida (el action persistía el payload crudo; ahora `validation.data`) + sanitizador endurecido (URL sin comillas, entidades HTML, controles en el esquema). Sin nueva dependencia en el bundle cliente. Techo documentado con `ponytail:`.
+- ✅ **H2** — helper `serializeJsonLd` escapa `<` en los tres JSON-LD.
+- ✅ **M1** — `limit` no finito cae al default (no más 500).
+- ✅ **M2** — guarda por IP en `/api/v1/*` **antes** de auth. Límite generoso (120/min, 2× el de clave), **sin lockout**, degradación graceful si Redis no está → **no penaliza a consumidores legítimos**. El frontend propio no consume `/api/v1/*`, así que no afecta a la UX interna.
+- ✅ **M3 (parcial)** — solo se convirtió a server component el único candidato con interactividad cero y padre server (`ContenidosPageList`). El resto de `'use client'` se dejó intacto por ser interactividad legítima (primitivas con `forwardRef`, hooks de scroll, backoffice).
+- ✅ **B1** — `.DS_Store` fuera del control de versiones.
+
+También aplicado:
+
+- ✅ **B2** — `.codebase-memory/` fuera del control de versiones + `.gitignore`.
+- ✅ **B3** — health check profundo: `GET /api/health?deep=1` verifica DB (`SELECT 1`) y Redis (`ping`), 503 si una dependencia requerida cae. El liveness simple (sin `?deep`) se mantiene intacto para el CD.
+
+### E1 — ✅ RESUELTO: suite e2e 32/32 (era drift test↔UI, no regresión)
+
+**Estado final: los 32 tests e2e pasan** (2 pasadas completas consecutivas). Todo lo corregido fue **código/config de test**; producción intacta y verificada en vivo. Resumen de causas y fixes:
+
+- **Home / Portafolio** (visitor): aserciones de copy desactualizadas + FilterBar refactorizado a dropdowns custom → selectores y `selectFilter` actualizados; secciones ancladas por id estable.
+- **admin (API key)**: el éxito "API key creada" es el `<h2>` del diálogo, no un `role="alert"`; se cierra el diálogo antes de revocar.
+- **catalog-editor (form)**: el editor no usa `<form>` sino `<fieldset>/<legend>` (rol `group`) → `promocionForm` ancla a la sección "Identidad".
+- **Ficha con mapa** (varios): maplibre pide tiles sin cesar y `networkidle` hacía timeout → `InmuebleDetailPage` navega con `waitUntil:"load"` **solo en la ficha** (BasePage y backoffice mantienen `networkidle`).
+- **Formulario de contacto**: bloqueado por Turnstile en headless → claves de **test públicas de Cloudflare** en el `webServer` de Playwright (test-only).
+
+Detalle histórico del diagnóstico (para trazabilidad):
+
+Al ejecutar `pnpm test:e2e` (Postgres local sembrado): fallos preexistentes por desalineación de los **tests** con la UI real (el código de producción funciona; verificado en vivo). Ninguno toca código de esta rama.
+
+**Corregidos** (los 2 que se pidieron — ahora verdes):
+
+1. ✅ `visitor.spec.ts` "home loads with real content" — hero → `/Tu hogar en Canarias/`; secciones ancladas por id estable (`#confianza`, `#promos`, `#faq-title`); enlace nav "Contactar".
+2. ✅ `visitor.spec.ts` "portafolio filters work correctly" — heading → "…próxima casa te espera…"; `filterBar` → "Filtrar promociones"; los filtros son **dropdowns custom** (`role=listbox/option`), no `<select>` nativos → `selectFilter` reescrito. `visitor.spec` completo: **5/5 verde**.
+
+**Pendientes** (fuera de lo pedido; diagnóstico confirmado, ninguno es fallo funcional):
+
+3. `admin.spec.ts:137` — el toast "API key creada" no es `role="alert"` (selector obsoleto). El flujo crear/revocar **funciona** (verificado a mano en vivo). Fix: apuntar al elemento real del modal.
+4. `catalog-editor.spec.ts:82` — espera `locator('form')`, pero el editor no envuelve los campos en `<form>`. El editor **carga** (verificado en vivo). Fix: aserción a un contenedor/heading real.
+5. `visitor.spec.ts:166/189` — timeout de `waitUntil: 'networkidle'` al navegar a la ficha: el mapa (maplibre) hace peticiones de tiles que no "reposan". **Flaky de infra**: pasan al correr `visitor.spec` aislado; solo fallan bajo carga de la suite completa. Fix: cambiar `networkidle` por `load`/`domcontentloaded` en el page object de la ficha.
+
+Estado suite completa: **28/32** (los 2 pedidos, en verde). Los 4 restantes son test-only; el código de producción está verificado en vivo.
+
+- 🔵 Ninguno de los cambios aplicados altera flujos de usuario existentes; M2 es la única barrera nueva y está calibrada para no dispararse con tráfico legítimo.

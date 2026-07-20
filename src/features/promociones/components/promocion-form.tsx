@@ -30,6 +30,8 @@ export interface PromocionFormProps {
   publishBlocked?: PublishBlockedInfo | null;
   /** Override the autosave interval in milliseconds. Defaults to 30000. */
   autosaveIntervalMs?: number;
+  /** When false (AGENT role), the Publicar button is hidden. */
+  canPublish?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +59,7 @@ export function PromocionForm({
   currentStatus,
   publishBlocked = null,
   autosaveIntervalMs = 30000,
+  canPublish = true,
 }: PromocionFormProps) {
   const {
     formState,
@@ -164,8 +167,8 @@ export function PromocionForm({
           island: formState.island,
           municipality: formState.municipality,
           address: formState.address,
-          lng: null,
-          lat: null,
+          lng: formState.lng,
+          lat: formState.lat,
           mapPrivacyMode: formState.mapPrivacyMode,
         }}
         errors={sectionErrors.location}
@@ -207,14 +210,16 @@ export function PromocionForm({
           {isLoading ? "Guardando…" : "Guardar borrador"}
         </Button>
 
-        <Button
-          type="button"
-          variant="primary"
-          disabled={isLoading}
-          onClick={handlePublish}
-        >
-          {isLoading ? "Publicando…" : "Publicar"}
-        </Button>
+        {canPublish && (
+          <Button
+            type="button"
+            variant="primary"
+            disabled={isLoading}
+            onClick={handlePublish}
+          >
+            {isLoading ? "Publicando…" : "Publicar"}
+          </Button>
+        )}
 
         {hasDraft && (
           <button

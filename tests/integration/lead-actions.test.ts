@@ -275,7 +275,7 @@ describe("LeadActions", () => {
 
       await expect(
         updateLeadStatusAction(LEAD_ID, "WON"),
-      ).rejects.toThrow("Invalid status transition");
+      ).rejects.toThrow("Transición de estado no permitida");
     });
   });
 

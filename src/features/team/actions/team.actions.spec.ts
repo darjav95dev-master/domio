@@ -5,6 +5,8 @@ import {
   createUserAction,
   updateUserAction,
   deactivateUserAction,
+  reactivateUserAction,
+  deleteUserAction,
 } from "./team.actions";
 import type { UserRow } from "@/shared/types/user-schema";
 import type { UserRole } from "@/shared/constants/db-enums";
@@ -13,13 +15,16 @@ import type { UserRole } from "@/shared/constants/db-enums";
 
 const mockGetServerSession = vi.hoisted(() => vi.fn());
 
-const { mockFindAll, mockFindById, mockCreate, mockUpdate, mockDeactivate } =
+const { mockFindAll, mockFindById, mockCreate, mockUpdate, mockDeactivate, mockReactivate, mockDelete, mockCountActiveAdmins } =
   vi.hoisted(() => ({
     mockFindAll: vi.fn(),
     mockFindById: vi.fn(),
     mockCreate: vi.fn(),
     mockUpdate: vi.fn(),
     mockDeactivate: vi.fn(),
+    mockReactivate: vi.fn(),
+    mockDelete: vi.fn(),
+    mockCountActiveAdmins: vi.fn(),
   }));
 
 vi.mock("@/infrastructure/db/repositories/user.repository", () => ({
@@ -29,6 +34,9 @@ vi.mock("@/infrastructure/db/repositories/user.repository", () => ({
     create: mockCreate,
     update: mockUpdate,
     deactivate: mockDeactivate,
+    reactivate: mockReactivate,
+    delete: mockDelete,
+    countActiveAdmins: mockCountActiveAdmins,
   })),
 }));
 
@@ -207,6 +215,34 @@ describe("createUserAction", () => {
     expect(result.success).toBe(false);
     expect(mockCreate).not.toHaveBeenCalled();
   });
+
+  it("should return friendly error when email already exists in tenant (23505)", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    const err = Object.assign(new Error("duplicate key value violates unique constraint"), { code: "23505" });
+    mockCreate.mockRejectedValue(err);
+
+    const result = await createUserAction({
+      email: "existing@example.com",
+      name: "Duplicate User",
+      role: "AGENT",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/ya existe un usuario con ese correo/i);
+    }
+    expect(mockCreate).toHaveBeenCalled();
+  });
+
+  it("should rethrow non-duplicate errors", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    const err = new Error("unexpected DB error");
+    mockCreate.mockRejectedValue(err);
+
+    await expect(
+      createUserAction({ email: "user@example.com", name: "Test", role: "AGENT" }),
+    ).rejects.toThrow("unexpected DB error");
+  });
 });
 
 describe("updateUserAction", () => {
@@ -282,5 +318,109 @@ describe("deactivateUserAction", () => {
 
     expect(result.success).toBe(false);
     expect(mockDeactivate).not.toHaveBeenCalled();
+  });
+});
+
+describe("reactivateUserAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should reactivate user when admin", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    mockReactivate.mockResolvedValue({ ...mockUserRow, isActive: true });
+
+    const result = await reactivateUserAction("user-1");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isActive).toBe(true);
+    }
+    expect(mockReactivate).toHaveBeenCalledWith("user-1");
+  });
+
+  it("should reject non-admin users", async () => {
+    mockGetServerSession.mockResolvedValue(operatorSession);
+
+    const result = await reactivateUserAction("user-1");
+
+    expect(result.success).toBe(false);
+    expect(mockReactivate).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteUserAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should delete a non-admin user when admin", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    mockFindById.mockResolvedValue({ ...mockUserRow, role: "AGENT", isActive: true });
+    mockDelete.mockResolvedValue(undefined);
+
+    const result = await deleteUserAction("user-1");
+
+    expect(result.success).toBe(true);
+    expect(mockDelete).toHaveBeenCalledWith("user-1");
+    expect(mockCountActiveAdmins).not.toHaveBeenCalled();
+  });
+
+  it("should delete an admin when other active admins exist", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    mockFindById.mockResolvedValue({ ...mockUserRow, role: "ADMIN", isActive: true });
+    mockCountActiveAdmins.mockResolvedValue(2);
+    mockDelete.mockResolvedValue(undefined);
+
+    const result = await deleteUserAction("user-2");
+
+    expect(result.success).toBe(true);
+    expect(mockDelete).toHaveBeenCalledWith("user-2");
+  });
+
+  it("should refuse to delete the last active admin", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    mockFindById.mockResolvedValue({ ...mockUserRow, id: "user-2", role: "ADMIN", isActive: true });
+    mockCountActiveAdmins.mockResolvedValue(1);
+
+    const result = await deleteUserAction("user-2");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/último administrador/i);
+    }
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("should refuse to delete your own account", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+
+    const result = await deleteUserAction("admin-1");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/tu propia cuenta/i);
+    }
+    expect(mockFindById).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("should refuse when target does not exist in tenant", async () => {
+    mockGetServerSession.mockResolvedValue(adminSession);
+    mockFindById.mockResolvedValue(null);
+
+    const result = await deleteUserAction("ghost");
+
+    expect(result.success).toBe(false);
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("should reject non-admin callers", async () => {
+    mockGetServerSession.mockResolvedValue(operatorSession);
+
+    const result = await deleteUserAction("user-1");
+
+    expect(result.success).toBe(false);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });

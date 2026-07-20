@@ -81,11 +81,20 @@ export async function createUserAction(
   }
 
   const repo = getUserRepo(auth.ctx);
-  const user = await repo.create({
-    email: parsed.data.email,
-    name: parsed.data.name,
-    role: parsed.data.role as UserRole,
-  });
+
+  let user;
+  try {
+    user = await repo.create({
+      email: parsed.data.email,
+      name: parsed.data.name,
+      role: parsed.data.role as UserRole,
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      return { success: false, error: "Ya existe un usuario con ese correo electrónico en este equipo." };
+    }
+    throw err;
+  }
 
   return { success: true, data: mapUserRow(user) };
 }
@@ -140,6 +149,75 @@ export async function deactivateUserAction(
     data: mapUserRow(user),
     ...(warning ? { warning } : {}),
   } as ActionResult<UserResponse>;
+}
+
+/**
+ * reactivateUserAction — re-enable a previously soft-deleted user.
+ * Only ADMIN can call this.
+ */
+export async function reactivateUserAction(
+  id: string,
+): Promise<ActionResult<UserResponse>> {
+  const auth = await requireAdmin();
+  if (!auth.authorized) return auth.result;
+
+  const repo = getUserRepo(auth.ctx);
+  const user = await repo.reactivate(id);
+
+  return { success: true, data: mapUserRow(user) };
+}
+
+/**
+ * deleteUserAction — permanently remove a user from the tenant.
+ *
+ * Safety guards:
+ *  - cannot delete your own account (would lock yourself out)
+ *  - cannot delete the last remaining active ADMIN of the tenant
+ *    (would leave the tenant without any admin access)
+ *
+ * Foreign keys to `users.id` are all `ON DELETE SET NULL` or `CASCADE`,
+ * so the delete cannot orphan rows; historical references are nullified.
+ *
+ * Only ADMIN can call this.
+ */
+export async function deleteUserAction(
+  id: string,
+): Promise<ActionResult<{ id: string }>> {
+  const auth = await requireAdmin();
+  if (!auth.authorized) return auth.result;
+
+  // Guard: cannot delete your own account
+  if (id === auth.ctx.userId) {
+    return {
+      success: false,
+      error: "No puedes eliminar tu propia cuenta. Pide a otro administrador que lo haga.",
+    };
+  }
+
+  const repo = getUserRepo(auth.ctx);
+
+  // Verify the target user exists within the tenant and is an ADMIN worth
+  // protecting (only the last-active-admin case is blocked).
+  const target = await repo.findById(id);
+  if (!target) {
+    return { success: false, error: "El usuario no existe o no pertenece a este tenant." };
+  }
+
+  if (target.role === "ADMIN" && target.isActive) {
+    const activeAdmins = await repo.countActiveAdmins();
+    if (activeAdmins <= 1) {
+      return {
+        success: false,
+        error:
+          "No se puede eliminar al último administrador activo del tenant. " +
+          "Nombra otro ADMIN antes de eliminarlo o desactívalo en su lugar.",
+      };
+    }
+  }
+
+  await repo.delete(id);
+
+  return { success: true, data: { id } };
 }
 
 // ---------------------------------------------------------------------------

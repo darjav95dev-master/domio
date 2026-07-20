@@ -44,6 +44,7 @@ export async function submitContactForm(
   const raw = {
     name: formData.get("name") as string,
     email: formData.get("email") as string,
+    phone: (formData.get("phone") as string) || undefined,
     message: formData.get("message") as string,
   };
 
@@ -63,19 +64,23 @@ export async function submitContactForm(
   if (contactEmail) {
     const emailService = new EmailService(new EmailRepository());
 
-    // Notificación interna al negocio.
-    await emailService.enqueue({
-      toEmail: contactEmail,
-      template: EMAIL_TEMPLATE_NAMES.CONTACT_FORM_NOTIFICATION,
-      payload: parsed.data satisfies Record<string, unknown>,
-    });
+    try {
+      // Notificación interna al negocio.
+      await emailService.enqueue({
+        toEmail: contactEmail,
+        template: EMAIL_TEMPLATE_NAMES.CONTACT_FORM_NOTIFICATION,
+        payload: parsed.data satisfies Record<string, unknown>,
+      });
 
-    // Confirmación a quien rellenó el formulario (como en el flujo de leads).
-    await emailService.enqueue({
-      toEmail: parsed.data.email,
-      template: EMAIL_TEMPLATE_NAMES.CONTACT_FORM_CONFIRMATION,
-      payload: { name: parsed.data.name, contactEmail },
-    });
+      // Confirmación a quien rellenó el formulario (como en el flujo de leads).
+      await emailService.enqueue({
+        toEmail: parsed.data.email,
+        template: EMAIL_TEMPLATE_NAMES.CONTACT_FORM_CONFIRMATION,
+        payload: { name: parsed.data.name, contactEmail },
+      });
+    } catch {
+      // Email delivery is best-effort — a queue failure never blocks submission.
+    }
   }
 
   return { success: true };

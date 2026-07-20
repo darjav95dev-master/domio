@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { contactFormSchema } from "./submit-contact.schema";
 
+/* eslint-disable sonarjs/no-duplicate-string -- test file: name stub "Juan" is intentionally repeated */
 describe("contactFormSchema", () => {
   const VALID_EMAIL = "juan@example.com";
   const SHORT_MSG = "Hola";
@@ -14,6 +15,38 @@ describe("contactFormSchema", () => {
       message: "Quiero información",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts valid input with phone", () => {
+    const result = contactFormSchema.safeParse({
+      name: "Juan",
+      email: VALID_EMAIL,
+      phone: "+34 600 000 000",
+      message: "Quiero información",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts empty string for phone (optional field submitted blank)", () => {
+    const result = contactFormSchema.safeParse({
+      name: "Juan",
+      email: VALID_EMAIL,
+      phone: "",
+      message: "Quiero información",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts input without phone field (phone is optional)", () => {
+    const result = contactFormSchema.safeParse({
+      name: "Juan",
+      email: VALID_EMAIL,
+      message: "Quiero información",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.phone).toBeUndefined();
+    }
   });
 
   it("accepts maximum length name and message", () => {
@@ -95,6 +128,16 @@ describe("contactFormSchema", () => {
       name: "Juan",
       email: VALID_EMAIL,
       message: "x".repeat(2001),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects phone exceeding 30 characters", () => {
+    const result = contactFormSchema.safeParse({
+      name: "Juan",
+      email: VALID_EMAIL,
+      phone: "+".repeat(31),
+      message: "Quiero información",
     });
     expect(result.success).toBe(false);
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { cn } from "@/shared/utils/cn";
 import { LeadStatusBadge } from "./lead-status-badge";
 import { LeadNotesSection } from "./lead-notes-section";
@@ -74,6 +75,10 @@ export function LeadDetail({
     reassignAgentId,
     setReassignAgentId,
   } = useLeadDetail(lead, initialNotes, initialHistory);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("lead:read"));
+  }, []);
 
   // ── Source display ─────────────────────────────────────────────────────
 
@@ -160,33 +165,53 @@ export function LeadDetail({
         aria-label="Cambiar estado"
         className="rounded-card border border-border-default bg-bg-surface p-6"
       >
-        <div className="flex items-center gap-4">
-          <label
-            htmlFor="lead-status-change"
-            className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle"
-          >
-            Cambiar estado
-          </label>
+        <h2 className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle">
+          Estado
+        </h2>
 
-          <select
-            id="lead-status-change"
-            value=""
-            onChange={(e) => handleStatusChange(e.target.value)}
-            disabled={validTransitions.length === 0 || isPending}
-            className={cn(CONTROL_CLASS, "disabled:cursor-not-allowed disabled:opacity-50")}
-            aria-label="Cambiar estado del lead"
-          >
-            <option value="" disabled>
-              {validTransitions.length === 0
-                ? "Estado terminal"
-                : "Seleccionar…"}
-            </option>
-            {validTransitions.map((status) => (
-              <option key={status} value={status}>
-                {STATUS_LABELS[status]}
-              </option>
-            ))}
-          </select>
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-sans text-sm text-fg-muted">Actual:</span>
+            <span className="font-sans text-sm font-medium text-fg-default">
+              {STATUS_LABELS[currentStatus] ?? currentStatus}
+            </span>
+          </div>
+
+          {validTransitions.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="lead-status-change"
+                className="font-sans text-sm text-fg-muted"
+              >
+                Cambiar a:
+              </label>
+              <select
+                id="lead-status-change"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) handleStatusChange(e.target.value);
+                }}
+                disabled={isPending}
+                className={cn(CONTROL_CLASS, "disabled:cursor-not-allowed disabled:opacity-50")}
+                aria-label="Cambiar estado del lead"
+              >
+                <option value="" disabled>Seleccionar…</option>
+                {validTransitions.map((status) => (
+                  <option key={status} value={status}>
+                    {STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <span className="rounded-pill bg-bg-subtle px-3 py-1 font-sans text-xs text-fg-muted">
+              Estado terminal — sin más transiciones
+            </span>
+          )}
+
+          {isPending && (
+            <span className="font-sans text-xs text-fg-subtle">Guardando…</span>
+          )}
         </div>
       </section>
 

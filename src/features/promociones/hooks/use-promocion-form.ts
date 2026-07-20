@@ -3,7 +3,7 @@
 import { useReducer, useState, useCallback, useRef } from "react";
 import { useAutosave } from "./use-autosave";
 import { useDraftRestore } from "./use-draft-restore";
-import { usePublishValidation, buildPublishPayload } from "./use-publish-validation";
+import { usePublishValidation } from "./use-publish-validation";
 import type { TipologiaEditorItem } from "../components/tipologia-editor";
 import type {
   IdentitySectionValues,
@@ -40,6 +40,8 @@ export interface PromocionFormData {
   island: string | null;
   municipality: string | null;
   address: string | null;
+  lng: number | null;
+  lat: number | null;
   mapPrivacyMode: string;
   seoTitle: string | null;
   seoDescription: string | null;
@@ -161,7 +163,6 @@ export function usePromocionForm({
   // ── Draft restore hook (T033) ─────────────────────────────────────────
   const {
     hasDraft,
-    applyDraft,
     discardDraft,
   } = useDraftRestore(promocionId, initialData as unknown as Record<string, unknown>, initialDraftPayload);
 
@@ -260,6 +261,10 @@ export function usePromocionForm({
       island: formState.island || null,
       municipality: formState.municipality || null,
       address: formState.address || null,
+      // Include location when both coordinates are set
+      ...(formState.lng !== null && formState.lat !== null
+        ? { location: { lng: formState.lng, lat: formState.lat } }
+        : {}),
       mapPrivacyMode: formState.mapPrivacyMode,
       seoTitle: formState.seoTitle || null,
       seoDescription: formState.seoDescription || null,
@@ -299,6 +304,8 @@ export function usePromocionForm({
       dispatch({ type: "SET_FIELD", field: "island", value: values.island });
       dispatch({ type: "SET_FIELD", field: "municipality", value: values.municipality });
       dispatch({ type: "SET_FIELD", field: "address", value: values.address });
+      dispatch({ type: "SET_FIELD", field: "lng", value: values.lng });
+      dispatch({ type: "SET_FIELD", field: "lat", value: values.lat });
       dispatch({ type: "SET_FIELD", field: "mapPrivacyMode", value: values.mapPrivacyMode });
     },
     [],
@@ -329,34 +336,36 @@ export function usePromocionForm({
   // ── Save as draft ─────────────────────────────────────────────────────
 
   const handleSaveDraft = useCallback(async () => {
-    await sendPatch(buildPayload({ status: currentStatus }));
-  }, [buildPayload, currentStatus, sendPatch]);
+    const success = await sendPatch(buildPayload({ status: currentStatus }));
+    // After saving to the main record, clear any stale autosave draftPayload
+    // so it doesn't override current data on the next page load.
+    if (success && hasDraft) {
+      try {
+        await discardDraft();
+      } catch {
+        // Non-critical: if clearing draft fails, it will be overwritten on next autosave
+      }
+    }
+  }, [buildPayload, currentStatus, discardDraft, hasDraft, sendPatch]);
 
   // ── Publish ───────────────────────────────────────────────────────────
 
   const handlePublish = useCallback(async () => {
-    // If there is a draft, apply it over the current form data
-    const mergedData = hasDraft
-      ? ({ ...formState, ...applyDraft() } as PromocionFormData)
-      : formState;
-
-    const { payload, sectionErrors, message } = validatePublish({
+    // validatePublish builds the payload from the current formState, which
+    // already has the draft applied on initial render. Do NOT re-merge the
+    // initialDraftPayload here — that would override current edits with stale data.
+    const { payload, sectionErrors: newErrors, message } = validatePublish({
       status: "PUBLISHED",
     });
 
     if (!payload) {
-      setSectionErrors(sectionErrors);
+      setSectionErrors(newErrors);
       setSubmitState({ status: "error", message: message ?? "Error al publicar" });
       return;
     }
 
-    // Override with merged draft data if applicable
-    const finalPayload = hasDraft
-      ? buildPublishPayload(mergedData, { status: "PUBLISHED" })
-      : payload;
-
-    await sendPatch(finalPayload);
-  }, [formState, hasDraft, applyDraft, sendPatch, validatePublish]);
+    await sendPatch(payload);
+  }, [sendPatch, validatePublish]);
 
   // ── Discard draft ─────────────────────────────────────────────────────
 
