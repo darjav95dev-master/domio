@@ -35,11 +35,29 @@ export const authConfig: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Contraseña", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
 
         if (!email || !password) {
+          return null;
+        }
+
+        // ── Login brute-force protection (per-IP, Redis-backed) ──────────────
+        // Only FAILED attempts consume a token, so legitimate logins — including
+        // switching between accounts from the same IP — are never rate-limited.
+        const { extractIpFromHeaders } = await import("@/shared/utils/extract-ip");
+        const { checkIpRateLimit, isIpLockedOut } = await import(
+          "@/infrastructure/rate-limiting/ip-rate-limit"
+        );
+        const reqHeaders =
+          req?.headers instanceof Headers
+            ? req.headers
+            : new Headers((req?.headers ?? {}) as Record<string, string>);
+        const ip = extractIpFromHeaders(reqHeaders);
+
+        // A locked-out IP is rejected before any DB query or bcrypt work.
+        if (await isIpLockedOut(ip, "login")) {
           return null;
         }
 
@@ -71,11 +89,19 @@ export const authConfig: NextAuthOptions = {
         );
 
         if (!user || !user.passwordHash || !user.isActive) {
+          await checkIpRateLimit(ip, "login"); // count failed attempt
           return null;
         }
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) {
+          await checkIpRateLimit(ip, "login"); // count failed attempt
+          return null;
+        }
+
+        // Valid credentials: enforce the successful-login abuse ceiling per IP.
+        const successCheck = await checkIpRateLimit(ip, "login_success");
+        if (!successCheck.allowed) {
           return null;
         }
 

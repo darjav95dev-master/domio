@@ -36,6 +36,28 @@ vi.mock("@/infrastructure/tenant/AuthenticatedContext", () => ({
   AuthenticatedContext: MockAuthenticatedContext,
 }));
 
+// Mocks for the authorize() flow: rate limiter, tenant DB context, bcrypt.
+const mockIsIpLockedOut = vi.fn();
+const mockCheckIpRateLimit = vi.fn();
+vi.mock("@/infrastructure/rate-limiting/ip-rate-limit", () => ({
+  isIpLockedOut: mockIsIpLockedOut,
+  checkIpRateLimit: mockCheckIpRateLimit,
+}));
+
+const mockPublicWithTransaction = vi.fn();
+vi.mock("@/infrastructure/tenant/PublicContext", () => ({
+  PublicContext: vi.fn().mockImplementation(() => ({
+    getTenantId: () => "tenant-1",
+    withTransaction: mockPublicWithTransaction,
+  })),
+}));
+
+const mockBcryptCompare = vi.fn();
+vi.mock("bcryptjs", () => ({
+  default: { compare: (...args: unknown[]) => mockBcryptCompare(...args) },
+  compare: (...args: unknown[]) => mockBcryptCompare(...args),
+}));
+
 describe("auth.config module", () => {
   it("should export handlers, signIn, signOut, and auth", async () => {
     const mod = await import("../auth.config");
@@ -114,5 +136,80 @@ describe("jwt callback — periodic isActive re-verification", () => {
 
     expect(result).not.toBeNull();
     expect(mockWithTransaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("authorize callback — login rate limiting", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type Authorize = (credentials: any, req?: any) => Promise<any>;
+
+  const ALLOWED = { allowed: true, remaining: 1, limit: 5, resetAt: new Date(), lockedOut: false };
+  const DENIED = { allowed: false, remaining: 0, limit: 30, resetAt: new Date(), lockedOut: false };
+  const CREDS = { email: "admin@domio.dev", password: "secret" };
+  const REQ = { headers: { "x-forwarded-for": "203.0.113.9" } };
+  const activeUser = {
+    id: "user-1",
+    email: "admin@domio.dev",
+    name: "Admin",
+    tenantId: "tenant-1",
+    role: "ADMIN",
+    passwordHash: "$2a$hash",
+    isActive: true,
+  };
+
+  async function getAuthorize(): Promise<Authorize> {
+    const { authConfig } = await import("../auth.config");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (authConfig.providers[0] as any).authorize as Authorize;
+  }
+
+  beforeEach(() => {
+    mockIsIpLockedOut.mockReset().mockResolvedValue(false);
+    mockCheckIpRateLimit.mockReset().mockResolvedValue(ALLOWED);
+    mockPublicWithTransaction.mockReset().mockResolvedValue([activeUser]);
+    mockBcryptCompare.mockReset().mockResolvedValue(true);
+  });
+
+  it("rejects a locked-out IP before any DB/bcrypt work (no token consumed)", async () => {
+    mockIsIpLockedOut.mockResolvedValue(true);
+    const authorize = await getAuthorize();
+
+    const result = await authorize(CREDS, REQ);
+
+    expect(result).toBeNull();
+    expect(mockPublicWithTransaction).not.toHaveBeenCalled();
+    expect(mockBcryptCompare).not.toHaveBeenCalled();
+    expect(mockCheckIpRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("counts a FAILED login (wrong password) against the 'login' scope", async () => {
+    mockBcryptCompare.mockResolvedValue(false);
+    const authorize = await getAuthorize();
+
+    const result = await authorize(CREDS, REQ);
+
+    expect(result).toBeNull();
+    expect(mockCheckIpRateLimit).toHaveBeenCalledWith(expect.any(String), "login");
+    expect(mockCheckIpRateLimit).not.toHaveBeenCalledWith(expect.any(String), "login_success");
+  });
+
+  it("counts a SUCCESSFUL login against 'login_success' and never against 'login'", async () => {
+    const authorize = await getAuthorize();
+
+    const result = await authorize(CREDS, REQ);
+
+    expect(result).not.toBeNull();
+    expect(result.id).toBe("user-1");
+    expect(mockCheckIpRateLimit).toHaveBeenCalledWith(expect.any(String), "login_success");
+    expect(mockCheckIpRateLimit).not.toHaveBeenCalledWith(expect.any(String), "login");
+  });
+
+  it("cuts off a valid login once over the successful-login ceiling", async () => {
+    mockCheckIpRateLimit.mockResolvedValue(DENIED); // login_success over cap
+    const authorize = await getAuthorize();
+
+    const result = await authorize(CREDS, REQ);
+
+    expect(result).toBeNull(); // correct password, but abuse ceiling reached
   });
 });
