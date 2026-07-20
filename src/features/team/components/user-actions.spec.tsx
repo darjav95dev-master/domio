@@ -57,6 +57,17 @@ describe("UserActions", () => {
     expect(screen.getByRole("button", { name: /desactivar/i })).toBeInTheDocument();
   });
 
+  it("shows no actions for an ADMIN user (protected account)", () => {
+    render(
+      <UserActions
+        user={{ ...defaultUser, role: "ADMIN" }}
+        onUpdated={mockOnUpdated}
+      />,
+    );
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("opens edit form when clicking edit", () => {
     render(<UserActions user={defaultUser} onUpdated={mockOnUpdated} />);
 

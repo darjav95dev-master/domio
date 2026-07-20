@@ -136,6 +136,16 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
     }
   }
 
+  // ── ADMIN: cuenta protegida, sin acciones (solo se visualiza) ──────────
+
+  if (user.role === "ADMIN") {
+    return (
+      <div className="flex items-center justify-end">
+        <span className="font-sans text-sm text-fg-subtle">—</span>
+      </div>
+    );
+  }
+
   // ── Render: edit form ──────────────────────────────────────────────────
 
   if (editing) {
@@ -375,15 +385,17 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
             <Power size={14} aria-hidden="true" />
             {reactivating ? "Activando..." : "Activar"}
           </button>
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            aria-label={`Eliminar ${user.name ?? user.email}`}
-            className={cn(ACTION_BUTTON_BASE, ACTION_BUTTON_DANGER)}
-          >
-            <Trash size={14} aria-hidden="true" />
-            Eliminar
-          </button>
+          {user.id !== currentUserId && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              aria-label={`Eliminar ${user.name ?? user.email}`}
+              className={cn(ACTION_BUTTON_BASE, ACTION_BUTTON_DANGER)}
+            >
+              <Trash size={14} aria-hidden="true" />
+              Eliminar
+            </button>
+          )}
         </>
       )}
     </div>
