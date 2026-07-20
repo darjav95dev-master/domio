@@ -154,11 +154,16 @@ describe("useAutosave", () => {
     expect(secondCallBody.name).toBe("Updated Name");
   });
 
-  it("should update lastSavedAt on successful save", async () => {
-    const savedAt = new Date("2026-07-08T12:00:00Z").toISOString();
+  it("should set lastSavedAt to the client save time on successful save", async () => {
+    // The draft save intentionally does NOT bump promociones.updatedAt, so the
+    // hook must use the real client save time, not the (stale) server value.
+    const before = Date.now();
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
-      json: async () => ({ draftPayload: formState, updatedAt: savedAt }),
+      json: async () => ({
+        draftPayload: formState,
+        updatedAt: new Date("2020-01-01T00:00:00Z").toISOString(),
+      }),
     });
 
     const { result } = renderHook(() =>
@@ -167,7 +172,8 @@ describe("useAutosave", () => {
 
     await tick(1000);
 
-    expect(result.current.lastSavedAt).toBe(savedAt);
+    expect(result.current.lastSavedAt).not.toBeNull();
+    expect(new Date(result.current.lastSavedAt!).getTime()).toBeGreaterThanOrEqual(before);
   });
 
   it("should set error on failed fetch", async () => {

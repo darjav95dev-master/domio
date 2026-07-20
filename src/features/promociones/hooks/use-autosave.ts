@@ -69,9 +69,11 @@ export function useAutosave(
         return;
       }
 
-      const data = (await response.json()) as { updatedAt: string };
+      // El guardado de borrador NO toca promociones.updatedAt (solo draftPayload),
+      // así que el updatedAt de la respuesta es el de la última edición completa
+      // y puede ser de hace días. Usamos la hora real del guardado en cliente.
       lastSavedSnapshotRef.current = currentSnapshot;
-      setLastSavedAt(data.updatedAt);
+      setLastSavedAt(new Date().toISOString());
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al guardar el borrador",
