@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkIpRateLimit } from "./ip-rate-limit";
+import { checkIpRateLimit, isIpLockedOut } from "./ip-rate-limit";
 import { logger } from "@/shared/utils/logger";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -209,6 +209,35 @@ describe("checkIpRateLimit", () => {
       expect(result.allowed).toBe(false);
       expect(result.lockedOut).toBe(true);
       expect(result.resetAt.getTime()).toBeGreaterThan(Date.now());
+    });
+  });
+
+  describe("isIpLockedOut (read-only, no consume)", () => {
+    it("returns true when the lockout key exists and never consumes a token", async () => {
+      mockRedis.exists.mockReset().mockResolvedValue(1);
+
+      const locked = await isIpLockedOut(TEST_IP, "login");
+
+      expect(locked).toBe(true);
+      // Read-only: must not touch the counter.
+      expect(mockRedis.incr).not.toHaveBeenCalled();
+    });
+
+    it("returns false when there is no lockout key", async () => {
+      mockRedis.exists.mockReset().mockResolvedValue(0);
+
+      expect(await isIpLockedOut(TEST_IP, "login")).toBe(false);
+      expect(mockRedis.incr).not.toHaveBeenCalled();
+    });
+
+    it("degrades to false (allow) when Redis throws", async () => {
+      mockRedis.exists.mockReset().mockRejectedValue(new Error("Connection refused"));
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      expect(await isIpLockedOut(TEST_IP, "login")).toBe(false);
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     });
   });
 });

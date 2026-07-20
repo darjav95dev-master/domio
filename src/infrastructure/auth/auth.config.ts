@@ -35,11 +35,29 @@ export const authConfig: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Contraseña", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
 
         if (!email || !password) {
+          return null;
+        }
+
+        // ── Login brute-force protection (per-IP, Redis-backed) ──────────────
+        // Only FAILED attempts consume a token, so legitimate logins — including
+        // switching between accounts from the same IP — are never rate-limited.
+        const { extractIpFromHeaders } = await import("@/shared/utils/extract-ip");
+        const { checkIpRateLimit, isIpLockedOut } = await import(
+          "@/infrastructure/rate-limiting/ip-rate-limit"
+        );
+        const reqHeaders =
+          req?.headers instanceof Headers
+            ? req.headers
+            : new Headers((req?.headers ?? {}) as Record<string, string>);
+        const ip = extractIpFromHeaders(reqHeaders);
+
+        // A locked-out IP is rejected before any DB query or bcrypt work.
+        if (await isIpLockedOut(ip, "login")) {
           return null;
         }
 
@@ -71,11 +89,19 @@ export const authConfig: NextAuthOptions = {
         );
 
         if (!user || !user.passwordHash || !user.isActive) {
+          await checkIpRateLimit(ip, "login"); // count failed attempt
           return null;
         }
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) {
+          await checkIpRateLimit(ip, "login"); // count failed attempt
+          return null;
+        }
+
+        // Valid credentials: enforce the successful-login abuse ceiling per IP.
+        const successCheck = await checkIpRateLimit(ip, "login_success");
+        if (!successCheck.allowed) {
           return null;
         }
 
@@ -106,18 +132,31 @@ export const authConfig: NextAuthOptions = {
         // Record the time of last isActive verification (initial login counts as verified)
         token.lastVerifiedAt = Date.now();
       } else if (token.user_id) {
-        // ponytail: check isActive at most every 5 min to catch deactivated users
-        const VERIFY_INTERVAL_MS = 5 * 60 * 1_000;
+        // ponytail: re-check isActive periodically to catch deactivated users.
+        // 30 min keeps it cheap; this does NOT re-authenticate active users.
+        const VERIFY_INTERVAL_MS = 30 * 60 * 1_000;
         const lastVerifiedAt = (token.lastVerifiedAt as number | undefined) ?? 0;
         if (Date.now() - lastVerifiedAt > VERIFY_INTERVAL_MS) {
           const { eq } = await import("drizzle-orm");
-          const { db } = await import("@/infrastructure/db/client");
           const { users } = await import("@/infrastructure/db/schema");
-          const [dbUser] = await db
-            .select({ isActive: users.isActive })
-            .from(users)
-            .where(eq(users.id, token.user_id as string))
-            .limit(1);
+          const { AuthenticatedContext } = await import(
+            "@/infrastructure/tenant/AuthenticatedContext"
+          );
+          // Must run inside a tenant transaction: the `users` RLS policy reads
+          // app.current_tenant_id via current_setting(), which THROWS if unset
+          // (production restricted role). Querying `db` bare broke the session.
+          const ctx = new AuthenticatedContext(
+            token.tenant_id as string,
+            token.user_id as string,
+            token.role as import("@/shared/constants/db-enums").UserRole,
+          );
+          const [dbUser] = await ctx.withTransaction((tx) =>
+            tx
+              .select({ isActive: users.isActive })
+              .from(users)
+              .where(eq(users.id, token.user_id as string))
+              .limit(1),
+          );
           if (!dbUser?.isActive) {
             // ponytail: NextAuth v4 types don't declare null but runtime supports it to destroy the session
             return null as unknown as import("next-auth/jwt").JWT;

@@ -24,8 +24,16 @@ export const PUBLIC_API_IP_MAX_PER_MIN = 120;
 
 /**
  * Maximum number of failed login attempts per IP within the login window.
+ * On exceed, the IP is locked out (brute-force protection).
  */
 export const LOGIN_MAX_ATTEMPTS = 5;
+
+/**
+ * Maximum number of SUCCESSFUL logins per IP within the login window.
+ * Abuse ceiling: legitimate use (including switching between accounts) stays
+ * well under it; only real hammering of the endpoint gets cut off.
+ */
+export const LOGIN_SUCCESS_MAX_ATTEMPTS = 30;
 
 /**
  * Duration (minutes) of the sliding window for login attempts.

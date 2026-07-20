@@ -4,6 +4,7 @@ import { getRedisClient } from "./redis-client";
 import { logger } from "@/shared/utils/logger";
 import {
   LOGIN_MAX_ATTEMPTS,
+  LOGIN_SUCCESS_MAX_ATTEMPTS,
   LOGIN_WINDOW_MINUTES,
   CONTACT_MAX_ATTEMPTS,
   CONTACT_WINDOW_MINUTES,
@@ -12,7 +13,9 @@ import {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type RateLimitScope = "login" | "contact";
+// "login" counts FAILED attempts (brute-force lockout); "login_success" counts
+// SUCCESSFUL logins (abuse ceiling); "contact" counts form submissions.
+export type RateLimitScope = "login" | "login_success" | "contact";
 
 export interface IpRateLimitResult {
   readonly allowed: boolean;
@@ -26,6 +29,10 @@ export interface IpRateLimitResult {
 
 const SCOPE_CONFIGS: Record<RateLimitScope, { limit: number; windowMs: number }> = {
   login: { limit: LOGIN_MAX_ATTEMPTS, windowMs: LOGIN_WINDOW_MINUTES * 60 * 1_000 },
+  login_success: {
+    limit: LOGIN_SUCCESS_MAX_ATTEMPTS,
+    windowMs: LOGIN_WINDOW_MINUTES * 60 * 1_000,
+  },
   contact: { limit: CONTACT_MAX_ATTEMPTS, windowMs: CONTACT_WINDOW_MINUTES * 60 * 1_000 },
 };
 
@@ -42,6 +49,32 @@ function buildLockoutKey(ip: string, scope: RateLimitScope): string {
 }
 
 // ─── Main API ────────────────────────────────────────────────────────────────
+
+/**
+ * Read-only lockout check for an IP + scope. Unlike {@link checkIpRateLimit} it
+ * does NOT consume a token, so it can gate every attempt (e.g. each login) while
+ * leaving the counter untouched for successful ones. Only failed attempts should
+ * call {@link checkIpRateLimit} to consume.
+ *
+ * Degrades to `false` (allow) if Redis is unavailable or errors.
+ */
+export async function isIpLockedOut(
+  ip: string,
+  scope: RateLimitScope,
+): Promise<boolean> {
+  const redis = getRedisClient();
+  if (!redis) return false;
+
+  try {
+    return (await redis.exists(buildLockoutKey(ip, scope))) === 1;
+  } catch (error) {
+    logger.warn(
+      `Degraded lockout check for "${ip}" scope "${scope}":`,
+      error instanceof Error ? error.message : String(error),
+    );
+    return false;
+  }
+}
 
 /**
  * Checks rate limit for a given IP and scope (login or contact).
