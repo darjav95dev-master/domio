@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { PencilSimple, Warning, X, Trash, Power } from "@phosphor-icons/react";
+import { PencilSimple, X, Trash, Power } from "@phosphor-icons/react";
 import {
   updateUserAction,
   deactivateUserAction,
@@ -12,7 +12,6 @@ import { Button } from "@/shared/components/button";
 import { Input } from "@/shared/components/input";
 import { USER_ROLES, type UserRole } from "@/shared/constants/db-enums";
 import { USER_ROLE_LABELS } from "@/shared/constants/domain-labels";
-import { ICON_SIZES } from "@/shared/constants/iconography";
 import { cn } from "@/shared/utils/cn";
 import type { UserResponse } from "@/shared/types/user-schema";
 
@@ -226,61 +225,52 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
         role="dialog"
         aria-modal="true"
         aria-label="Confirmar desactivación"
-        className="rounded-surface border border-border-default bg-bg-surface p-4 text-left"
+        className="rounded-surface border border-border-default bg-bg-surface p-6 text-center"
       >
-        <div className="flex items-start gap-3">
-          <Warning
-            size={ICON_SIZES.inline}
-            className="mt-0.5 shrink-0 text-status-warning-default"
-            aria-hidden="true"
-          />
-          <div className="flex-1">
-            <p className="font-sans text-sm font-medium text-fg-default">
-              ¿Desactivar a {user.name ?? user.email}?
-            </p>
-            <p className="mt-1 font-sans text-sm text-fg-subtle">
-              El usuario no podrá acceder al panel. Sus asignaciones históricas
-              se mantendrán.
-            </p>
+        <p className="font-sans text-base font-semibold text-fg-default">
+          ¿Desactivar a {user.name ?? user.email}?
+        </p>
+        <p className="mx-auto mt-2 max-w-md font-sans text-sm leading-relaxed text-fg-subtle">
+          El usuario no podrá acceder al panel. Sus asignaciones históricas
+          se mantendrán.
+        </p>
 
-            {user.id === currentUserId && (
-              <p
-                role="alert"
-                className="mt-3 rounded-md border border-status-warning-default/40 bg-status-warning-subtle px-3 py-2 font-sans text-sm text-status-warning-default"
-              >
-                Te has desactivado a ti mismo. Si eras el último ADMIN, el
-                tenant queda sin acceso.
-              </p>
-            )}
+        {user.id === currentUserId && (
+          <p
+            role="alert"
+            className="mx-auto mt-4 max-w-md rounded-md border border-status-warning-default/40 bg-status-warning-subtle px-3 py-2 font-sans text-sm text-status-warning-default"
+          >
+            Te has desactivado a ti mismo. Si eras el último ADMIN, el
+            tenant queda sin acceso.
+          </p>
+        )}
 
-            {error && (
-              <p
-                role="alert"
-                aria-live="polite"
-                className="mt-2 font-sans text-sm text-status-danger-default"
-              >
-                {error}
-              </p>
-            )}
-            <div className="mt-3 flex gap-2">
-              <Button
-                variant="primary"
-                onClick={handleDeactivate}
-                disabled={deactivating}
-                className="text-sm"
-              >
-                {deactivating ? "Desactivando..." : "Sí, desactivar"}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setConfirmDeactivate(false)}
-                disabled={deactivating}
-                className="text-sm"
-              >
-                Cancelar
-              </Button>
-            </div>
-          </div>
+        {error && (
+          <p
+            role="alert"
+            aria-live="polite"
+            className="mt-3 font-sans text-sm text-status-danger-default"
+          >
+            {error}
+          </p>
+        )}
+        <div className="mt-5 flex justify-center gap-2">
+          <Button
+            variant="primary"
+            onClick={handleDeactivate}
+            disabled={deactivating}
+            className="text-sm"
+          >
+            {deactivating ? "Desactivando..." : "Sí, desactivar"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmDeactivate(false)}
+            disabled={deactivating}
+            className="text-sm"
+          >
+            Cancelar
+          </Button>
         </div>
       </div>
     );
@@ -294,56 +284,47 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
         role="dialog"
         aria-modal="true"
         aria-label="Confirmar eliminación"
-        className="rounded-surface border border-status-danger-default/40 bg-bg-surface p-4 text-left"
+        className="rounded-surface border border-status-danger-default/40 bg-bg-surface p-6 text-center"
       >
-        <div className="flex items-start gap-3">
-          <Warning
-            size={ICON_SIZES.inline}
-            className="mt-0.5 shrink-0 text-status-danger-default"
-            aria-hidden="true"
-          />
-          <div className="flex-1">
-            <p className="font-sans text-sm font-medium text-fg-default">
-              ¿Eliminar a {user.name ?? user.email}?
-            </p>
-            <p className="mt-1 font-sans text-sm text-fg-subtle">
-              Esta acción es <strong className="text-fg-default">definitiva</strong>.
-              El usuario se borrará del tenant y ya no podrá iniciar sesión.
-              Las asignaciones de leads y promociones se liberarán (set null);
-              el historial asociado al usuario se eliminará en cascada.
-            </p>
+        <p className="font-sans text-base font-semibold text-fg-default">
+          ¿Eliminar a {user.name ?? user.email}?
+        </p>
+        <p className="mx-auto mt-2 max-w-md font-sans text-sm leading-relaxed text-fg-subtle">
+          Esta acción es <strong className="text-fg-default">definitiva</strong>.
+          El usuario se borrará del tenant y ya no podrá iniciar sesión.
+          Las asignaciones de leads y promociones se liberarán (set null);
+          el historial asociado al usuario se eliminará en cascada.
+        </p>
 
-            {error && (
-              <p
-                role="alert"
-                aria-live="polite"
-                className="mt-2 rounded-md border border-status-danger-default/40 bg-status-danger-subtle px-3 py-2 font-sans text-sm text-status-danger-default"
-              >
-                {error}
-              </p>
-            )}
-            <div className="mt-3 flex gap-2">
-              <Button
-                variant="primary"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-sm"
-              >
-                {deleting ? "Eliminando..." : "Sí, eliminar"}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setConfirmDelete(false);
-                  setError(null);
-                }}
-                disabled={deleting}
-                className="text-sm"
-              >
-                Cancelar
-              </Button>
-            </div>
-          </div>
+        {error && (
+          <p
+            role="alert"
+            aria-live="polite"
+            className="mx-auto mt-3 max-w-md rounded-md border border-status-danger-default/40 bg-status-danger-subtle px-3 py-2 font-sans text-sm text-status-danger-default"
+          >
+            {error}
+          </p>
+        )}
+        <div className="mt-5 flex justify-center gap-2">
+          <Button
+            variant="primary"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-sm"
+          >
+            {deleting ? "Eliminando..." : "Sí, eliminar"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setConfirmDelete(false);
+              setError(null);
+            }}
+            disabled={deleting}
+            className="text-sm"
+          >
+            Cancelar
+          </Button>
         </div>
       </div>
     );

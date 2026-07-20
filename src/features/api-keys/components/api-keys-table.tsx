@@ -14,10 +14,14 @@ import type { ApiKeyResponse, PaginatedApiKeys } from "@/shared/types/api-key-sc
 // ---------------------------------------------------------------------------
 
 const STATUS_OPTIONS = [
-  { value: "all", label: "Todas" },
   { value: "active", label: "Activas" },
+  { value: "all", label: "Todas" },
   { value: "inactive", label: "Eliminadas" },
 ] as const;
+
+// Default view: only active keys. Revoked (soft-deleted) keys are kept in the DB
+// for audit but hidden here unless explicitly filtered via "Todas"/"Eliminadas".
+const DEFAULT_STATUS_FILTER = "active";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,7 +42,7 @@ export function ApiKeysTable({ onRevokeKey, excludeIds }: ApiKeysTableProps) {
   const [data, setData] = useState<PaginatedApiKeys | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER);
   const mountedRef = useRef(true);
 
   // ── Data fetching ─────────────────────────────────────────────────────
@@ -125,7 +129,7 @@ export function ApiKeysTable({ onRevokeKey, excludeIds }: ApiKeysTableProps) {
             No hay API keys
           </p>
           <p className="mt-1 font-sans text-sm text-fg-subtle">
-            {statusFilter !== "all"
+            {statusFilter === "inactive"
               ? "Prueba a cambiar el filtro"
               : "Crea tu primera API key"}
           </p>

@@ -10,6 +10,33 @@ Domio permite a una empresa de servicios operar sitios web de venta de viviendas
 
 ---
 
+## Enlaces del proyecto
+
+| Recurso | Enlace |
+|---------|--------|
+| 🌐 Proyecto desplegado (en producción) | **[wedomio.com](https://wedomio.com)** |
+| 💻 Repositorio (GitHub) | [github.com/darjav95dev-master/domio](https://github.com/darjav95dev-master/domio) |
+| 📑 Presentación (slides) | _Pendiente_ |
+| 🎥 Vídeo de explicación | _Pendiente_ |
+
+---
+
+## Acceso de prueba (login)
+
+El proyecto tiene un backoffice protegido en **[wedomio.com/panel/login](https://wedomio.com/panel/login)** (o `http://localhost:3000/panel/login` en local) con tres roles:
+
+| Rol | Acceso |
+|-----|--------|
+| `ADMIN` | Acceso completo: promociones, leads, equipo, contenido CMS, API keys y dashboard |
+| `OPERATOR` | Gestión del catálogo (promociones) y de contenidos CMS. No accede a leads, equipo ni API keys |
+| `AGENT` | Catálogo y gestión de los leads que tiene asignados |
+
+> **Las credenciales de acceso se facilitan directamente al tribunal en la entrega del TFM**, no se publican en este repositorio público por seguridad. Con la cuenta de administrador se puede navegar por los tres niveles de permiso.
+
+**Para probarlo en local:** ejecuta `pnpm db:seed`, que crea un usuario de cada rol con datos de ejemplo. Las credenciales del seed están documentadas en `scripts/seed.ts:32-85`.
+
+---
+
 
 
 ## Problema que resuelve
@@ -30,9 +57,8 @@ El mercado inmobiliario español tiene cientos de pequeñas y medianas promotora
 | Administrador (tenant) | Editar contenido CMS de páginas públicas con versionado | `contenidos` |
 | Administrador (tenant) | Gestionar API keys para acceso a la API pública | `api-keys` |
 | Administrador (tenant) | Ver dashboard con KPIs de leads y promociones | `backoffice` |
-| Operador (tenant) | Ver leads, promociones, cambiar estado, añadir notas | `leads`, `promociones` |
+| Operador (tenant) | Gestionar el catálogo de promociones y el contenido CMS (no accede a leads) | `promociones`, `contenidos` |
 | Agente (tenant) | Ver leads asignados, cambiar estado, añadir notas | `leads` |
-| Editor (tenant) | Editar contenido CMS | `contenidos` |
 | Sistema externo | Consultar promociones publicadas via API REST | `api-public` |
 | Sistema externo | Crear leads institucionales via API REST | `api-public` |
 
@@ -41,8 +67,8 @@ El mercado inmobiliario español tiene cientos de pequeñas y medianas promotora
 | Rol | Privilegios |
 |-----|-------------|
 | `ADMIN` | Acceso completo: promociones, leads, equipo, contenido, API keys, dashboard |
-| `OPERATOR` | Gestión de leads + promociones (sin gestión de equipo ni API keys) |
-| `AGENT` | Gestión de leads asignados (cambio de estado, notas) |
+| `OPERATOR` | Gestión del catálogo de promociones y del contenido CMS. Sin acceso a leads, equipo ni API keys |
+| `AGENT` | Catálogo y gestión de los leads asignados (cambio de estado, notas) |
 
 Fuente: `src/shared/constants/db-enums.ts:1` (enumerado `USER_ROLES`), `src/infrastructure/auth/require-admin.ts`, `src/infrastructure/auth/require-auth.ts`.
 
@@ -108,7 +134,7 @@ Fuente: `src/infrastructure/db/schema/media-assets.ts`, `src/infrastructure/medi
 
 ARSOP es un módulo de cumplimiento normativo para gestionar peticiones de exportación o eliminación de datos personales (RGPD). Un administrador puede iniciar una solicitud ARSOP desde el backoffice, que queda registrada en `arsop_requests` vinculada a un lead.
 
-Fuente: `src/features/leads/components/ArsopPanel.tsx`, `src/infrastructure/db/schema/arsop-requests.ts`, `src/shared/constants/db-enums.ts:91-92`.
+Fuente: `src/features/leads/components/arsop-buttons.tsx`, `src/features/leads/actions/arsop.actions.ts`, `src/infrastructure/db/schema/arsop-requests.ts`, `src/shared/constants/db-enums.ts:91-92`.
 
 ## Arquitectura
 
@@ -1193,9 +1219,16 @@ Fuente: `src/shared/config/app-env.ts`.
 | `TURNSTILE_SECRET_KEY` | Recomendada | dev/prod | Secret Key de Turnstile. | La verificación server-side se omite (log: `[Domio] TURNSTILE_SECRET_KEY not configured. CAPTCHA verification skipped.`). |
 | `WORKER_INTERVAL_MS` | No | - | Intervalo de polling del worker de emails (defecto: 30000ms). | Worker usa 30s. |
 
-## Arranque rápido
+## Instalación y ejecución
 
-Levanta el proyecto en local con PostgreSQL sin servicios externos. Ideal para empezar a desarrollar o explorar el código.
+Levanta el proyecto en local con PostgreSQL, sin necesidad de servicios externos. Ideal para desarrollar o explorar el código.
+
+### Requisitos
+
+- Node.js >= 20
+- pnpm 9.x (via corepack: `corepack enable`)
+- PostgreSQL 15+ con PostGIS (recomendado: Docker)
+- Opcional: cuentas en Cloudflare R2, Resend, Upstash, Sentry
 
 ### Variables mínimas
 
@@ -1207,7 +1240,7 @@ AUTH_SECRET=una-cadena-aleatoria-de-32-caracteres-como-minimo
 NEXTAUTH_URL=http://localhost:3000
 ```
 
-Sin estas cuatro variables la aplicación no arranca o falla inmediatamente (`db/client.ts`, `PublicContext`, NextAuth). Sin el resto, el proyecto sigue funcionando con estas limitaciones:
+Sin estas cuatro variables la aplicación no arranca o falla inmediatamente (`db/client.ts`, `PublicContext`, NextAuth). Sin el resto de variables el proyecto sigue funcionando, con estas limitaciones:
 
 - **Emails**: se encolan en `email_queue` pero nunca se envían (no hay `RESEND_API_KEY`).
 - **Imágenes**: se sirven placeholders desde `/public` en lugar de Cloudflare R2 (`APP_ENV=local` por defecto).
@@ -1238,51 +1271,6 @@ pnpm db:migrate
 pnpm db:seed
 
 # Arrancar
-pnpm dev  # http://localhost:3000
-```
-
-El worker de emails es opcional en local:
-
-```bash
-pnpm worker:emails  # Procesa la cola email_queue cada 30s
-```
-
-## Instalación y desarrollo local
-
-### Requisitos
-
-- Node.js >= 20
-- pnpm 9.x (via corepack: `corepack enable`)
-- PostgreSQL 15+ con PostGIS (recomendado: Docker)
-- Opcional: cuentas en Cloudflare R2, Resend, Upstash, Sentry
-
-### Primeros pasos
-
-```bash
-corepack enable
-pnpm install
-cp .env.example .env.local
-# Editar .env.local con las credenciales de desarrollo
-```
-
-### Base de datos local
-
-```bash
-docker run -d \
-  --name domio-postgres \
-  -e POSTGRES_USER=domio \
-  -e POSTGRES_PASSWORD=domio \
-  -e POSTGRES_DB=domio_dev \
-  -p 5432:5432 \
-  postgis/postgis:16-3.4
-
-pnpm db:migrate
-pnpm db:seed  # (opcional) datos de prueba
-```
-
-### Arrancar
-
-```bash
 pnpm dev  # http://localhost:3000
 ```
 
@@ -1567,7 +1555,7 @@ En entornos no productivos se añade `X-Robots-Tag: noindex, nofollow` para evit
 
 **Decisión**: Usar next-auth v4 (packages `next-auth` y `next-auth/jwt`) en lugar de Auth.js v5 (`@auth/*`).
 
-**Evidencia**: `package.json` (`"next-auth": "^4.24.11"`). `src/infrastructure/auth/auth.config.ts:160-165` envuelve `NextAuth` en un wrapper que implementa `NextAuthV5Compat` `GET`/`POST` para compatibilidad con la API de App Router de Next 15. El middleware Edge usa `getToken` de `next-auth/jwt` para verificar el JWT desde Edge Runtime.
+**Evidencia**: `package.json` (`"next-auth": "^4.24.14"`). `src/infrastructure/auth/auth.config.ts:160-165` envuelve `NextAuth` en un wrapper que implementa `NextAuthV5Compat` `GET`/`POST` para compatibilidad con la API de App Router de Next 15. El middleware Edge usa `getToken` de `next-auth/jwt` para verificar el JWT desde Edge Runtime.
 
 **Ventaja**: next-auth v4 tiene soporte maduro para `getToken()` en Edge Runtime, necesario para el middleware de protección de rutas sin necesidad de un endpoint de verificación. La compatibilidad con App Router se logra con un wrapper de 5 líneas.
 
