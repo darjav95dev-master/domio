@@ -140,6 +140,16 @@ export async function deactivateUserAction(
   if (!auth.authorized) return auth.result;
 
   const repo = getUserRepo(auth.ctx);
+
+  // El ADMIN gobierna el tenant: no se puede desactivar (ni a sí mismo ni a otro).
+  const target = await repo.findById(id);
+  if (target?.role === "ADMIN") {
+    return {
+      success: false,
+      error: "No se puede desactivar a un administrador.",
+    };
+  }
+
   const user = await repo.deactivate(id);
 
   const warning = id === auth.ctx.userId ? "Te has desactivado a ti mismo." : undefined;

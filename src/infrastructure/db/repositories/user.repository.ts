@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { eq, and, count, desc } from "drizzle-orm";
+import { eq, and, count, desc, sql } from "drizzle-orm";
 import { users, emailQueue } from "@/infrastructure/db/schema";
 import { TenantAwareRepository } from "@/infrastructure/db/repositories/TenantAwareRepository";
 import { AuthenticatedContext } from "@/infrastructure/tenant/AuthenticatedContext";
@@ -71,7 +71,11 @@ export class UserRepository extends TenantAwareRepository {
         })
         .from(users)
         .where(whereClause)
-        .orderBy(desc(users.createdAt));
+        // ADMIN siempre primero; dentro de cada grupo, los más recientes arriba.
+        .orderBy(
+          sql`CASE WHEN ${users.role} = 'ADMIN' THEN 0 ELSE 1 END`,
+          desc(users.createdAt),
+        );
 
       const totalResult = await tx
         .select({ count: count() })

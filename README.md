@@ -16,8 +16,8 @@ Domio permite a una empresa de servicios operar sitios web de venta de viviendas
 |---------|--------|
 | 🌐 Proyecto desplegado (en producción) | **[wedomio.com](https://wedomio.com)** |
 | 💻 Repositorio (GitHub) | [github.com/darjav95dev-master/domio](https://github.com/darjav95dev-master/domio) |
-| 📑 Presentación (slides) | _Pendiente_ |
-| 🎥 Vídeo de explicación | _Pendiente_ |
+| 📑 Presentación (slides) | https://docs.google.com/presentation/d/161-SriRm_Q9bk4H_47LmwZnQ9LL9UJGB/edit?usp=drive_link&ouid=109372805520955640642&rtpof=true&sd=true|
+| 🎥 Vídeo de explicación | https://www.youtube.com/watch?v=k4zvX-QZapM |
 
 ---
 
