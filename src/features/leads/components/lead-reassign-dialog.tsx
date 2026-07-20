@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { cn } from "@/shared/utils/cn";
 import { Button } from "@/shared/components/button";
+import { getUsersAction } from "@/features/team/actions/team.actions";
 import type { UserRole } from "@/shared/constants/db-enums";
 
 // ---------------------------------------------------------------------------
@@ -19,6 +21,11 @@ const INPUT_BASE = [
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+interface AgentOption {
+  id: string;
+  label: string;
+}
 
 interface LeadReassignDialogProps {
   currentUserRole: UserRole;
@@ -43,7 +50,35 @@ export function LeadReassignDialog({
   setShowReassign,
   setReassignAgentId,
 }: LeadReassignDialogProps) {
+  const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+
+  // Load active agents when the reassign form is opened.
+  useEffect(() => {
+    if (!showReassign) return;
+
+    let alive = true;
+    setLoadingAgents(true);
+    getUsersAction({ role: "AGENT", isActive: true }).then((result) => {
+      if (!alive) return;
+      if (result.success) {
+        setAgents(
+          result.data.items.map((u) => ({ id: u.id, label: u.name ?? u.email })),
+        );
+      }
+      setLoadingAgents(false);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [showReassign]);
+
   if (currentUserRole !== "ADMIN") return null;
+
+  let placeholderLabel = "Selecciona un agente";
+  if (loadingAgents) placeholderLabel = "Cargando agentes…";
+  else if (agents.length === 0) placeholderLabel = "No hay agentes activos";
 
   return (
     <section
@@ -67,20 +102,26 @@ export function LeadReassignDialog({
               htmlFor="reassign-agent"
               className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-subtle"
             >
-              Nuevo agente (ID)
+              Nuevo agente
             </label>
-            <input
+            <select
               id="reassign-agent"
               name="agentId"
-              type="text"
               value={reassignAgentId}
               onChange={(e) => setReassignAgentId(e.target.value)}
-              placeholder="ID del agente…"
+              disabled={loadingAgents || agents.length === 0}
               className={cn(
                 INPUT_BASE.join(" "),
-                "mt-1 w-full bg-bg-canvas placeholder:text-fg-subtle",
+                "mt-1 w-full bg-bg-canvas disabled:opacity-60",
               )}
-            />
+            >
+              <option value="">{placeholderLabel}</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <Button

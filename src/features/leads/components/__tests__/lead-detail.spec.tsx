@@ -13,6 +13,12 @@ vi.mock("@/features/leads/actions/leads.actions", () => ({
   getLeadDetailAction: vi.fn(),
 }));
 
+// Mock the active-agents lookup used by the reassign dropdown
+const mockGetUsers = vi.fn();
+vi.mock("@/features/team/actions/team.actions", () => ({
+  getUsersAction: (...args: unknown[]) => mockGetUsers(...args),
+}));
+
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
@@ -80,6 +86,16 @@ function makeHistoryEntry(
 describe("LeadDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetUsers.mockResolvedValue({
+      success: true,
+      data: {
+        items: [
+          { id: "agent-1", name: "Ana García", email: "ana@domio.dev", role: "AGENT", isActive: true },
+          { id: "agent-2", name: "Carlos Pérez", email: "carlos@domio.dev", role: "AGENT", isActive: true },
+        ],
+        total: 2,
+      },
+    });
   });
 
   it("renders lead contact information", () => {
@@ -259,9 +275,10 @@ describe("LeadDetail", () => {
     const reassignBtn = screen.getByRole("button", { name: /reasignar/i });
     await user.click(reassignBtn);
 
-    // Should show agent ID input
-    const agentInput = screen.getByLabelText(/nuevo agente/i);
-    await user.type(agentInput, "agent-2");
+    // Should show a dropdown of active agents (loaded async) — pick one
+    const agentSelect = screen.getByLabelText(/nuevo agente/i);
+    await screen.findByRole("option", { name: "Carlos Pérez" });
+    await user.selectOptions(agentSelect, "agent-2");
 
     const confirmBtn = screen.getByRole("button", { name: /confirmar/i });
     await user.click(confirmBtn);
