@@ -16,7 +16,7 @@ import type { ApiKeyResponse, PaginatedApiKeys } from "@/shared/types/api-key-sc
 const STATUS_OPTIONS = [
   { value: "all", label: "Todas" },
   { value: "active", label: "Activas" },
-  { value: "inactive", label: "Revocadas" },
+  { value: "inactive", label: "Eliminadas" },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -85,17 +85,17 @@ export function ApiKeysTable({ onRevokeKey, excludeIds }: ApiKeysTableProps) {
   function renderStatusBadge(isActive: boolean) {
     if (isActive) {
       return (
-        <span className="inline-flex items-center gap-1.5 font-sans text-sm text-status-success-default">
-          <span className="h-2 w-2 rounded-full bg-status-success-default" aria-hidden="true" />
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-status-success-default/30 bg-status-success-subtle px-2.5 py-0.5 font-sans text-xs font-medium text-status-success-default">
+          <span className="h-1.5 w-1.5 rounded-full bg-status-success-default" aria-hidden="true" />
           Activa
         </span>
       );
     }
 
     return (
-      <span className="inline-flex items-center gap-1.5 font-sans text-sm text-status-danger-default">
-        <span className="h-2 w-2 rounded-full bg-status-danger-default" aria-hidden="true" />
-        Revocada
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-status-danger-default/30 bg-status-danger-subtle px-2.5 py-0.5 font-sans text-xs font-medium text-status-danger-default">
+        <span className="h-1.5 w-1.5 rounded-full bg-status-danger-default" aria-hidden="true" />
+        Eliminada
       </span>
     );
   }

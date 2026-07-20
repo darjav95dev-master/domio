@@ -98,7 +98,7 @@ describe("ApiKeysTable", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByText("Activa")).toHaveLength(2);
-    expect(within(table).getByText("Revocada")).toBeInTheDocument();
+    expect(within(table).getByText("Eliminada")).toBeInTheDocument();
   });
 
   it("does not show a key prefix column", async () => {

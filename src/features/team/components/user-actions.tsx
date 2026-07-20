@@ -143,7 +143,7 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
     return (
       <div
         aria-label="Editar usuario"
-        className="rounded-surface border border-border-default bg-bg-surface p-4"
+        className="rounded-surface border border-border-default bg-bg-surface p-4 text-left"
       >
         <form onSubmit={handleEditSubmit}>
           <div className="flex flex-col gap-3">
@@ -226,7 +226,7 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
         role="dialog"
         aria-modal="true"
         aria-label="Confirmar desactivación"
-        className="rounded-surface border border-border-default bg-bg-surface p-4"
+        className="rounded-surface border border-border-default bg-bg-surface p-4 text-left"
       >
         <div className="flex items-start gap-3">
           <Warning
@@ -294,7 +294,7 @@ export function UserActions({ user, onUpdated, currentUserId }: UserActionsProps
         role="dialog"
         aria-modal="true"
         aria-label="Confirmar eliminación"
-        className="rounded-surface border border-status-danger-default/40 bg-bg-surface p-4"
+        className="rounded-surface border border-status-danger-default/40 bg-bg-surface p-4 text-left"
       >
         <div className="flex items-start gap-3">
           <Warning
